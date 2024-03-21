@@ -2,57 +2,38 @@
 <html>
 <head>
     <title>Dashboard</title>
-    <!-- Include necessary libraries -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 </head>
 <body>
-    <h1>Dashboard</h1>
-    <label for="variable_select">Variable:</label>
-    <select id="variable_select">
-        <!-- Dropdown options will be populated dynamically -->
-    </select>
-    <canvas id="myChart"></canvas>
+    <form action="{% url 'myapp:index' %}" method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <input type="file" name="excel_file" required>
+        <input type="submit" value="Upload">
+    </form>
 
-    <script>
-        // Example chart data (replace with actual data)
-        var data = [12, 19, 3, 5, 2, 3];
-        var labels = ['Red', 'Blue', 'Yellow', 'Green', 'Purple', 'Orange'];
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <label for="variable_select">Select Variable:</label>
+        <select id="variable_select" name="variable_select">
+            {% for variable in dropdown_options %}
+                <option value="{{ variable }}">{{ variable }}</option>
+            {% endfor %}
+        </select>
+        <input type="submit" value="Plot">
+    </form>
 
-        var ctx = document.getElementById('myChart').getContext('2d');
-        var myChart = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: '# of Votes',
-                    data: data,
-                    backgroundColor: [
-                        'rgba(255, 99, 132, 0.2)',
-                        'rgba(54, 162, 235, 0.2)',
-                        'rgba(255, 206, 86, 0.2)',
-                        'rgba(75, 192, 192, 0.2)',
-                        'rgba(153, 102, 255, 0.2)',
-                        'rgba(255, 159, 64, 0.2)'
-                    ],
-                    borderColor: [
-                        'rgba(255, 99, 132, 1)',
-                        'rgba(54, 162, 235, 1)',
-                        'rgba(255, 206, 86, 1)',
-                        'rgba(75, 192, 192, 1)',
-                        'rgba(153, 102, 255, 1)',
-                        'rgba(255, 159, 64, 1)'
-                    ],
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                scales: {
-                    y: {
-                        beginAtZero: true
-                    }
-                }
-            }
-        });
-    </script>
+    <!-- Display the plot image -->
+    {% if plot_image %}
+        <img src="data:image/png;base64,{{ plot_image }}" alt="Plot">
+    {% endif %}
+
+    <hr>
+
+    {% for row in excel_data %}
+        {% for cell in row %}
+            {{ cell }}&nbsp;&nbsp;
+        {% endfor %}
+        <br>
+    {% endfor %}
 </body>
 </html>
