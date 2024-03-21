@@ -115,3 +115,39 @@ def chart(request):
         labels = [str(2020 + i) for i in range(10)]
 
         return JsonResponse({'labels': labels, 'data': data})
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+from django.shortcuts import render
+from django.http import HttpResponseRedirect
+from openpyxl import load_workbook
+
+def upload_file(request):
+    if request.method == 'POST' and request.FILES['excel_file']:
+        excel_file = request.FILES['excel_file']
+        wb = load_workbook(excel_file)
+        ws = wb.active
+        data = [[cell.value for cell in row] for row in ws.iter_rows(values_only=True)]
+        # Store data in session or database for use in dashboard
+        request.session['data'] = data
+        return HttpResponseRedirect('/dashboard/')
+    return render(request, 'chart.html')
+
+def dashboard(request):
+    data = request.session.get('data', [])
+    # You can process the data and pass it to the template for rendering
+    return render(request, 'dashboard.html', {'data': data})

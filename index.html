@@ -1,134 +1,58 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Upload Data</title>
-</head>
-<body>
-    <h2>Upload Data</h2>
-    <form action="/dashboard/" method="post" enctype="multipart/form-data">
-      <!DOCTYPE html>
-<html>
-<head>
     <title>Dashboard</title>
-    <!-- Include Chart.js -->
+    <!-- Include necessary libraries -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        .container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            margin-top: 20px;
-        }
-        canvas {
-            max-width: 800px;
-            margin-bottom: 20px;
-        }
-    </style>
 </head>
 <body>
-    <div class="container">
-        <h2>Dashboard</h2>
-        <form id="filterForm" method="post" enctype="multipart/form-data">
-            {% csrf_token %}
-            <label for="excel_file">Choose an Excel file:</label>
-            <input type="file" id="excel_file" name="excel_file" accept=".xlsx">
-
-            <label for="variable_select">Variable:</label>
-            <select id="variable_select" name="variable_select">
-                {% for variable in dropdown_options.variable %}
-                    <option value="{{ variable }}">{{ variable }}</option>
-                {% endfor %}
-            </select>
-
-            <label for="dataset_select">Dataset:</label>
-            <select id="dataset_select" name="dataset_select">
-                {% for dataset in dropdown_options.dataset %}
-                    <option value="{{ dataset }}">{{ dataset }}</option>
-                {% endfor %}
-            </select>
-
-            <label for="country_select">Country:</label>
-            <select id="country_select" name="country_select">
-                {% for country in dropdown_options.country %}
-                    <option value="{{ country }}">{{ country }}</option>
-                {% endfor %}
-            </select>
-
-            <label for="model_select">Model:</label>
-            <select id="model_select" name="model_select">
-                {% for model in dropdown_options.model %}
-                    <option value="{{ model }}">{{ model }}</option>
-                {% endfor %}
-            </select>
-
-            <label for="chart_type_select">Chart Type:</label>
-            <select id="chart_type_select" name="chart_type_select">
-                <option value="line">Line</option>
-                <option value="bar">Bar</option>
-                <option value="scatter">Scatter</option>
-            </select>
-
-            <input type="submit" value="Plot">
-        </form>
-
-        <canvas id="myChart"></canvas>
-    </div>
+    <h1>Dashboard</h1>
+    <label for="variable_select">Variable:</label>
+    <select id="variable_select">
+        <!-- Dropdown options will be populated dynamically -->
+    </select>
+    <canvas id="myChart"></canvas>
 
     <script>
-        document.getElementById('filterForm').addEventListener('submit', function(event) {
-            event.preventDefault();
-            updateChart();
-        });
+        // Example chart data (replace with actual data)
+        var data = [12, 19, 3, 5, 2, 3];
+        var labels = ['Red', 'Blue', 'Yellow', 'Green', 'Purple', 'Orange'];
 
-        function updateChart() {
-            var form = document.getElementById('filterForm');
-            var formData = new FormData(form);
-
-            fetch('/chart/', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                updateChartWithData(data.labels, data.data, 'line');
-            })
-            .catch(error => {
-                console.error('Error:', error);
-            });
-        }
-
-        function updateChartWithData(labels, data, chartType) {
-            var ctx = document.getElementById('myChart').getContext('2d');
-            var myChart = new Chart(ctx, {
-                type: chartType,
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: 'Dataset',
-                        data: data,
-                        backgroundColor: 'rgba(54, 162, 235, 0.2)',
-                        borderColor: 'rgba(54, 162, 235, 1)',
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        y: {
-                            beginAtZero: true
-                        }
+        var ctx = document.getElementById('myChart').getContext('2d');
+        var myChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: '# of Votes',
+                    data: data,
+                    backgroundColor: [
+                        'rgba(255, 99, 132, 0.2)',
+                        'rgba(54, 162, 235, 0.2)',
+                        'rgba(255, 206, 86, 0.2)',
+                        'rgba(75, 192, 192, 0.2)',
+                        'rgba(153, 102, 255, 0.2)',
+                        'rgba(255, 159, 64, 0.2)'
+                    ],
+                    borderColor: [
+                        'rgba(255, 99, 132, 1)',
+                        'rgba(54, 162, 235, 1)',
+                        'rgba(255, 206, 86, 1)',
+                        'rgba(75, 192, 192, 1)',
+                        'rgba(153, 102, 255, 1)',
+                        'rgba(255, 159, 64, 1)'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                scales: {
+                    y: {
+                        beginAtZero: true
                     }
                 }
-            });
-        }
+            }
+        });
     </script>
-</body>
-</html>
-  {% csrf_token %}
-        <label for="excel_file">Upload Excel file:</label>
-        <input type="file" id="excel_file" name="excel_file" required>
-        <input type="submit" value="Upload">
-    </form>
 </body>
 </html>

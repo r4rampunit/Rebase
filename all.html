@@ -1,55 +1,14 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Dashboard</title>
-    <!-- Include Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <title>Upload Excel File</title>
 </head>
 <body>
-    <h2>Dashboard</h2>
-    <form id="filterForm">
-        <label for="variable_select">Variable:</label>
-        <select id="variable_select" name="variable_select">
-            {% for variable in dropdown_options.variable %}
-                <option value="{{ variable }}">{{ variable }}</option>
-            {% endfor %}
-        </select>
-
-        <label for="dataset_select">Dataset:</label>
-        <select id="dataset_select" name="dataset_select">
-            {% for dataset in dropdown_options.dataset %}
-                <option value="{{ dataset }}">{{ dataset }}</option>
-            {% endfor %}
-        </select>
-
-        <label for="country_select">Country:</label>
-        <select id="country_select" name="country_select">
-            {% for country in dropdown_options.country %}
-                <option value="{{ country }}">{{ country }}</option>
-            {% endfor %}
-        </select>
-
-        <label for="model_select">Model:</label>
-        <select id="model_select" name="model_select">
-            {% for model in dropdown_options.model %}
-                <option value="{{ model }}">{{ model }}</option>
-            {% endfor %}
-        </select>
-
-        <label for="chart_type_select">Chart Type:</label>
-        <select id="chart_type_select" name="chart_type_select">
-            <option value="line">Line</option>
-            <option value="bar">Bar</option>
-            <option value="scatter">Scatter</option>
-        </select>
-
-        <input type="submit" value="Plot">
+    <h1>Upload Excel File</h1>
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <input type="file" name="excel_file" accept=".xlsx">
+        <button type="submit">Upload</button>
     </form>
-
-    <canvas id="myChart"></canvas>
-
-    <script>
-        // Your JavaScript code for updating the chart based on dropdown selections
-    </script>
 </body>
 </html>
