@@ -1,135 +1,15 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Dashboard</title>
-    <!-- Include Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        .container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            margin-top: 20px;
-        }
-        canvas {
-            max-width: 800px;
-            margin-bottom: 20px;
-        }
-    </style>
+    <title>Upload Data</title>
 </head>
 <body>
-    <div class="container">
-        <h2>Dashboard</h2>
-        <form id="filterForm">
-            <label for="variable_select">Variable:</label>
-            <select id="variable_select" name="variable_select">
-                {% for variable in dropdown_options.variable %}
-                    <option value="{{ variable }}">{{ variable }}</option>
-                {% endfor %}
-            </select>
-
-            <label for="dataset_select">Dataset:</label>
-            <select id="dataset_select" name="dataset_select">
-                {% for dataset in dropdown_options.dataset %}
-                    <option value="{{ dataset }}">{{ dataset }}</option>
-                {% endfor %}
-            </select>
-
-            <label for="country_select">Country:</label>
-            <select id="country_select" name="country_select">
-                {% for country in dropdown_options.country %}
-                    <option value="{{ country }}">{{ country }}</option>
-                {% endfor %}
-            </select>
-
-            <label for="model_select">Model:</label>
-            <select id="model_select" name="model_select">
-                {% for model in dropdown_options.model %}
-                    <option value="{{ model }}">{{ model }}</option>
-                {% endfor %}
-            </select>
-
-            <label for="chart_type_select">Chart Type:</label>
-            <select id="chart_type_select" name="chart_type_select">
-                <option value="line">Line</option>
-                <option value="bar">Bar</option>
-                <option value="scatter">Scatter</option>
-            </select>
-
-            <input type="submit" value="Plot">
-        </form>
-
-        <canvas id="myChart"></canvas>
-    </div>
-
-    <script>
-        document.getElementById('filterForm').addEventListener('submit', function(event) {
-            event.preventDefault();
-            updateChart();
-        });
-
-        function updateChart() {
-            var variable = document.getElementById('variable_select').value;
-            var dataset = document.getElementById('dataset_select').value;
-            var country = document.getElementById('country_select').value;
-            var model = document.getElementById('model_select').value;
-            var chartType = document.getElementById('chart_type_select').value;
-
-            // Send AJAX request to update chart data based on selected filters
-            // Example:
-            // $.ajax({
-            //     url: '/update_chart_data/',
-            //     method: 'POST',
-            //     data: {
-            //         'variable': variable,
-            //         'dataset': dataset,
-            //         'country': country,
-            //         'model': model
-            //     },
-            //     success: function(response) {
-            //         var data = response.data;
-            //         var labels = response.labels;
-            //         updateChartWithData(labels, data, chartType);
-            //     },
-            //     error: function(error) {
-            //         console.log(error);
-            //     }
-            // });
-
-            // For demo purposes, generate random data
-            var data = [];
-            for (var i = 0; i < 10; i++) {
-                data.push(Math.random() * 100);
-            }
-            var labels = Array.from({ length: 10 }, (_, i) => (i + 2020).toString());
-            updateChartWithData(labels, data, chartType);
-        }
-
-        function updateChartWithData(labels, data, chartType) {
-            var ctx = document.getElementById('myChart').getContext('2d');
-            var myChart = new Chart(ctx, {
-                type: chartType,
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: 'Dataset',
-                        data: data,
-                        backgroundColor: 'rgba(54, 162, 235, 0.2)',
-                        borderColor: 'rgba(54, 162, 235, 1)',
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        y: {
-                            beginAtZero: true
-                        }
-                    }
-                }
-            });
-        }
-    </script>
+    <h2>Upload Data</h2>
+    <form action="/dashboard/" method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <label for="excel_file">Upload Excel file:</label>
+        <input type="file" id="excel_file" name="excel_file" required>
+        <input type="submit" value="Upload">
+    </form>
 </body>
 </html>
