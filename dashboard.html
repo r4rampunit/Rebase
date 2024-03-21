@@ -112,3 +112,91 @@
 
 
 
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dashboard</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        $(document).ready(function(){
+            // Function to update plot based on dropdown values
+            function updatePlot() {
+                var variable = $("#variable-dropdown").val();
+                var dataset = $("#dataset-dropdown").val();
+                var country = $("#country-dropdown").val();
+                var model = $("#model-dropdown").val();
+                var scenario = $("#scenario-dropdown").val();
+                var chartType = $("#chart-type-dropdown").val();
+                var dataType = $("#data-type-dropdown").val();
+
+                $.ajax({
+                    url: "{% url 'myapp:update_plot' %}",
+                    data: {
+                        'variable': variable,
+                        'dataset': dataset,
+                        'country': country,
+                        'model': model,
+                        'scenario': scenario,
+                        'chart_type': chartType,
+                        'data_type': dataType
+                    },
+                    dataType: 'html',
+                    success: function(response) {
+                        $("#plot").html(response);
+                    }
+                });
+            }
+
+            // Bind change event to dropdowns
+            $("#variable-dropdown, #dataset-dropdown, #country-dropdown, #model-dropdown, #scenario-dropdown, #chart-type-dropdown, #data-type-dropdown").change(function(){
+                updatePlot();
+            });
+
+            // Initial plot update
+            updatePlot();
+        });
+    </script>
+</head>
+<body>
+    <h1>Dashboard</h1>
+    <div>
+        <label for="variable-dropdown">Variable:</label>
+        <select id="variable-dropdown">
+            <!-- Options for variable dropdown -->
+        </select>
+        <br>
+        <label for="dataset-dropdown">Dataset:</label>
+        <select id="dataset-dropdown">
+            <!-- Options for dataset dropdown -->
+        </select>
+        <br>
+        <label for="country-dropdown">Country:</label>
+        <select id="country-dropdown">
+            <!-- Options for country dropdown -->
+        </select>
+        <br>
+        <label for="model-dropdown">Model:</label>
+        <select id="model-dropdown">
+            <!-- Options for model dropdown -->
+        </select>
+        <br>
+        <label for="scenario-dropdown">Scenario:</label>
+        <select id="scenario-dropdown">
+            <!-- Options for scenario dropdown -->
+        </select>
+        <br>
+        <label for="chart-type-dropdown">Chart Type:</label>
+        <select id="chart-type-dropdown">
+            <!-- Options for chart type dropdown -->
+        </select>
+        <br>
+        <label for="data-type-dropdown">Data Type:</label>
+        <select id="data-type-dropdown">
+            <!-- Options for data type dropdown -->
+        </select>
+    </div>
+    <div id="plot">
+        <!-- Plot will be rendered here -->
+    </div>
+</body>
+</html>
