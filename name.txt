@@ -791,3 +791,96 @@ def update_plot(request):
         return HttpResponse(plot_div)
     else:
         return HttpResponse('No data found for the selected combination.')
+
+
+
+
+
+
+
+
+
+
+
+
+import plotly.graph_objs as go
+from plotly.io import to_html
+
+def dashboard(request):
+    data = request.session.get('data', [])
+    variable_options = request.session.get('variable_options', [])
+    country_options = request.session.get('country_options', [])
+    model_options = request.session.get('model_options', [])
+
+    # Default values for the dropdown selections
+    selected_variable = variable_options[0] if variable_options else ''
+    selected_country = country_options[0] if country_options else ''
+    selected_model = model_options[0] if model_options else ''
+
+    filtered_data = [row for row in data if row['Variable'] == selected_variable and row['Region'] == selected_country and row['Model'] == selected_model]
+
+    if filtered_data:
+        years = [int(key) for key in filtered_data[0].keys() if key.isdigit()]
+        years.sort()
+
+        trace = go.Scatter(
+            x=years,
+            y=[row[str(year)] for row in filtered_data for year in years],
+            mode='lines+markers',
+            name=f"{selected_variable} for {selected_country} ({selected_model})"
+        )
+
+        layout = go.Layout(
+            title=f"{selected_variable} for {selected_country} ({selected_model})",
+            xaxis=dict(title='Year'),
+            yaxis=dict(title=selected_variable)
+        )
+
+        fig = go.Figure(data=[trace], layout=layout)
+        plot_div = to_html(fig, full_html=False)
+    else:
+        plot_div = None
+
+    context = {
+        'variable_options': variable_options,
+        'country_options': country_options,
+        'model_options': model_options,
+        'plot_div': plot_div
+    }
+
+    return render(request, 'myapp/dashboard.html', context)
+
+def update_plot(request):
+    data = request.session.get('data', [])
+    variable_options = request.session.get('variable_options', [])
+    country_options = request.session.get('country_options', [])
+    model_options = request.session.get('model_options', [])
+
+    selected_variable = request.GET.get('variable', variable_options[0] if variable_options else '')
+    selected_country = request.GET.get('country', country_options[0] if country_options else '')
+    selected_model = request.GET.get('model', model_options[0] if model_options else '')
+
+    filtered_data = [row for row in data if row['Variable'] == selected_variable and row['Region'] == selected_country and row['Model'] == selected_model]
+
+    if filtered_data:
+        years = [int(key) for key in filtered_data[0].keys() if key.isdigit()]
+        years.sort()
+
+        trace = go.Scatter(
+            x=years,
+            y=[row[str(year)] for row in filtered_data for year in years],
+            mode='lines+markers',
+            name=f"{selected_variable} for {selected_country} ({selected_model})"
+        )
+
+        layout = go.Layout(
+            title=f"{selected_variable} for {selected_country} ({selected_model})",
+            xaxis=dict(title='Year'),
+            yaxis=dict(title=selected_variable)
+        )
+
+        fig = go.Figure(data=[trace], layout=layout)
+        plot_div = to_html(fig, full_html=False)
+        return HttpResponse(plot_div)
+    else:
+        return HttpResponse('No data found for the selected combination.')
