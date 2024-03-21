@@ -465,3 +465,53 @@ def dashboard(request):
     </script>
 </body>
 </html>
+
+
+
+
+
+
+
+
+
+
+
+from django.shortcuts import render, redirect
+import openpyxl
+import pandas as pd
+import json
+
+def index(request):
+    if request.method == "GET":
+        return render(request, 'myapp/chart.html', {})
+    else:
+        excel_file = request.FILES["excel_file"]
+        wb = openpyxl.load_workbook(excel_file)
+        worksheet = wb.active
+        excel_data = list()
+        for row in worksheet.iter_rows():
+            row_data = list()
+            for cell in row:
+                row_data.append(cell.value)
+            excel_data.append(row_data)
+
+        df = pd.DataFrame(excel_data[1:], columns=excel_data[0])
+        variable_options = sorted(df['Variable'].unique().tolist())
+        country_options = sorted(df['Region'].unique().tolist())
+        model_options = sorted(df['Model'].unique().tolist())
+
+        request.session['data'] = json.loads(df.to_json(orient='records'))
+        request.session['variable_options'] = variable_options
+        request.session['country_options'] = country_options
+        request.session['model_options'] = model_options
+
+        return redirect('myapp:dashboard')
+
+def dashboard(request):
+    context = {
+        'variable_options': request.session.get('variable_options', []),
+        'country_options': request.session.get('country_options', []),
+        'model_options': request.session.get('model_options', []),
+        'data': request.session.get('data', [])
+    }
+    return render(request, 'myapp/dashboard.html', context)
