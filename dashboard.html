@@ -200,3 +200,124 @@
     </div>
 </body>
 </html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Interactive Dashboard</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        #chart {
+            width: 100%;
+            height: 500px;  /* Adjust height as needed */
+        }
+    </style>
+</head>
+<body>
+    <h1>Interactive Dashboard</h1>
+    <div>
+        <label for="variable_select">Variable:</label>
+        <select id="variable_select">
+            </select>
+        <label for="country_select">Country:</label>
+        <select id="country_select">
+            </select>
+        <label for="model_select">Model:</label>
+        <select id="model_select">
+            </select>
+    </div>
+    <div id="chart">
+        </div>
+
+    <script>
+        // Get references to the dropdown elements
+        var variableSelect = document.getElementById('variable_select');
+        var countrySelect = document.getElementById('country_select');
+        var modelSelect = document.getElementById('model_select');
+
+        // Function to update the plot based on selected filters
+        function updatePlot() {
+            var selectedVariable = variableSelect.value;
+            var selectedCountry = countrySelect.value;
+            var selectedModel = modelSelect.value;
+
+            // Make an AJAX request to the server for updated data
+            fetch('/update_plot/?variable=' + selectedVariable + '&country=' + selectedCountry + '&model=' + selectedModel)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.plot_div) {
+                        document.getElementById('chart').innerHTML = data.plot_div;
+                    } else {
+                        document.getElementById('chart').innerHTML = 'No data found for the selected combination.';
+                    }
+                })
+                .catch(error => console.error(error));
+        }
+
+        // Add event listeners to the dropdown elements
+        variableSelect.addEventListener('change', updatePlot);
+        countrySelect.addEventListener('change', updatePlot);
+        modelSelect.addEventListener('change', updatePlot);
+
+        // Function to populate the dropdown options (optional)
+        function populateOptions(data, elementId) {
+            var options = '';
+            for (var i = 0; i < data.length; i++) {
+                options += '<option value="' + data[i] + '">' + data[i] + '</option>';
+            }
+            document.getElementById(elementId).innerHTML = options;
+        }
+
+        // Load initial data from Django context (optional)
+        var variableOptions = {{ variable_options|safe }};  # Access data from Django context
+        var countryOptions = {{ country_options|safe }};
+        var modelOptions = {{ model_options|safe }};
+
+        // Populate dropdown options using the loaded data (optional)
+        populateOptions(variableOptions, 'variable_select');
+        populateOptions(countryOptions, 'country_select');
+        populateOptions(modelOptions, 'model_select');
+
+        // Perform initial plot update on page load (optional)
+        updatePlot();
+    </script>
+</body>
+</html>
+
