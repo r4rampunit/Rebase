@@ -62,9 +62,18 @@
                 return row['Variable'] === selectedVariable && row['Region'] === selectedCountry && row['Model'] === selectedModel;
             });
 
+            console.log('Filtered Data:', filteredData);
+
+            if (filteredData.length === 0) {
+                console.log('No data found for the selected combination.');
+                return;
+            }
+
             var years = Object.keys(filteredData[0]).filter(function(key) {
                 return !isNaN(parseInt(key));
             });
+
+            console.log('Years:', years);
 
             var trace = {
                 x: years,
