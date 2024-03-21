@@ -293,3 +293,96 @@ def index(request):
 
 def dashboard(request):
     return render(request, 'myapp/dashboard.html')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dashboard</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        #chart {
+            width: 100%;
+            height: 500px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Interactive Dashboard</h1>
+
+    <div id="chart"></div>
+
+    <script>
+        var data = JSON.parse('{{ data|safe }}');
+
+        // Get the first row of data
+        var firstRow = data[0];
+
+        // Extract the years from the column names
+        var years = Object.keys(firstRow).filter(function(key) {
+            return !isNaN(parseInt(key));
+        });
+
+        // Create the trace for the line chart
+        var trace = {
+            x: years,
+            y: years.map(function(year) {
+                return firstRow[year];
+            }),
+            type: 'line',
+            mode: 'lines+markers'
+        };
+
+        // Create the layout
+        var layout = {
+            title: firstRow['Variable'] + ' for ' + firstRow['Region'] + ' (' + firstRow['Model'] + ')',
+            xaxis: {
+                title: 'Year'
+            },
+            yaxis: {
+                title: firstRow['Variable']
+            }
+        };
+
+        // Plot the data
+        Plotly.newPlot('chart', [trace], layout);
+    </script>
+</body>
+</html>
