@@ -429,3 +429,101 @@
     </script>
   </body>
 </html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard</title>
+    <!-- Include Plotly.js -->
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+    <h1>Interactive Dashboard</h1>
+
+    <div>
+        <label for="variable">Variable:</label>
+        <select id="variable">
+            {% for variable in variable_options %}
+                <option value="{{ variable }}">{{ variable }}</option>
+            {% endfor %}
+        </select>
+
+        <label for="country">Country:</label>
+        <select id="country">
+            {% for country in country_options %}
+                <option value="{{ country }}">{{ country }}</option>
+            {% endfor %}
+        </select>
+
+        <label for="model">Model:</label>
+        <select id="model">
+            {% for model in model_options %}
+                            <option value="{{ model }}">{{ model }}</option>
+            {% endfor %}
+        </select>
+
+        <button onclick="updatePlot()">Update Plot</button>
+    </div>
+
+    <div>
+        <h2>Single Line Plot</h2>
+        <div id="plot_div_single">
+            <!-- Plot will be rendered here -->
+        </div>
+    </div>
+
+    <div>
+        <h2>Multi-Line Plot</h2>
+        <div id="plot_div_multi">
+            <!-- Plot will be rendered here -->
+        </div>
+    </div>
+
+    <script>
+        function updatePlot() {
+            var variable = document.getElementById('variable').value;
+            var country = document.getElementById('country').value;
+            var model = document.getElementById('model').value;
+
+            var url = `/update_plot?variable=${variable}&country=${country}&model=${model}`;
+
+            fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('plot_div_single').innerHTML = data.plot_div_single;
+                document.getElementById('plot_div_multi').innerHTML = data.plot_div_multi;
+            })
+            .catch(error => console.error('Error:', error));
+        }
+    </script>
+</body>
+</html>
