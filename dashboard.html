@@ -332,3 +332,100 @@
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Dashboard</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+      #chart_single, #chart_multi {
+        width: 100%;
+        height: 500px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Interactive Dashboard</h1>
+    <div>
+      <label for="variable_select">Variable: </label>
+      <select id="variable_select">
+        {% for variable in variable_options %}
+        <option value="{{ variable }}">{{ variable }}</option>
+        {% endfor %}
+      </select>
+      <label for="country_select">Country: </label>
+      <select id="country_select">
+        {% for country in country_options %}
+        <option value="{{ country }}">{{ country }}</option>
+        {% endfor %}
+      </select>
+      <label for="model_select">Model: </label>
+      <select id="model_select">
+        {% for model in model_options %}
+        <option value="{{ model }}">{{ model }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div id="chart_single"></div>
+    <div id="chart_multi"></div>
+    <script>
+      var variable_select = document.getElementById("variable_select");
+      var country_select = document.getElementById("country_select");
+      var model_select = document.getElementById("model_select");
+
+      function updatePlots() {
+        var selectedVariable = variable_select.value;
+        var selectedCountry = country_select.value;
+        var selectedModel = model_select.value;
+
+        // Make an AJAX request to the server to get the updated plots
+        var xhr = new XMLHttpRequest();
+        xhr.open(
+          "GET",
+          `/update_plots/?variable=${selectedVariable}&country=${selectedCountry}&model=${selectedModel}`,
+          true
+        );
+        xhr.onreadystatechange = function () {
+          if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
+            var response = JSON.parse(xhr.responseText);
+            var plotDivSingle = document.getElementById("chart_single");
+            var plotDivMulti = document.getElementById("chart_multi");
+            plotDivSingle.innerHTML = response.plot_div_single;
+            plotDivMulti.innerHTML = response.plot_div_multi;
+          }
+        };
+        xhr.send();
+      }
+
+      variable_select.addEventListener("change", updatePlots);
+      country_select.addEventListener("change", updatePlots);
+      model_select.addEventListener("change", updatePlots);
+
+      // Initial plot rendering
+      updatePlots();
+    </script>
+  </body>
+</html>
