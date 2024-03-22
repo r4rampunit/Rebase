@@ -1147,3 +1147,135 @@ def update_plot(request):
         return HttpResponse(plot_div)
     else:
         return HttpResponse("No data found for the selected combination")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+from django.shortcuts import render, redirect
+import pandas as pd
+import plotly.graph_objs as go
+
+def chart(request):
+    if request.method == "GET":
+        return render(request, 'chart.html', {})
+    else:
+        excel_file = request.FILES["excel_file"]
+        df = pd.read_excel(excel_file)
+        variable_options = df['Variable'].unique().tolist()
+        country_options = df['Country'].unique().tolist()
+        model_options = df['Model'].unique().tolist()
+        request.session['data'] = df.to_dict(orient='records')
+        request.session['variable_options'] = variable_options
+        request.session['country_options'] = country_options
+        request.session['model_options'] = model_options
+        return redirect('dashboard')
+
+def dashboard(request):
+    data = request.session.get('data', [])
+    variable_options = request.session.get('variable_options', [])
+    country_options = request.session.get('country_options', [])
+    model_options = request.session.get('model_options', [])
+
+    selected_variable = request.GET.get('variable', variable_options[0] if variable_options else None)
+    selected_country = request.GET.get('country', country_options[0] if country_options else None)
+    selected_model = request.GET.get('model', model_options[0] if model_options else None)
+
+    filtered_data = [row for row in data if row['Variable'] == selected_variable and row['Country'] == selected_country]
+
+    if filtered_data:
+        years = [int(col) for col in filtered_data[0].keys() if col.isdigit()]
+        years.sort()
+
+        # Create traces for each scenario
+        traces = []
+        for model in model_options:
+            trace = go.Scatter(
+                x=years,
+                y=[row[str(year)] for row in filtered_data if row['Model'] == model],
+                mode='lines+markers',
+                name=model
+            )
+            traces.append(trace)
+
+        layout = go.Layout(
+            title=f"{selected_variable} for {selected_country}",
+            xaxis=dict(title='Year'),
+            yaxis=dict(title=selected_variable)
+        )
+        fig = go.Figure(data=traces, layout=layout)
+        plot_div = fig.to_html(full_html=False)
+    else:
+        plot_div = None
+
+    context = {
+        'variable_options': variable_options,
+        'country_options': country_options,
+        'model_options': model_options,
+        'selected_variable': selected_variable,
+        'selected_country': selected_country,
+        'selected_model': selected_model,
+        'plot_div': plot_div
+    }
+
+    return render(request, 'dashboard.html', context)
+
+def update_plot(request):
+    data = request.session.get('data', [])
+    selected_variable = request.GET.get('variable')
+    selected_country = request.GET.get('country')
+
+    filtered_data = [row for row in data if row['Variable'] == selected_variable and row['Country'] == selected_country]
+
+    if filtered_data:
+        years = [int(col) for col in filtered_data[0].keys() if col.isdigit()]
+        years.sort()
+
+        traces = []
+        for model in model_options:
+            trace = go.Scatter(
+                x=years,
+                y=[row[str(year)] for row in filtered_data if row['Model'] == model],
+                mode='lines+markers',
+                name=model
+            )
+            traces.append(trace)
+
+        layout = go.Layout(
+            title=f"{selected_variable} for {selected_country}",
+            xaxis=dict(title='Year'),
+            yaxis=dict(title=selected_variable)
+        )
+        fig = go.Figure(data=traces, layout=layout)
+        plot_div = fig.to_html(full_html=False)
+        return HttpResponse(plot_div)
+    else:
+        return HttpResponse("No data found for the selected combination")
