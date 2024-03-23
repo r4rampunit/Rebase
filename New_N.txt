@@ -272,27 +272,29 @@ def dashboard(request):
 </head>
 <body>
     <h1>Dashboard</h1>
-    <div class="dropdown-container">
-        <label for="variable">Variable:</label>
-        <select name="variable" id="variable">
-            {% for option in variable_options %}
-                <option value="{{ option }}" {% if option == selected_variable %}selected{% endif %}>{{ option }}</option>
-            {% endfor %}
-        </select>
-        <label for="country">Country:</label>
-        <select name="country" id="country">
-            {% for option in country_options %}
-                <option value="{{ option }}" {% if option == selected_country %}selected{% endif %}>{{ option }}</option>
-            {% endfor %}
-        </select>
-        <label for="model">Model:</label>
-        <select name="model" id="model">
-            {% for option in model_options %}
-                <option value="{{ option }}" {% if option == selected_model %}selected{% endif %}>{{ option }}</option>
-            {% endfor %}
-        </select>
-        <input type="submit" value="Submit">
-    </div>
+    <form action="{% url 'dashboard' %}" method="get">
+        <div class="dropdown-container">
+            <label for="variable">Variable:</label>
+            <select name="variable" id="variable">
+                {% for option in variable_options %}
+                    <option value="{{ option }}" {% if option == selected_variable %}selected{% endif %}>{{ option }}</option>
+                {% endfor %}
+            </select>
+            <label for="country">Country:</label>
+            <select name="country" id="country">
+                {% for option in country_options %}
+                    <option value="{{ option }}" {% if option == selected_country %}selected{% endif %}>{{ option }}</option>
+                {% endfor %}
+            </select>
+            <label for="model">Model:</label>
+            <select name="model" id="model">
+                {% for option in model_options %}
+                    <option value="{{ option }}" {% if option == selected_model %}selected{% endif %}>{{ option }}</option>
+                {% endfor %}
+            </select>
+            <input type="submit" value="Submit">
+        </div>
+    </form>
 
     {% if plot_div_single %}
         {{ plot_div_single|safe }}
@@ -323,3 +325,4 @@ def dashboard(request):
     {% endif %}
 </body>
 </html>
+
