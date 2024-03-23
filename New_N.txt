@@ -195,3 +195,131 @@ def dashboard(request):
     {% endif %}
 </body>
 </html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard</title>
+    <!-- Plotly.js -->
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        /* Add your CSS styles here */
+        .dropdown-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .dropdown-container select {
+            width: 200px;
+            padding: 8px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            font-size: 16px;
+        }
+        .dropdown-container label {
+            margin-right: 10px;
+            font-size: 16px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        tr:hover {
+            background-color: #f5f5f5;
+        }
+    </style>
+</head>
+<body>
+    <h1>Dashboard</h1>
+    <div class="dropdown-container">
+        <label for="variable">Variable:</label>
+        <select name="variable" id="variable">
+            {% for option in variable_options %}
+                <option value="{{ option }}" {% if option == selected_variable %}selected{% endif %}>{{ option }}</option>
+            {% endfor %}
+        </select>
+        <label for="country">Country:</label>
+        <select name="country" id="country">
+            {% for option in country_options %}
+                <option value="{{ option }}" {% if option == selected_country %}selected{% endif %}>{{ option }}</option>
+            {% endfor %}
+        </select>
+        <label for="model">Model:</label>
+        <select name="model" id="model">
+            {% for option in model_options %}
+                <option value="{{ option }}" {% if option == selected_model %}selected{% endif %}>{{ option }}</option>
+            {% endfor %}
+        </select>
+        <input type="submit" value="Submit">
+    </div>
+
+    {% if plot_div_single %}
+        {{ plot_div_single|safe }}
+    {% endif %}
+
+    {% if filtered_data %}
+        <h2>Data</h2>
+        <table>
+            <thead>
+                <tr>
+                    {% for column in filtered_data.0.keys %}
+                        <th>{{ column }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in filtered_data %}
+                    <tr>
+                        {% for value in row.values %}
+                            <td>{{ value }}</td>
+                        {% endfor %}
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>No data available for the selected options.</p>
+    {% endif %}
+</body>
+</html>
