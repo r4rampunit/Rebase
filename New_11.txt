@@ -435,3 +435,87 @@ def dashboard(request):
     }
 
     return render(request, 'dashboard.html', context)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import pandas as pd
+import plotly.graph_objs as go
+from plotly.offline import plot
+
+def dashboard(request):
+
+    # Load data from Excel file
+    df = pd.read_excel("static/data/data_dashboard.xlsx")
+
+    selected_variable = request.GET.get('variable', None)
+    selected_country = request.GET.get('country', None)
+    selected_model = request.GET.get("model", None)
+
+    if selected_variable and selected_country and selected_model:
+        # Filter the DataFrame based on selected filters
+        filtered_data = df[(df['Variable'] == selected_variable) &
+                           (df['Region'] == selected_country) &
+                           (df['Model'] == selected_model)]
+
+        if not filtered_data.empty:
+            # Check if filtered data is not empty
+            years = [2020, 2025, 2030, 2035, 2040, 2045, 2050]
+            traces = []
+
+            for scenario, scenario_data in filtered_data.groupby('Scenario'):
+                trace = go.Scatter(
+                    x=years,
+                    y=scenario_data[years].values.flatten(),
+                    mode='lines+markers',
+                    line=dict(width=5, shape='spline'),
+                    name=scenario
+                )
+                traces.append(trace)
+
+            # Create the multiline plot
+            layout = go.Layout(
+                title=selected_variable,
+                xaxis=dict(title='Year', showgrid=False, tickfont=dict(color="black")),
+                yaxis=dict(title='Value', showgrid=False, tickfont=dict(color="black")),
+                height=750,
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(8,8,8,8)'
+            )
+
+            fig = go.Figure(data=traces, layout=layout)
+            plot_div_single = plot(fig, output_type='div', include_plotlyjs=False)
+
+        else:
+            plot_div_single = None
+
+    else:
+        filtered_data = None
+        plot_div_single = None
+
+    context = {
+        'variable_options': df['Variable'].unique().tolist(),
+        'country_options': df['Country'].unique().tolist(),
+        'model_options': df['Model'].unique().tolist(),
+        'selected_variable': selected_variable,
+        'selected_country': selected_country,
+        'selected_model': selected_model,
+        'filtered_data': filtered_data,
+        'plot_div_single': plot_div_single,
+    }
+
+    return render(request, 'dashboard.html', context)
