@@ -653,3 +653,72 @@ def get_model_options(request):
 
     # Return JSON response with model options
     return JsonResponse(model_options, safe=False)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import pandas as pd
+import plotly.graph_objs as go
+from plotly.offline import plot
+
+def dashboard(request):
+  # Load data from Excel file
+  df = pd.read_excel("static/data/data_dashboard.xlsx")
+
+  # Get selected options from request
+  selected_variable = request.GET.get('variable', None)
+  selected_country = request.GET.get('country', None)
+  selected_model = request.GET.get("model", None)
+
+  # Prepare initial context with all options
+  context = {
+      'variable_options': df['Variable'].unique().tolist(),
+      'country_options': [],  # Initially empty for cascading
+      'model_options': [],    # Initially empty for cascading
+      'selected_variable': selected_variable,
+      'selected_country': selected_country,
+      'selected_model': selected_model,
+      'filtered_data': None,
+      'plot_div_single': None,
+  }
+
+  # Filter variable options based on selection (if any)
+  if selected_variable:
+      filtered_df = df[df['Variable'] == selected_variable]
+      context['variable_options'] = [selected_variable]  # Keep only selected
+
+      # Filter country options based on selected variable (if data allows)
+      country_options = filtered_df['Region'].unique().tolist()
+      if country_options:
+          context['country_options'] = country_options
+
+      # Filter model options based on selected variable and country (if data allows)
+      if selected_country:
+          filtered_df = filtered_df[filtered_df['Region'] == selected_country]
+          model_options = filtered_df['Model'].unique().tolist()
+          if model_options:
+              context['model_options'] = model_options
+
+  # Data filtering and plot generation (similar logic as before)
+  if selected_variable and selected_country and selected_model:
+      # ... (Your existing data filtering and plot generation logic here)
+
+  # Return context to the template
+  return render(request, 'dashboard.html', context)
+
