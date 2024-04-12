@@ -815,3 +815,144 @@ def dashboard(request):
 
     return render(request, 'dashboard.html', context)
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<body>
+    <div class="logo-container">
+    </div>
+    <h1>Dashboard for Scenario</h1>
+    <div class="dashboard-container">
+        <form action="{% url 'dashboard' %}" method="get">
+            <div class="dropdown-container">
+                <label for="variable">Variable:</label>
+                <select name="variable" id="variable" onchange="updateCountryOptions(this.value)">
+                    <option value="">Select Variable</option>
+                    {% for option in variable_options %}
+                        <option value="{{ option }}" {% if option == selected_variable %}selected{% endif %}>{{ option }}</option>
+                    {% endfor %}
+                </select>
+
+                <label for="country">Country:</label>
+                <select name="country" id="country" onchange="updateModelOptions(this.value)">
+                    <option value="">Select Country</option>
+                    {% for option in country_options %}
+                        <option value="{{ option }}" {% if option == selected_country %}selected{% endif %}>{{ option }}</option>
+                    {% endfor %}
+                </select>
+
+                <label for="model">Model:</label>
+                <select name="model" id="model">
+                    <option value="">Select Model</option>
+                    {% for option in model_options %}
+                        <option value="{{ option }}" {% if option == selected_model %}selected{% endif %}>{{ option }}</option>
+                    {% endfor %}
+                </select>
+
+                <input type="submit" value="Submit">
+            </div>
+        </form>
+
+        {% if plot_div_single %}
+            {{ plot_div_single|safe }}
+        {% endif %}
+
+        {% if filtered_data %}
+            <h2>Data</h2>
+            <table>
+                <thead>
+                    <tr>
+                        {% for column in filtered_data.columns %}
+                            <th>{{ column }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for _, row in filtered_data.iterrows %}
+                        <tr>
+                            {% for value in row %}
+                                <td>{{ value }}</td>
+                            {% endfor %}
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p>No data available for the selected options.</p>
+        {% endif %}
+    </div>
+
+    <script>
+        var countryOptions = {{ country_options|safe }};
+        var modelOptions = {{ model_options|safe }};
+
+        function updateCountryOptions(selectedVariable) {
+            var countrySelect = document.getElementById('country');
+            countrySelect.innerHTML = '<option value="">Select Country</option>';
+
+            if (selectedVariable) {
+                var filteredCountries = countryOptions.filter(function(country) {
+                    return country.startsWith(selectedVariable);
+                });
+
+                filteredCountries.forEach(function(country) {
+                    var option = document.createElement('option');
+                    option.value = country;
+                    option.text = country;
+                    countrySelect.add(option);
+                });
+            }
+        }
+
+        function updateModelOptions(selectedCountry) {
+            var modelSelect = document.getElementById('model');
+            modelSelect.innerHTML = '<option value="">Select Model</option>';
+
+            if (selectedCountry) {
+                var filteredModels = modelOptions.filter(function(model) {
+                    return model.startsWith(selectedCountry);
+                });
+
+                filteredModels.forEach(function(model) {
+                    var option = document.createElement('option');
+                    option.value = model;
+                    option.text = model;
+                    modelSelect.add(option);
+                });
+            }
+        }
+    </script>
+</body>
