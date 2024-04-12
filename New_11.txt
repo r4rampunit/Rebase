@@ -956,3 +956,31 @@ def dashboard(request):
         }
     </script>
 </body>
+
+
+
+
+
+{% if filtered_data.empty %}
+    <p>No data available for the selected options.</p>
+{% else %}
+    <h2>Data</h2>
+    <table>
+        <thead>
+            <tr>
+                {% for column in filtered_data.columns %}
+                    <th>{{ column }}</th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for _, row in filtered_data.iterrows %}
+                <tr>
+                    {% for value in row %}
+                        <td>{{ value }}</td>
+                    {% endfor %}
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endif %}
