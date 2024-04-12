@@ -1888,3 +1888,30 @@ def dashboard(request):
 #     }
 #
 #     return render(request, 'dashboard.html', context)
+
+
+
+
+
+
+
+
+
+
+
+
+.dropdown-container select option[value*="BL"] {
+    color: yellow;
+}
+
+.dropdown-container select option[value*="NZ"] {
+    color: skyblue;
+}
+
+.dropdown-container select option[value*="DT"] {
+    color: black;
+}
+
+.dropdown-container select option[value*="DP"] {
+    color: red;
+}
