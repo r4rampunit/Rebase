@@ -984,3 +984,907 @@ def dashboard(request):
         </tbody>
     </table>
 {% endif %}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard</title>
+    <!-- Plotly.js -->
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        /* Add your CSS styles here */
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #ffffff, #ffcccb);
+            background-size: 400% 400%;
+            animation: gradientAnimation 15s ease infinite;
+            color: #333;
+        }
+
+        @keyframes gradientAnimation {
+            0% {
+                background-position: 0% 50%;
+            }
+            50% {
+                background-position: 100% 50%;
+            }
+            100% {
+                background-position: 0% 50%;
+            }
+        }
+
+        /* Table styles */
+        .table {
+            border-collapse: collapse;
+            overflow-x: auto;
+            background-color: #fff;
+            color: #333;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        th, td {
+            padding: 10px;
+            text-align: left;
+            border: 1px solid #ddd;
+            font-weight: bold;
+            border-radius: 5px;
+        }
+
+        th {
+            background-color: #333;
+            color: #fff;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+
+        tr:hover {
+            background-color: #e6e6e6;
+        }
+
+        h1 {
+            text-align: center;
+            margin-top: 30px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        .dashboard-container {
+            border: 1px solid #ccc;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px auto;
+            max-width: 1450px;
+            background-color: #f5f5f5;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            overflow-x: auto;
+        }
+
+        .dropdown-container label {
+            font-size: 20px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .dropdown-container select {
+            font-size: 18px;
+            padding: 10px 20px;
+            border-radius: 20px;
+            background-color: #ffcccb;
+            color: #333;
+            font-weight: bold;
+            border: none;
+            outline: none;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .dropdown-container select:hover {
+            background-color: #ff7f7f;
+        }
+
+        .dropdown-container select:focus {
+            box-shadow: 0 0 5px rgba(255, 127, 127, 0.5);
+        }
+
+        input[type="submit"] {
+            padding: 8px 16px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #fff;
+            background-color: #8b0000;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        input[type="submit"]:hover {
+            background-color: #ff4500;
+        }
+
+        .logo-container {
+            text-align: right;
+            margin-bottom: 20px;
+        }
+
+        .logo {
+            width: 100px;
+            height: auto;
+            border-radius: 50%;
+            animation: logoAnimation 5s infinite;
+        }
+
+        @keyframes logoAnimation {
+            0% {
+                box-shadow: 0 0 0 0 rgba(255, 127, 127, 0.7);
+            }
+            70% {
+                box-shadow: 0 0 0 20px rgba(255, 127, 127, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(255, 127, 127, 0);
+            }
+        }
+
+
+
+
+
+
+<!--        /* Add your CSS styles here */-->
+<!--        body {-->
+<!--            margin: 0;-->
+<!--            padding: 0;-->
+<!--            font-family: Arial, sans-serif;-->
+<!--            background-image: url('/static/chart_3.jfif'); /* Specify the URL of your background image */-->
+<!--            background-size: cover;-->
+<!--            background-position: center;-->
+<!--            color: black; /* Set text color to black */-->
+<!--        }-->
+
+<!--        /* Table styles */-->
+<!--        .table {-->
+<!--            border-collapse: collapse;-->
+<!--            overflow-x: auto; /* Enable horizontal scrolling */-->
+<!--        }-->
+
+<!--        th, td {-->
+<!--            padding: 10px;-->
+<!--            text-align: left;-->
+<!--            border-bottom: 1px solid #ddd;-->
+<!--            font-weight: bold; /* Make column names bold */-->
+<!--        }-->
+
+<!--        th {-->
+<!--            background-color: red; /* Set column headers background color */-->
+<!--            color: white; /* Set column headers text color */-->
+<!--        }-->
+
+<!--        tr:nth-child(even) {-->
+<!--            background-color: #f2f2f2; /* Light green background for even rows */-->
+<!--        }-->
+
+<!--        tr:hover {-->
+<!--            background-color: #ddd; /* Darker green background on hover */-->
+<!--        }-->
+
+
+<!--        h1 {-->
+<!--            text-align: center;-->
+<!--            margin-top: 30px;-->
+<!--        }-->
+<!--        .dashboard-container {-->
+<!--            border: 1px solid #ccc; /* Light gray border */-->
+<!--            border-radius: 5px; /* Rounded corners */-->
+<!--            padding: 20px;-->
+<!--            margin: 20px auto;-->
+<!--            max-width: 1450px; /* Limit width for better readability */-->
+<!--            background: url('/static/chart_2.jfif') no-repeat center center fixed, #ccc; /* Background image and gray color */-->
+<!--            background-size: cover;-->
+<!--            background-color: #ccc; /* White background */-->
+<!--            overflow-x: auto; /* Ensure content doesn't overflow (consider removing if needed) */-->
+<!--        }-->
+<!--        .dropdown-container label {-->
+<!--            font-size: 20px; /* Increase font size */-->
+<!--            font-weight: bold; /* Make font bold */-->
+<!--            color: black; /* Set text color to black */-->
+<!--        }-->
+
+<!--        .dropdown-container select {-->
+<!--            font-size: 18px; /* Increase font size */-->
+<!--        }-->
+
+<!--        .dropdown-container select:hover {-->
+<!--            border-color: #0056b3; /* Darker shade of blue on hover */-->
+<!--        }-->
+
+<!--        .dropdown-container select:focus {-->
+<!--            outline: none; /* Remove default focus outline */-->
+<!--            border-color: #0056b3; /* Darker shade of blue when focused */-->
+<!--        }-->
+
+<!--        input[type="submit"] {-->
+<!--            padding: 3.5px 18px; /* Adjust padding */-->
+<!--            font-size: 18px; /* Increase font size */-->
+<!--            font-weight: bold; /* Make font bold */-->
+<!--            color: black; /* Set text color to black */-->
+<!--            background-color: #007bff; /* Blue background color */-->
+<!--            border: 2px solid white; /* Blue border */-->
+<!--            border-radius: 5px;-->
+<!--            cursor: pointer;-->
+<!--            transition: background-color 0.3s ease;-->
+<!--        }-->
+
+<!--        input[type="submit"]:hover {-->
+<!--            background-color: #0056b3; /* Darker shade of blue on hover */-->
+<!--        }-->
+
+<!--        .logo-container {-->
+<!--            text-align: right;-->
+<!--            margin-bottom: 20px;-->
+<!--        }-->
+<!--        .logo {-->
+<!--            width: 100px;-->
+<!--            height: auto;-->
+<!--            border: 1px solid #ccc; /* Light gray border */-->
+<!--            border-radius: 5px;-->
+<!--        }-->
+<!--        .table {-->
+<!--            border-collapse: collapse;-->
+<!--            margin-bottom: 20px;-->
+<!--            background-color: #fff;-->
+<!--            overflow-x: auto; /* Horizontal scrollbar */-->
+<!--        }-->
+
+    </style>
+</head>
+
+
+
+
+<body>
+    <div class="logo-container">
+    </div>
+    <h1>Dashboard for Scenario</h1>
+    <div class="dashboard-container">
+        <form id="dashboard-form">
+            <div class="dropdown-container">
+<!--                <label for="variable">Variable:</label>-->
+                <select name="variable" id="variable" onchange="updateRegionOptions(this.value)">
+                    <option value="">Select Variable</option>
+                    {% for option in variable_options %}
+                        <option value="{{ option }}" {% if option == selected_variable %}selected{% endif %}>{{ option }}</option>
+                    {% endfor %}
+                </select>
+
+<!--                <label for="region">Region:</label>-->
+                <select name="region" id="region" onchange="updateModelOptions(this.value)">
+                    <option value="">Select Region</option>
+                    {% for option in region_options %}
+                        <option value="{{ option }}" {% if option == selected_region %}selected{% endif %}>{{ option }}</option>
+                    {% endfor %}
+                </select>
+
+<!--                <label for="model">Model:</label>-->
+                <select name="model" id="model">
+                    <option value="">Select Model</option>
+                    {% for option in model_options %}
+                        <option value="{{ option }}" {% if option == selected_model %}selected{% endif %}>{{ option }}</option>
+                    {% endfor %}
+                </select>
+
+<!--                <label for="plot_type">Plot Type:</label>-->
+                <select name="plot_type" id="plot_type">
+                    <option value="line" {% if selected_plot_type == "line" %}selected{% endif %}>Line</option>
+                    <option value="line+marker" {% if selected_plot_type == "line+marker" %}selected{% endif %}>Line+Marker</option>
+                    <option value="bar" {% if selected_plot_type == "bar" %}selected{% endif %}>Bar</option>
+                </select>
+            </div>
+        </form>
+
+        {% if plot_div_single %}
+            {{ plot_div_single|safe }}
+        {% endif %}
+
+        {% if not filtered_data.empty %}
+            <h2>Data</h2>
+            <table>
+                <thead>
+                    <tr>
+                        {% for column in filtered_data.columns %}
+                            <th>{{ column }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for _, row in filtered_data.iterrows %}
+                        <tr>
+                            {% for value in row %}
+                                <td>{{ value }}</td>
+                            {% endfor %}
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p>No data available for the selected options.</p>
+        {% endif %}
+    </div>
+
+    <script>
+        var regionOptions = {{ region_options|safe }};
+        var modelOptions = {{ model_options|safe }};
+
+        function updateRegionOptions(selectedVariable) {
+            var regionSelect = document.getElementById('region');
+            regionSelect.innerHTML = '<option value="">Select Region</option>';
+
+            if (selectedVariable) {
+                var filteredRegions = regionOptions.filter(function(region) {
+                    return region.startsWith(selectedVariable);
+                });
+
+                filteredRegions.forEach(function(region) {
+                    var option = document.createElement('option');
+                    option.value = region;
+                    option.text = region;
+                    regionSelect.add(option);
+                });
+            }
+        }
+
+        function updateModelOptions(selectedRegion) {
+            var modelSelect = document.getElementById('model');
+            modelSelect.innerHTML = '<option value="">Select Model</option>';
+
+            if (selectedRegion) {
+                var filteredModels = modelOptions.filter(function(model) {
+                    return model.startsWith(selectedRegion);
+                });
+
+                filteredModels.forEach(function(model) {
+                    var option = document.createElement('option');
+                    option.value = model;
+                    option.text = model;
+                    modelSelect.add(option);
+                });
+            }
+        }
+
+        // Add event listener to the form
+        document.getElementById('dashboard-form').addEventListener('change', function() {
+            // Submit the form when any dropdown value changes
+            this.submit();
+        });
+    </script>
+</body>
+
+
+
+
+<!--<body>-->
+<!--    <div class="logo-container">-->
+<!--    </div>-->
+<!--    <h1>Dashboard for Scenario</h1>-->
+<!--    <div class="dashboard-container">-->
+<!--        <form id="dashboard-form">-->
+<!--            <div class="dropdown-container">-->
+<!--                <label for="variable">Variable:</label>-->
+<!--                <select name="variable" id="variable" onchange="updateRegionOptions(this.value)">-->
+<!--                    <option value="">Select Variable</option>-->
+<!--                    {% for option in variable_options %}-->
+<!--                        <option value="{{ option }}" {% if option == selected_variable %}selected{% endif %}>{{ option }}</option>-->
+<!--                    {% endfor %}-->
+<!--                </select>-->
+
+<!--                <label for="region">Region:</label>-->
+<!--                <select name="region" id="region" onchange="updateModelOptions(this.value)">-->
+<!--                    <option value="">Select Region</option>-->
+<!--                    {% for option in region_options %}-->
+<!--                        <option value="{{ option }}" {% if option == selected_region %}selected{% endif %}>{{ option }}</option>-->
+<!--                    {% endfor %}-->
+<!--                </select>-->
+
+<!--                <label for="model">Model:</label>-->
+<!--                <select name="model" id="model">-->
+<!--                    <option value="">Select Model</option>-->
+<!--                    {% for option in model_options %}-->
+<!--                        <option value="{{ option }}" {% if option == selected_model %}selected{% endif %}>{{ option }}</option>-->
+<!--                    {% endfor %}-->
+<!--                </select>-->
+
+
+<!--                <label for="plot_type">Plot Type:</label>-->
+<!--                <select name="plot_type" id="plot_type">-->
+<!--                    <option value="line" {% if selected_plot_type == "line" %}selected{% endif %}>Line</option>-->
+<!--                    <option value="line+marker" {% if selected_plot_type == "line+marker" %}selected{% endif %}>Line+Marker</option>-->
+<!--                    <option value="bar" {% if selected_plot_type == "bar" %}selected{% endif %}>Bar</option>-->
+<!--                </select>-->
+<!--            </div>-->
+<!--        </form>-->
+
+<!--        {% if plot_div_single %}-->
+<!--            {{ plot_div_single|safe }}-->
+<!--        {% endif %}-->
+
+<!--        {% if not filtered_data.empty %}-->
+<!--            <h2>Data</h2>-->
+<!--            <table>-->
+<!--                <thead>-->
+<!--                    <tr>-->
+<!--                        {% for column in filtered_data.columns %}-->
+<!--                            <th>{{ column }}</th>-->
+<!--                        {% endfor %}-->
+<!--                    </tr>-->
+<!--                </thead>-->
+<!--                <tbody>-->
+<!--                    {% for _, row in filtered_data.iterrows %}-->
+<!--                        <tr>-->
+<!--                            {% for value in row %}-->
+<!--                                <td>{{ value }}</td>-->
+<!--                            {% endfor %}-->
+<!--                        </tr>-->
+<!--                    {% endfor %}-->
+<!--                </tbody>-->
+<!--            </table>-->
+<!--        {% else %}-->
+<!--            <p>No data available for the selected options.</p>-->
+<!--        {% endif %}-->
+<!--    </div>-->
+
+<!--    <script>-->
+<!--        var regionOptions = {{ region_options|safe }};-->
+<!--        var modelOptions = {{ model_options|safe }};-->
+
+<!--        function updateRegionOptions(selectedVariable) {-->
+<!--            var regionSelect = document.getElementById('region');-->
+<!--            regionSelect.innerHTML = '<option value="">Select Region</option>';-->
+
+<!--            if (selectedVariable) {-->
+<!--                var filteredRegions = regionOptions.filter(function(region) {-->
+<!--                    return region.startsWith(selectedVariable);-->
+<!--                });-->
+
+<!--                filteredRegions.forEach(function(region) {-->
+<!--                    var option = document.createElement('option');-->
+<!--                    option.value = region;-->
+<!--                    option.text = region;-->
+<!--                    regionSelect.add(option);-->
+<!--                });-->
+<!--            }-->
+<!--        }-->
+
+<!--        function updateModelOptions(selectedRegion) {-->
+<!--            var modelSelect = document.getElementById('model');-->
+<!--            modelSelect.innerHTML = '<option value="">Select Model</option>';-->
+
+<!--            if (selectedRegion) {-->
+<!--                var filteredModels = modelOptions.filter(function(model) {-->
+<!--                    return model.startsWith(selectedRegion);-->
+<!--                });-->
+
+<!--                filteredModels.forEach(function(model) {-->
+<!--                    var option = document.createElement('option');-->
+<!--                    option.value = model;-->
+<!--                    option.text = model;-->
+<!--                    modelSelect.add(option);-->
+<!--                });-->
+<!--            }-->
+<!--        }-->
+
+<!--        // Add event listener to the form-->
+<!--        document.getElementById('dashboard-form').addEventListener('change', function() {-->
+<!--            // Submit the form when any dropdown value changes-->
+<!--            this.submit();-->
+<!--        });-->
+
+
+<!--    </script>-->
+<!--</body>-->
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+from django.shortcuts import render, redirect
+import openpyxl
+import json
+from django.http import HttpResponse
+from django.shortcuts import render
+import pandas as pd
+import plotly.graph_objs as go
+from plotly.offline import plot
+
+def chart(request):
+    if request.method == "GET":
+        return render(request, 'chart.html', {})
+    else:
+        excel_file = request.FILES["excel_file"]
+        wb = openpyxl.load_workbook(excel_file)
+        worksheet = wb.active
+        excel_data = []
+        for row in worksheet.iter_rows():
+            row_data = []
+            for cell in row:
+                row_data.append(cell.value)
+            excel_data.append(row_data)
+
+        df = pd.DataFrame(excel_data[1:], columns=excel_data[0])
+        variable_options = sorted(df['Variable'].unique().tolist())
+        country_options = list(set([(country, variable) for country, variable in zip(df['Region'], df['Variable'])]))
+        model_options = list(set([(model, variable, country) for model, variable, country in zip(df['Model'], df['Variable'], df['Region'])]))
+
+        request.session['data'] = json.loads(df.to_json(orient='records'))
+        request.session['variable_options'] = variable_options
+        request.session['country_options'] = country_options
+        request.session['model_options'] = model_options
+
+        return redirect('dashboard')
+
+
+
+
+import pandas as pd
+import plotly.graph_objs as go
+from plotly.offline import plot
+
+def dashboard(request):
+    # Load data from Excel file
+    df = pd.read_excel("charts/static/data/bs_check.xlsx")
+
+    # Get selected options from request
+    selected_variable = request.GET.get('variable', None)
+    selected_region = request.GET.get('region', None)
+    selected_model = request.GET.get("model", None)
+    selected_plot_type = request.GET.get("plot_type", "line")
+
+    # Filter the DataFrame based on selected filters
+    if selected_variable and selected_region and selected_model:
+        filtered_data = df[(df['Variable'] == selected_variable) &
+                           (df['Region'] == selected_region) &
+                           (df['Model'] == selected_model)]
+        if not filtered_data.empty:
+            # Create traces for each scenario
+            years = [2020, 2025, 2030, 2035, 2040, 2045, 2050]
+            traces = []
+            for scenario, scenario_data in filtered_data.groupby('Scenario'):
+                if selected_plot_type == "line":
+                    trace = go.Scatter(
+                        x=years,
+                        y=scenario_data[years].values.flatten(),
+                        mode='lines',
+                        line=dict(width=5, shape='spline'),
+                        name=scenario
+                    )
+                elif selected_plot_type == "line+marker":
+                    trace = go.Scatter(
+                        x=years,
+                        y=scenario_data[years].values.flatten(),
+                        mode='lines+markers',
+                        line=dict(width=5, shape='spline'),
+                        name=scenario
+                    )
+                elif selected_plot_type == "bar":
+                    trace = go.Bar(
+                        x=years,
+                        y=scenario_data[years].values.flatten(),
+
+                        name=scenario
+                    )
+                traces.append(trace)
+
+            # Create the plot
+            layout = go.Layout(
+                title=selected_variable,
+                xaxis=dict(title='Year', showgrid=False, tickfont=dict(color="black")),
+                yaxis=dict(title='Value', showgrid=False, tickfont=dict(color="black")),
+                height=750,
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(8,8,8,8)'
+            )
+            fig = go.Figure(data=traces, layout=layout)
+            plot_div_single = plot(fig, output_type='div', include_plotlyjs=False)
+        else:
+            # If filtered data is empty, set plot_div_single to None
+            plot_div_single = None
+    else:
+        # If any of the options is not selected, set filtered_data and plot_div_single to None
+        filtered_data, plot_div_single = None, None
+
+    # Get unique values for each column
+    variable_options = df['Variable'].unique().tolist()
+    region_options = df['Region'].unique().tolist()
+    model_options = df['Model'].unique().tolist()
+
+    # Filter region options based on selected variable
+    if selected_variable:
+        region_options = df[df['Variable'] == selected_variable]['Region'].unique().tolist()
+
+    # Filter model options based on selected variable and region
+    if selected_variable and selected_region:
+        model_options = df[(df['Variable'] == selected_variable) & (df['Region'] == selected_region)]['Model'].unique().tolist()
+
+    # Prepare context to pass to the template
+    context = {
+        'variable_options': variable_options,
+        'region_options': region_options,
+        'model_options': model_options,
+        'selected_variable': selected_variable,
+        'selected_region': selected_region,
+        'selected_model': selected_model,
+        'selected_plot_type': selected_plot_type,
+        'filtered_data': filtered_data,
+        'plot_div_single': plot_div_single,
+    }
+
+    return render(request, 'dashboard.html', context)
+
+# def dashboard(request):
+#     # Load data from Excel file
+#     df = pd.read_excel("charts/static/data/bs_check.xlsx")
+#
+#     # Get selected options from request
+#     selected_variable = request.GET.get('variable', None)
+#     selected_region = request.GET.get('region', None)
+#     selected_model = request.GET.get("model", None)
+#     selected_plot_type = request.GET.get("plot_type", None)
+#
+#     # Filter the DataFrame based on selected filters
+#     if selected_variable and selected_region and selected_model:
+#         filtered_data = df[(df['Variable'] == selected_variable) &
+#                            (df['Region'] == selected_region) &
+#                            (df['Model'] == selected_model)]
+#         if not filtered_data.empty:
+#             # Create traces for each scenario
+#             years = [2020, 2025, 2030, 2035, 2040, 2045, 2050]
+#             traces = []
+#             for scenario, scenario_data in filtered_data.groupby('Scenario'):
+#                 if selected_plot_type == "line":
+#                     trace = go.Scatter(
+#                         x=years,
+#                         y=scenario_data[years].values.flatten(),
+#                         mode='lines',
+#                         line=dict(width=3),
+#                         name=scenario
+#                     )
+#                 elif selected_plot_type == "line+marker":
+#                     trace = go.Scatter(
+#                         x=years,
+#                         y=scenario_data[years].values.flatten(),
+#                         mode='lines+markers',
+#                         line=dict(width=3),
+#                         name=scenario
+#                     )
+#                 elif selected_plot_type == "bar":
+#                     trace = go.Bar(
+#                         x=years,
+#                         y=scenario_data[years].values.flatten(),
+#                         name=scenario
+#                     )
+#                 traces.append(trace)
+#
+#             # Create the plot
+#             layout = go.Layout(
+#                 title=selected_variable,
+#                 xaxis=dict(title='Year', showgrid=True, tickfont=dict(color="black")),
+#                 yaxis=dict(title='Value', showgrid=True, tickfont=dict(color="black")),
+#                 height=750,
+#                 plot_bgcolor='rgba(0,0,0,0)',
+#                 paper_bgcolor='rgba(8,8,8,8)'
+#             )
+#             fig = go.Figure(data=traces, layout=layout)
+#             plot_div_single = plot(fig, output_type='div', include_plotlyjs=False)
+#         else:
+#             # If filtered data is empty, set plot_div_single to None
+#             plot_div_single = None
+#     else:
+#         # If any of the options is not selected, set filtered_data and plot_div_single to None
+#         filtered_data, plot_div_single = None, None
+#
+#     # Get unique values for each column
+#     variable_options = df['Variable'].unique().tolist()
+#     region_options = df['Region'].unique().tolist()
+#     model_options = df['Model'].unique().tolist()
+#
+#     # Filter region options based on selected variable
+#     if selected_variable:
+#         region_options = df[df['Variable'] == selected_variable]['Region'].unique().tolist()
+#
+#     # Filter model options based on selected variable and region
+#     if selected_variable and selected_region:
+#         model_options = df[(df['Variable'] == selected_variable) & (df['Region'] == selected_region)]['Model'].unique().tolist()
+#
+#     # Prepare context to pass to the template
+#     context = {
+#         'variable_options': variable_options,
+#         'region_options': region_options,
+#         'model_options': model_options,
+#         'selected_variable': selected_variable,
+#         'selected_region': selected_region,
+#         'selected_model': selected_model,
+#         'selected_plot_type': selected_plot_type,
+#         'filtered_data': filtered_data,
+#         'plot_div_single': plot_div_single,
+#     }
+#
+#     return render(request, 'dashboard.html', context)
+
+# def dashboard(request):
+#     # Load data from Excel file
+#     df = pd.read_excel("charts/static/data/bs_check.xlsx")
+#
+#     # Get selected options from request
+#     selected_variable = request.GET.get('variable', None)
+#     selected_region = request.GET.get('region', None)
+#     selected_model = request.GET.get("model", None)
+#     selected_plot_type = request.GET.get("plot_type", None)
+#
+#
+#     # Filter the DataFrame based on selected filters
+#     if selected_variable and selected_region and selected_model:
+#         filtered_data = df[(df['Variable'] == selected_variable) &
+#                            (df['Region'] == selected_region) &
+#                            (df['Model'] == selected_model)]
+#         if not filtered_data.empty:
+#             # Create traces for each scenario
+#             years = [2020, 2025, 2030, 2035, 2040, 2045, 2050]
+#             traces = []
+#             for scenario, scenario_data in filtered_data.groupby('Scenario'):
+#                 trace = go.Scatter(
+#                     x=years,
+#                     y=scenario_data[years].values.flatten(),
+#                     mode='lines+markers',
+#                     line=dict(width=5, shape='spline'),
+#                     name=scenario
+#                 )
+#                 traces.append(trace)
+#             # Create the multiline plot
+#             layout = go.Layout(
+#                 title=selected_variable,
+#                 xaxis=dict(title='Year', showgrid=False, tickfont=dict(color="black")),
+#                 yaxis=dict(title='Value', showgrid=False, tickfont=dict(color="black")),
+#                 height=750,
+#                 plot_bgcolor='rgba(0,0,0,0)',
+#                 paper_bgcolor='rgba(8,8,8,8)'
+#             )
+#             fig = go.Figure(data=traces, layout=layout)
+#             plot_div_single = plot(fig, output_type='div', include_plotlyjs=False)
+#         else:
+#             # If filtered data is empty, set plot_div_single to None
+#             plot_div_single = None
+#     else:
+#         # If any of the options is not selected, set filtered_data and plot_div_single to None
+#         filtered_data, plot_div_single = None, None
+#
+#     # Get unique values for each column
+#     variable_options = df['Variable'].unique().tolist()
+#     region_options = df['Region'].unique().tolist()
+#     model_options = df['Model'].unique().tolist()
+#
+#     # Filter region options based on selected variable
+#     if selected_variable:
+#         region_options = df[df['Variable'] == selected_variable]['Region'].unique().tolist()
+#
+#     # Filter model options based on selected variable and region
+#     if selected_variable and selected_region:
+#         model_options = df[(df['Variable'] == selected_variable) & (df['Region'] == selected_region)]['Model'].unique().tolist()
+#
+#     # Prepare context to pass to the template
+#     context = {
+#         'variable_options': variable_options,
+#         'region_options': region_options,
+#         'model_options': model_options,
+#         'selected_variable': selected_variable,
+#         'selected_region': selected_region,
+#         'selected_model': selected_model,
+#         'filtered_data': filtered_data,
+#         'selected_plot_type': selected_plot_type,
+#         'plot_div_single': plot_div_single,
+#     }
+#
+#     return render(request, 'dashboard.html', context)
+
+# def dashboard(request):
+#     # Load data from Excel file
+#     df = pd.read_excel("charts/static/data/bs_check.xlsx")
+#     print(df)
+#     # Get selected options from request
+#     selected_variable = request.GET.get('variable', None)
+#     selected_country = request.GET.get('country', None)
+#     selected_model = request.GET.get("model", None)
+#
+#     # Filter the DataFrame based on selected filters
+#     if selected_variable and selected_country and selected_model:
+#         filtered_data = df[(df['Variable'] == selected_variable) &
+#                            (df['Region'] == selected_country) &
+#                            (df['Model'] == selected_model)]
+#         if not filtered_data.empty:
+#             # Create traces for each scenario
+#             years = [2020, 2025, 2030, 2035, 2040, 2045, 2050]
+#             traces = []
+#             for scenario, scenario_data in filtered_data.groupby('Scenario'):
+#                 trace = go.Scatter(
+#                     x=years,
+#                     y=scenario_data[years].values.flatten(),
+#                     mode='lines+markers',
+#                     line=dict(width=5, shape='spline'),
+#                     name=scenario
+#                 )
+#                 traces.append(trace)
+#             # Create the multiline plot
+#             layout = go.Layout(
+#                 title=selected_variable,
+#                 xaxis=dict(title='Year', showgrid=False, tickfont=dict(color="black")),
+#                 yaxis=dict(title='Value', showgrid=False, tickfont=dict(color="black")),
+#                 height=750,
+#                 plot_bgcolor='rgba(0,0,0,0)',
+#                 paper_bgcolor='rgba(8,8,8,8)'
+#             )
+#             fig = go.Figure(data=traces, layout=layout)
+#             plot_div_single = plot(fig, output_type='div', include_plotlyjs=False)
+#         else:
+#             # If filtered data is empty, set plot_div_single to None
+#             plot_div_single = None
+#     else:
+#         # If any of the options is not selected, set filtered_data and plot_div_single to None
+#         filtered_data, plot_div_single = None, None
+#
+#     # Get unique values for each column
+#     variable_options = df['Variable'].unique().tolist()
+#     country_options = df['Region'].unique().tolist()
+#     model_options = df['Model'].unique().tolist()
+#
+#     # Filter country options based on selected variable
+#     if selected_variable:
+#         country_options = df[df['Variable'] == selected_variable]['Region'].unique().tolist()
+#
+#     # Filter model options based on selected variable and country
+#     if selected_variable and selected_country:
+#         model_options = df[(df['Variable'] == selected_variable) & (df['Region'] == selected_country)]['Model'].unique().tolist()
+#
+#     # Prepare context to pass to the template
+#     context = {
+#         'variable_options': variable_options,
+#         'country_options': country_options,
+#         'model_options': model_options,
+#         'selected_variable': selected_variable,
+#         'selected_country': selected_country,
+#         'selected_model': selected_model,
+#         'filtered_data': filtered_data,
+#         'plot_div_single': plot_div_single,
+#     }
+#
+#     return render(request, 'dashboard.html', context)
