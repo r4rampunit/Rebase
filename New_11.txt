@@ -1914,4 +1914,115 @@ def dashboard(request):
 
 .dropdown-container select option[value*="DP"] {
     color: red;
-}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+from django.shortcuts import render
+from django.core.paginator import Paginator
+import pandas as pd
+import plotly.graph_objs as go
+from plotly.offline import plot
+
+def dashboard(request):
+    # Get selected options from request
+    selected_variable = request.GET.get('variable', None)
+    selected_region = request.GET.get('region', None)
+    selected_model = request.GET.get("model", None)
+    selected_plot_type = request.GET.get("plot_type", "line")
+
+    # Load data from Excel file (consider loading only necessary columns if dataset is too large)
+    df = pd.read_excel("charts/static/data/bs_check.xlsx")
+
+    # Filter the DataFrame based on selected filters
+    filtered_data = df.copy()  # Copy the dataframe to avoid modifying the original one
+    if selected_variable:
+        filtered_data = filtered_data[filtered_data['Variable'] == selected_variable]
+    if selected_region:
+        filtered_data = filtered_data[filtered_data['Region'] == selected_region]
+    if selected_model:
+        filtered_data = filtered_data[filtered_data['Model'] == selected_model]
+
+    # Pagination
+    paginator = Paginator(filtered_data.values.tolist(), 10)  # Change 10 to your desired page size
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    # Create the plot if data is available
+    if len(filtered_data) > 0:
+        # Extract relevant columns for plotting
+        years = [2020, 2025, 2030, 2035, 2040, 2045, 2050]
+        traces = []
+        for scenario, scenario_data in filtered_data.groupby('Scenario'):
+            if selected_plot_type == "line":
+                trace = go.Scatter(
+                    x=years,
+                    y=scenario_data[years].values.flatten(),
+                    mode='lines',
+                    line=dict(width=5, shape='spline'),
+                    name=scenario
+                )
+            elif selected_plot_type == "line+marker":
+                trace = go.Scatter(
+                    x=years,
+                    y=scenario_data[years].values.flatten(),
+                    mode='lines+markers',
+                    line=dict(width=5, shape='spline'),
+                    name=scenario
+                )
+            elif selected_plot_type == "bar":
+                trace = go.Bar(
+                    x=years,
+                    y=scenario_data[years].values.flatten(),
+                    name=scenario
+                )
+            traces.append(trace)
+
+        # Create the plot
+        layout = go.Layout(
+            title=selected_variable,
+            xaxis=dict(title='Year', showgrid=False, tickfont=dict(color="black")),
+            yaxis=dict(title='Value', showgrid=False, tickfont=dict(color="black")),
+            height=750,
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(8,8,8,8)'
+        )
+        fig = go.Figure(data=traces, layout=layout)
+        plot_div_single = plot(fig, output_type='div', include_plotlyjs=False)
+    else:
+        plot_div_single = None
+
+    # Get unique values for each column
+    variable_options = df['Variable'].unique().tolist()
+    region_options = df['Region'].unique().tolist()
+    model_options = df['Model'].unique().tolist()
+
+    # Prepare context to pass to the template
+    context = {
+        'variable_options': variable_options,
+        'region_options': region_options,
+        'model_options': model_options,
+        'selected_variable': selected_variable,
+        'selected_region': selected_region,
+        'selected_model': selected_model,
+        'selected_plot_type': selected_plot_type,
+        'page_obj': page_obj,
+        'plot_div_single': plot_div_single,
+    }
+
+    return render(request, 'dashboard.html', context)
