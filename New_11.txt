@@ -2137,3 +2137,271 @@ def dashboard(request):
     }
 
     return render(request, 'dashboard.html', context)
+
+
+
+
+
+
+
+
+
+
+
+
+# Install necessary packages
+!pip install plotly pandas
+
+# Load data from Excel file (for demonstration, you can upload your file to Colab)
+import pandas as pd
+
+# Load your dataset
+df = pd.read_excel("path_to_your_file/bs_check.xlsx")
+
+# Create dropdowns using Plotly's Dash components
+import plotly.graph_objs as go
+import dash
+import dash_core_components as dcc
+import dash_html_components as html
+from dash.dependencies import Input, Output
+
+app = dash.Dash(__name__)
+
+app.layout = html.Div([
+    html.H1('Dashboard for Scenario'),
+    html.Div([
+        html.Label('Variable:'),
+        dcc.Dropdown(
+            id='variable-dropdown',
+            options=[{'label': var, 'value': var} for var in df['Variable'].unique()],
+            value=None,
+            multi=False
+        ),
+        html.Label('Region:'),
+        dcc.Dropdown(
+            id='region-dropdown',
+            options=[{'label': reg, 'value': reg} for reg in df['Region'].unique()],
+            value=None,
+            multi=False
+        ),
+        html.Label('Model:'),
+        dcc.Dropdown(
+            id='model-dropdown',
+            options=[{'label': mod, 'value': mod} for mod in df['Model'].unique()],
+            value=None,
+            multi=False
+        ),
+        html.Label('Plot Type:'),
+        dcc.Dropdown(
+            id='plot-type-dropdown',
+            options=[
+                {'label': 'Line', 'value': 'line'},
+                {'label': 'Line+Marker', 'value': 'line+marker'},
+                {'label': 'Bar', 'value': 'bar'}
+            ],
+            value='line',
+            multi=False
+        ),
+    ]),
+    html.Div(id='plot-container')
+])
+
+@app.callback(
+    Output('plot-container', 'children'),
+    [Input('variable-dropdown', 'value'),
+     Input('region-dropdown', 'value'),
+     Input('model-dropdown', 'value'),
+     Input('plot-type-dropdown', 'value')]
+)
+def update_plot(selected_variable, selected_region, selected_model, selected_plot_type):
+    # Filter the DataFrame based on selected filters
+    filtered_data = df.copy()  # Copy the dataframe to avoid modifying the original one
+    if selected_variable:
+        filtered_data = filtered_data[filtered_data['Variable'] == selected_variable]
+    if selected_region:
+        filtered_data = filtered_data[filtered_data['Region'] == selected_region]
+    if selected_model:
+        filtered_data = filtered_data[filtered_data['Model'] == selected_model]
+
+    # Create traces for each scenario
+    years = [2020, 2025, 2030, 2035, 2040, 2045, 2050]
+    traces = []
+    for scenario, scenario_data in filtered_data.groupby('Scenario'):
+        if selected_plot_type == "line":
+            trace = go.Scatter(
+                x=years,
+                y=scenario_data[years].values.flatten(),
+                mode='lines',
+                line=dict(width=5, shape='spline'),
+                name=scenario
+            )
+        elif selected_plot_type == "line+marker":
+            trace = go.Scatter(
+                x=years,
+                y=scenario_data[years].values.flatten(),
+                mode='lines+markers',
+                line=dict(width=5, shape='spline'),
+                name=scenario
+            )
+        elif selected_plot_type == "bar":
+            trace = go.Bar(
+                x=years,
+                y=scenario_data[years].values.flatten(),
+                name=scenario
+            )
+        traces.append(trace)
+
+    # Create the plot
+    layout = go.Layout(
+        title=selected_variable,
+        xaxis=dict(title='Year', showgrid=False, tickfont=dict(color="black")),
+        yaxis=dict(title='Value', showgrid=False, tickfont=dict(color="black")),
+        height=750,
+        plot_bgcolor='rgba(0,0,0,0)',
+        paper_bgcolor='rgba(8,8,8,8)'
+    )
+    fig = go.Figure(data=traces, layout=layout)
+    return dcc.Graph(
+        id='plot',
+        figure=fig
+    )
+
+if __name__ == '__main__':
+    app.run_server(debug=True, use_reloader=False)
+
+
+
+
+
+
+
+
+# Import necessary modules
+from django.shortcuts import render
+import pandas as pd
+import plotly.graph_objs as go
+from dash import Dash
+from dash.dependencies import Input, Output
+import dash_core_components as dcc
+import dash_html_components as html
+
+# Create a function to generate the Dash dashboard layout
+def generate_dash_layout(df):
+    # Define the Dash app
+    app = Dash(__name__)
+
+    # Define the layout of the dashboard
+    app.layout = html.Div([
+        html.H1('Dashboard for Scenario'),
+        html.Div([
+            html.Label('Variable:'),
+            dcc.Dropdown(
+                id='variable-dropdown',
+                options=[{'label': var, 'value': var} for var in df['Variable'].unique()],
+                value=None,
+                multi=False
+            ),
+            html.Label('Region:'),
+            dcc.Dropdown(
+                id='region-dropdown',
+                options=[{'label': reg, 'value': reg} for reg in df['Region'].unique()],
+                value=None,
+                multi=False
+            ),
+            html.Label('Model:'),
+            dcc.Dropdown(
+                id='model-dropdown',
+                options=[{'label': mod, 'value': mod} for mod in df['Model'].unique()],
+                value=None,
+                multi=False
+            ),
+            html.Label('Plot Type:'),
+            dcc.Dropdown(
+                id='plot-type-dropdown',
+                options=[
+                    {'label': 'Line', 'value': 'line'},
+                    {'label': 'Line+Marker', 'value': 'line+marker'},
+                    {'label': 'Bar', 'value': 'bar'}
+                ],
+                value='line',
+                multi=False
+            ),
+        ]),
+        html.Div(id='plot-container')
+    ])
+
+    # Define the callback function to update the plot
+    @app.callback(
+        Output('plot-container', 'children'),
+        [Input('variable-dropdown', 'value'),
+         Input('region-dropdown', 'value'),
+         Input('model-dropdown', 'value'),
+         Input('plot-type-dropdown', 'value')]
+    )
+    def update_plot(selected_variable, selected_region, selected_model, selected_plot_type):
+        # Filter the DataFrame based on selected filters
+        filtered_data = df.copy()  # Copy the dataframe to avoid modifying the original one
+        if selected_variable:
+            filtered_data = filtered_data[filtered_data['Variable'] == selected_variable]
+        if selected_region:
+            filtered_data = filtered_data[filtered_data['Region'] == selected_region]
+        if selected_model:
+            filtered_data = filtered_data[filtered_data['Model'] == selected_model]
+
+        # Create traces for each scenario
+        years = [2020, 2025, 2030, 2035, 2040, 2045, 2050]
+        traces = []
+        for scenario, scenario_data in filtered_data.groupby('Scenario'):
+            if selected_plot_type == "line":
+                trace = go.Scatter(
+                    x=years,
+                    y=scenario_data[years].values.flatten(),
+                    mode='lines',
+                    line=dict(width=5, shape='spline'),
+                    name=scenario
+                )
+            elif selected_plot_type == "line+marker":
+                trace = go.Scatter(
+                    x=years,
+                    y=scenario_data[years].values.flatten(),
+                    mode='lines+markers',
+                    line=dict(width=5, shape='spline'),
+                    name=scenario
+                )
+            elif selected_plot_type == "bar":
+                trace = go.Bar(
+                    x=years,
+                    y=scenario_data[years].values.flatten(),
+                    name=scenario
+                )
+            traces.append(trace)
+
+        # Create the plot
+        layout = go.Layout(
+            title=selected_variable,
+            xaxis=dict(title='Year', showgrid=False, tickfont=dict(color="black")),
+            yaxis=dict(title='Value', showgrid=False, tickfont=dict(color="black")),
+            height=750,
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(8,8,8,8)'
+        )
+        fig = go.Figure(data=traces, layout=layout)
+        return dcc.Graph(
+            id='plot',
+            figure=fig
+        )
+
+    # Return the app's layout
+    return app.layout
+
+# Your existing Django view
+def dashboard(request):
+    # Load data from Excel file
+    df = pd.read_excel("charts/static/data/bs_check.xlsx")
+
+    # Generate the Dash dashboard layout
+    dash_layout = generate_dash_layout(df)
+
+    # Pass the Dash layout to the template
+    context = {'dash_layout': dash_layout}
+    return render(request, 'dashboard.html', context)
