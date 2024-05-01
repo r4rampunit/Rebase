@@ -2962,3 +2962,81 @@ for sheet_name in workbook.sheetnames:
 output_file = input_file.replace(".xlsx", "_formatted.xlsx")
 workbook.save(output_file)
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import pandas as pd
+import openpyxl
+from openpyxl import load_workbook, Workbook
+from openpyxl.styles import Font, PatternFill, Border, Side
+from datetime import datetime
+
+def add_output_columns(sheet, workbook):
+    ws = workbook[sheet]
+    data = ws.values
+    cols = next(data)
+    data = list(data)
+    df = pd.DataFrame(data, columns=cols).round(1)  # Round data to 1 decimal place
+
+    # Your existing transformations
+    df["GDP YR"] = df.groupby(["ISOCODES"])["GDP"].pct_change(4) * 100
+    df["CPI YR"] = df.groupby(["ISOCODES"])["CPI"].pct_change(4) * 100
+    df["PH YR"] = df.groupby(["ISOCODES"])["PH"].pct_change(4) * 100
+    df["PH DUBAI YR"] = df.groupby(["ISOCODES"])["PH_DUBAI"].pct_change(4) * 100
+    df["PCOM YR"] = df.groupby(["ISOCODES"])["PCOM"].pct_change(4) * 100
+    df["GDP QoQ"] = df.groupby(["ISOCODES"])["GDP"].pct_change(1) * 100
+    df["CPI QoQ"] = df.groupby(["ISOCODES"])["CPI"].pct_change(1) * 100
+    df["PH_QoQ"] = df.groupby(["ISOCODES"])["PH"].pct_change(1) * 100
+    df["PH_DUBAI_QOQ"] = df.groupby(["ISOCODES"])["PH_DUBAI"].pct_change(1) * 100
+    df["PCOM QOQ"] = df.groupby(["ISOCODES"])["PCOM"].pct_change(1) * 100
+
+    return df
+
+# Assuming the rest of your functions are defined here as per your original code
+
+def apply_custom_formatting(workbook):
+    for sheet_name in workbook.sheetnames:
+        sheet = workbook[sheet_name]
+        # Apply formatting here as per your requirements
+        for row in sheet.iter_rows(min_row=2):
+            for cell in row:
+                if cell.row > 5:
+                    cell.fill = PatternFill(start_color="FFAFAFAF", end_color="FFAFAFAF", fill_type="solid")
+                if cell.row in [1, 2, 3, 4, 5]:
+                    cell.fill = PatternFill(start_color="FF808080", end_color="FF808080", fill_type="solid")
+                if cell.row == 1:
+                    cell.font = Font(color="FFFF0000")
+                thin_border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
+                cell.border = thin_border
+        # Add custom rows for IFRS scenarios if needed
+
+# Load workbook and apply transformations and formatting
+input_file = r"C:\Users\45363901\PycharmProjects\pythonProject\Automation_GBIC\GBIC_Workings Data\Data - Copy.xlsx"
+workbook = load_workbook(input_file)
+sheetNames = workbook.sheetnames
+All = []
+
+for sheet in sheetNames:
+    df = add_output_columns(sheet, workbook)
+    All.append(df)
+
+# Assuming you have a function to write these DataFrames back to an Excel file
+# After writing back to Excel, reload the workbook to apply custom formatting
+workbook = load_workbook('path_to_your_new_excel_file.xlsx')  # Use the path where you saved the new Excel file
+apply_custom_formatting(workbook)
+workbook.save('path_to_your_final_excel_file.xlsx')  # Save the final version of your Excel file with formatting
+
