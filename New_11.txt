@@ -2860,3 +2860,46 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+workbook = load_workbook(input_file)
+
+for sheet_name in workbook.sheetnames:
+    sheet = workbook[sheet_name]
+    # Remove gridlines
+    sheet.sheet_view.showGridLines = False
+    # Apply grey color to all data cells except column names
+    for row in sheet.iter_rows(min_row=2):
+        for cell in row:
+            if cell.row > 5:
+                cell.fill = PatternFill(start_color="FFAFAFAF", end_color="FFAFAFAF", fill_type="solid")
+    # Add darker grey to specific rows
+    for row in sheet.iter_rows(min_row=2, max_row=5):
+        for cell in row:
+            cell.fill = PatternFill(start_color="FF808080", end_color="FF808080", fill_type="solid")
+    # Rename Q1, Q2, etc. columns to country codes
+    for cell in sheet["D"][1:]:
+        cell.value = cell.value.replace("Q", "")
+    # Freeze top 5 rows and left 4 columns
+    sheet.freeze_panes = "E6"
+
+output_file = input_file.replace(".xlsx", "_formatted.xlsx")
+workbook.save(output_file)
+
