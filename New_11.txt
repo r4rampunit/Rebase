@@ -3040,3 +3040,79 @@ workbook = load_workbook('path_to_your_new_excel_file.xlsx')  # Use the path whe
 apply_custom_formatting(workbook)
 workbook.save('path_to_your_final_excel_file.xlsx')  # Save the final version of your Excel file with formatting
 
+
+
+
+
+
+
+
+import pandas as pd
+from openpyxl import load_workbook, Workbook
+from openpyxl.styles import Font, PatternFill, Border, Side
+from datetime import datetime
+import numpy as np
+
+# Function to add output columns to DataFrame
+def add_output_columns(df):
+    # Assuming 'df' is your DataFrame after reading from Excel
+    # Perform your calculations here
+    # Example:
+    df["GDP YR"] = df.groupby(["ISOCODES"])["GDP"].pct_change(4) * 100
+    # Continue for other columns...
+    return df.round(1)  # Round to 1 decimal place
+
+# Function to apply custom formatting to a sheet
+def apply_custom_formatting(sheet):
+    for row in sheet.iter_rows(min_row=2):
+        for cell in row:
+            if cell.row > 5:
+                cell.fill = PatternFill(start_color="FFAFAFAF", end_color="FFAFAFAF", fill_type="solid")
+            if cell.row in [1, 2, 3, 4, 5]:
+                cell.fill = PatternFill(start_color="FF808080", end_color="FF808080", fill_type="solid")
+            if cell.row == 1:
+                cell.font = Font(color="FFFF0000")
+            thin_border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
+            cell.border = thin_border
+
+    # Additional formatting here as needed
+
+# Main code
+input_file = "path_to_your_excel_file.xlsx"
+output_file = "path_to_your_output_file.xlsx"
+
+# Load the workbook and sheet names
+workbook = load_workbook(input_file)
+sheet_names = workbook.sheetnames
+
+# New workbook for output
+wb_out = Workbook()
+wb_out.remove(wb_out.active)  # Remove default sheet
+
+for sheet_name in sheet_names:
+    ws = workbook[sheet_name]
+    data = ws.values
+    cols = next(data)[0:]  # Read the header row
+    data = list(data)  # Convert iterator to list
+    df = pd.DataFrame(data, columns=cols)
+
+    # Apply your data transformations
+    df_transformed = add_output_columns(df)
+
+    # Write transformed DataFrame to new workbook
+    ws_out = wb_out.create_sheet(title=sheet_name)
+    for r in dataframe_to_rows(df_transformed, index=False, header=True):
+        ws_out.append(r)
+
+# Save the transformed data to a new Excel file
+wb_out.save(output_file)
+
+# Re-open the output workbook to apply formatting
+wb_formatted = load_workbook(output_file)
+for sheet_name in wb_formatted.sheetnames:
+    sheet = wb_formatted[sheet_name]
+    apply_custom_formatting(sheet)
+
+# Save the final formatted workbook
+wb_formatted.save("final_formatted_output.xlsx")
+
