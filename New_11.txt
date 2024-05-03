@@ -3856,3 +3856,62 @@ def construct_and_populate_tables(Isocode, tzero_date, col):
 
     calculate_weights(df_table, Isocode)
     return df_table
+
+
+
+
+
+
+
+
+import pandas as pd
+from datetime import datetime
+
+def construct_and_populate_tables(Isocode, tzero_date, col):
+    curr_year = 2024
+    columns_1 = ['ARE', 'IFRS9 1Q24 Scenarios', '', '', '', 'IFRS9 4Q23 Scenarios', '', '', '', "Moody's"]
+    columns_2 = ['', 'Upside', 'Central', 'Down 1', 'Down 2', 'Upside', 'Central', 'Down 1', 'Down 2', 'Weighted', '10% up', 'Central', '10% DN', '4% DN']
+    columns = [(col1, col2) for col1, col2 in zip(columns_1, columns_2)]
+    rows = ['01', 'Q2', 'Q3', 'Q4', str(curr_year) + ' 1', 'Q1', 'Q2', 'Q3', 'Q4', str(curr_year), str(curr_year + 1), str(curr_year + 2), str(curr_year + 3), '5yr Avg']
+
+    df_table = pd.DataFrame(index=rows)
+
+    for col1, col2 in columns:
+        df_table[col1] = col2
+
+    for frame in All:
+        for row in frame.itertuples():
+            # Your existing logic here...
+
+        # Your existing logic here...
+
+    calculate_weights(df_table, Isocode)
+    return df_table
+
+
+# Adjusted table
+adjusted_table = """
++----+---------------------+---------------------+---------------------+---------------------+---------------------+---------------------+---------------------+---------------------+---------------------+---------------------+---------------------+---------------------+---------------------+
+| ARE|                                                 IFRS9 1Q24 Scenarios                                       |                                   IFRS9 4Q23 Scenarios                                                  |                                      Moody's                         |
+|----+---------------------+---------------------+---------------------+---------------------+---------------------+---------------------+---------------------+---------------------+---------------------+---------------------+---------------------+---------------------+---------------------|
+|    |                     |       Upside       |        Central       |        Down 1       |       Down 2       |        Upside       |       Central       |        Down 1       |       Down 2       |      Weighted     |      10% up      |      Central      |      10% DN    |   4% DN  |
+|----+---------------------+---------------------+---------------------+---------------------+---------------------+---------------------+---------------------+---------------------+---------------------+---------------------+---------------------+---------------------+---------------------|
+| 01 |                     |                     |                           |                     |                           |                     |                           |                     |                     |                    |                     |                     |                     |
+| Q2 |                     |                     |                           |                     |                           |                     |                           |                     |                     |                    |                     |                     |                     |
+| Q3 |                     |                     |                           |                     |                           |                     |                           |                     |                     |                    |                     |                     |                     |
+| Q4 |                     |                     |                           |                     |                           |                     |                           |                     |                     |                    |                     |                     |                     |
+|2024|                     |                     |                           |                     |                           |                     |                           |                     |                     |                    |                     |                     |                     |
+| Q1 |                     |                     |                           |                     |                           |                     |                           |                     |                     |                    |                     |                     |                     |
+| Q2 |                     |                     |                           |                     |                           |                     |                           |                     |                     |                    |                     |                     |                     |
+| Q3 |                     |                     |                           |                     |                           |                     |                           |                     |                     |                    |                     |                     |                     |
+| Q4 |                     |                     |                           |                     |                           |                     |                           |                     |                     |                    |                     |                     |                     |
+|2025|                     |                     |                           |                     |                           |                     |                           |                     |                     |                    |                     |                     |                     |
+|2026|                     |                     |                           |                     |                           |                     |                           |                     |                     |                    |                     |                     |                     |
+|2027|                     |                     |                           |                     |                           |                     |                           |                     |                     |                    |                     |                     |                     |
+|Syr |                     |                     |                           |                     |                           |                     |                           |                     |                     |                    |                     |                     |                     |
+|Avg |                     |                     |                           |                     |                           |                     |                           |                     |                     |                    |                     |                     |                     |
++----+---------------------+---------------------+---------------------+---------------------+---------------------+---------------------+---------------------+---------------------+---------------------+---------------------+---------------------+---------------------+
+"""
+
+# Now you can call your function
+# construct_and_populate_tables(Isocode, tzero_date, col)
