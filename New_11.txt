@@ -3529,3 +3529,19 @@ curr_year = 2024
   columns = all_cols
   rows = ['Q1', 'Q2', 'Q3', 'Q4', f'{curr_year} 1', 'Q1', 'Q2', 'Q3', 'Q4', curr_year, 'Q1', 'Q2', 'Q3', 'Q4', curr_year + 1, curr_year + 2, curr_year + 3, '5yr Avg']
   df_table = pd.DataFrame(columns=columns, index=rows)
+
+
+
+
+
+def construct_and_populate_tables(Isocode, tzero_date, col):
+    curr_year = 2024
+    common_columns_1 = ['IFRS9 1Q24 Scenarios'] * 4
+    common_columns_2 = ['IFRS9 4Q23 Scenarios'] * 4
+    common_columns_3 = ["Moody's"] * 4
+    columns = common_columns_1 + common_columns_2 + common_columns_3 + ['10% UP', 'Central', '10% DN', '4% DN']
+    rows = ['Q1', 'Q2', 'Q3', 'Q4', str(curr_year) + ' 1', 'Q1', 'Q2', 'Q3', 'Q4', str(curr_year), 'Q1', 'Q2', 'Q3', 'Q4', str(curr_year + 1), str(curr_year + 2), str(curr_year + 3), '5yr Avg']
+    df_table = pd.DataFrame(columns=columns, index=rows)
+    year3_sum = 0
+    year4_sum = 0
+    col_index = 0
