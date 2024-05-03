@@ -3807,3 +3807,21 @@ def format_sheet(sheet):
     for col in range(1, 14, 4):
         sheet.merge_cells(start_row=1, start_column=col, end_row=1, end_column=col+3)
         sheet.cell(row=1, column=col).alignment = Alignment(horizontal='center')
+
+
+
+
+
+
+
+
+
+curr_year = 2024
+    common_columns_1 = ['ARE'] + ['IFRS9 1Q24 Scenarios'] * 4 + [''] + ['IFRS9 4Q23 Scenarios'] * 4 + [''] + ["Moody's"] * 3
+    common_columns_2 = [''] + ['Upside', 'Central', 'Down 1', 'Down 2'] * 2 + ['Weighted'] + ['10% UP', 'Central', '10% DN', '4% DN 1']
+    columns = common_columns_1 + common_columns_2
+    rows = ['01', 'Q2', 'Q3', 'Q4', str(curr_year) + ' 1', 'Q1', 'Q2', 'Q3', 'Q4', str(curr_year), 'Q1', 'Q2', 'Q3', 'Q4', str(curr_year + 1), str(curr_year + 2), str(curr_year + 3), '5yr Avg']
+    df_table = pd.DataFrame(columns=columns, index=rows)
+    year3_sum = 0
+    year4_sum = 0
+    col_index = 0
