@@ -3515,3 +3515,17 @@ for Isocode in country_list:
     start_col = 4
     for col in col_list:
         table = construct_and_populate_tables(Isocode, tzero_date, col)
+
+
+
+
+
+
+curr_year = 2024
+  scenario_cols = ['Upside', 'Central', 'Down 1', 'Down 2']
+  moody_cols = ['10% UP', 'Central', '10% DN', '4% DN']
+  all_cols = scenario_cols * 2 + ['Weighted'] + moody_cols
+
+  columns = all_cols
+  rows = ['Q1', 'Q2', 'Q3', 'Q4', f'{curr_year} 1', 'Q1', 'Q2', 'Q3', 'Q4', curr_year, 'Q1', 'Q2', 'Q3', 'Q4', curr_year + 1, curr_year + 2, curr_year + 3, '5yr Avg']
+  df_table = pd.DataFrame(columns=columns, index=rows)
