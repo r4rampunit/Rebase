@@ -4050,3 +4050,12 @@ for name, cols in zip(column_names, columns):
 
 # Displaying the DataFrames
 df_final = pd.concat(dfs, axis=1)
+
+
+
+
+
+dfs = [pd.DataFrame(columns=pd.MultiIndex.from_product([name, cols]), index=rows) for name, cols in zip(column_names, columns)]
+
+# Concatenate the DataFrames along columns
+df_table = pd.concat(dfs, axis=1)
