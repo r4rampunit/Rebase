@@ -3891,3 +3891,123 @@ def construct_and_populate_tables(Isocode, tzero_date, col):
 
 columns_1 = ['ARE', '', '', '', '', 'IFRS9 1Q24 Scenarios', '', '', '', '', 'IFRS9 4Q23 Scenarios', '', '', '', '', "Moody's"]
 columns_1 = ['ARE', '', '', '', '', 'IFRS9 1Q24 Scenarios', '', '', '', '', 'IFRS9 4Q23 Scenarios', '', '', '', '', "Moody's"]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def construct_and_populate_tables(Isocode, tzero_date, col):
+    # curr_year = int(input("enter the current year "))
+    curr_year = 2024
+    column_names = ['IFRS9 1Q24 Scenarios', 'IFRS9 4Q23 Scenarios', 'Moody\'s']
+    columns = ['Upside', 'Central', 'Down 1', 'Down 2', 'Upside', 'Central', 'Down 1', 'Down 2', 'Weighted', '10% UP', 'Central', '10% DN', '4% DN']
+    rows = ['Q1', 'Q2', 'Q3', 'Q4', str(curr_year - 1), 'Q1', 'Q2', 'Q3', 'Q4', str(curr_year), 'Q1', 'Q2', 'Q3', 'Q4', str(curr_year + 1), str(curr_year + 2), str(curr_year + 3), '5yr Avg']
+    df_table = pd.DataFrame(columns=pd.MultiIndex.from_product([column_names, columns]), index=rows)
+    year3_sum = 0
+    year4_sum = 0
+    col_index = 0
+    #tzero_date = input("please give the tzero input: ")
+    for frame in All:
+        for row in frame.itertuples():
+            # for previous year
+            if row.ISOCODES == Isocode and row.date == datetime.strptime(str(curr_year - 1) + "-03-31 00:00:00", "%Y-%m-%d %H:%M:%S"):
+                df_table.values[0][(column_names[col_index], columns[col_index])] = getattr(row, col)
+            if row.ISOCODES == Isocode and row.date == datetime.strptime(str(curr_year - 1) + "-06-30 00:00:00", "%Y-%m-%d %H:%M:%S"):
+                df_table.values[1][(column_names[col_index], columns[col_index + 1])] = getattr(row, col)
+            if row.ISOCODES == Isocode and row.date == datetime.strptime(str(curr_year - 1) + "-09-30 00:00:00", "%Y-%m-%d %H:%M:%S"):
+                df_table.values[2][(column_names[col_index], columns[col_index + 2])] = getattr(row, col)
+            if row.ISOCODES == Isocode and row.date == datetime.strptime(str(curr_year - 1) + "-12-31 00:00:00", "%Y-%m-%d %H:%M:%S"):
+                df_table.values[3][(column_names[col_index], columns[col_index + 3])] = getattr(row, col)
+            # for current year
+            if row.ISOCODES == Isocode and row.date == datetime.strptime(str(curr_year) + "-03-31 00:00:00", "%Y-%m-%d %H:%M:%S"):
+                df_table.values[5][(column_names[col_index + 1], columns[col_index])] = getattr(row, col)
+            if row.ISOCODES == Isocode and row.date == datetime.strptime(str(curr_year) + "-06-30 00:00:00", "%Y-%m-%d %H:%M:%S"):
+                df_table.values[6][(column_names[col_index + 1], columns[col_index + 1])] = getattr(row, col)
+            if row.ISOCODES == Isocode and row.date == datetime.strptime(str(curr_year) + "-09-30 00:00:00", "%Y-%m-%d %H:%M:%S"):
+                df_table.values[7][(column_names[col_index + 1], columns[col_index + 2])] = getattr(row, col)
+            if row.ISOCODES == Isocode and row.date == datetime.strptime(str(curr_year) + "-12-31 00:00:00", "%Y-%m-%d %H:%M:%S"):
+                df_table.values[8][(column_names[col_index + 1], columns[col_index + 3])] = getattr(row, col)
+            # for next year
+            if row.ISOCODES == Isocode and row.date == datetime.strptime(str(curr_year + 1) + "-03-31 00:00:00", "%Y-%m-%d %H:%M:%S"):
+                df_table.values[10][(column_names[col_index + 2], columns[col_index])] = getattr(row, col)
+            if row.ISOCODES == Isocode and row.date == datetime.strptime(str(curr_year + 1) + "-06-30 00:000
+
+0:00", "%Y-%m-%d %H:%M:%S"):
+                df_table.values[11][(column_names[col_index + 2], columns[col_index + 1])] = getattr(row, col)
+            if row.ISOCODES == Isocode and row.date == datetime.strptime(str(curr_year + 1) + "-09-30 00:00:00", "%Y-%m-%d %H:%M:%S"):
+                df_table.values[12][(column_names[col_index + 2], columns[col_index + 2])] = getattr(row, col)
+            if row.ISOCODES == Isocode and row.date == datetime.strptime(str(curr_year + 1) + "-12-31 00:00:00", "%Y-%m-%d %H:%M:%S"):
+                df_table.values[13][(column_names[col_index + 2], columns[col_index + 3])] = getattr(row, col)
+            # for current year + 2
+            if row.ISOCODES == Isocode and row.date == datetime.strptime(str(curr_year + 2) + "-03-31 00:00:00", "%Y-%m-%d %H:%M:%S"):
+                year3_sum += getattr(row, col)
+            if row.ISOCODES == Isocode and row.date == datetime.strptime(str(curr_year + 2) + "-06-30 00:00:00", "%Y-%m-%d %H:%M:%S"):
+                year3_sum += getattr(row, col)
+            if row.ISOCODES == Isocode and row.date == datetime.strptime(str(curr_year + 2) + "-09-30 00:00:00", "%Y-%m-%d %H:%M:%S"):
+                year3_sum += getattr(row, col)
+            if row.ISOCODES == Isocode and row.date == datetime.strptime(str(curr_year + 2) + "-12-31 00:00:00", "%Y-%m-%d %H:%M:%S"):
+                year3_sum += getattr(row, col)
+            # for current year + 3
+            if row.ISOCODES == Isocode and row.date == datetime.strptime(str(curr_year + 3) + "-03-31 00:00:00", "%Y-%m-%d %H:%M:%S"):
+                year4_sum += getattr(row, col)
+            if row.ISOCODES == Isocode and row.date == datetime.strptime(str(curr_year + 3) + "-06-30 00:00:00", "%Y-%m-%d %H:%M:%S"):
+                year4_sum += getattr(row, col)
+            if row.ISOCODES == Isocode and row.date == datetime.strptime(str(curr_year + 3) + "-09
