@@ -4010,4 +4010,43 @@ def construct_and_populate_tables(Isocode, tzero_date, col):
                 year4_sum += getattr(row, col)
             if row.ISOCODES == Isocode and row.date == datetime.strptime(str(curr_year + 3) + "-06-30 00:00:00", "%Y-%m-%d %H:%M:%S"):
                 year4_sum += getattr(row, col)
+
             if row.ISOCODES == Isocode and row.date == datetime.strptime(str(curr_year + 3) + "-09
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+         import pandas as pd
+
+curr_year = 2024
+column_names = [['IFRS9 1Q24 Scenarios'], ['IFRS9 4Q23 Scenarios'], ["Moody's"]]
+columns = [['Upside', 'Central', 'Down 1', 'Down 2'], ['Upside', 'Central', 'Down 1', 'Down 2', 'Weighted'], ['10% UP', 'Central', '10% DN', '4% DN']]
+rows = ['Q1', 'Q2', 'Q3', 'Q4', str(curr_year - 1), 'Q1', 'Q2', 'Q3', 'Q4', str(curr_year), 'Q1', 'Q2', 'Q3', 'Q4', str(curr_year + 1), str(curr_year + 2), str(curr_year + 3), '5yr Avg']
+
+# Creating DataFrames for each element in column_names
+dfs = []
+for name, cols in zip(column_names, columns):
+    df = pd.DataFrame(columns=pd.MultiIndex.from_product([name, cols]), index=rows)
+    dfs.append(df)
+
+# Displaying the DataFrames
+df_final = pd.concat(dfs, axis=1)
