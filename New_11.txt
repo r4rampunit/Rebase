@@ -4283,3 +4283,52 @@ def format_sheet(sheet):
             for col in range(min_col, max_col + 1):
                 cell = sheet.cell(row=row, column=col)
                 cell.border = white_border
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+from openpyxl.styles import Font
+
+def format_sheet(sheet):
+    # Define column names and columns
+    column_names = [['IFRS9 1Q24 Scenarios'], ['IFRS9 4Q23 Scenarios'], ["Moody's"]]
+    columns = [['Upside', 'Central', 'Down 1', 'Down 2'], ['Upside', 'Central', 'Down 1', 'Down 2', 'Weighted'], ['10% UP', 'Central', '10% DN', '4% DN']]
+
+    # Define rows
+    curr_year = 2024
+    rows = ['Q1', 'Q2', 'Q3', 'Q4', str(curr_year - 1), 'Q1', 'Q2', 'Q3', 'Q4', str(curr_year), 'Q1', 'Q2', 'Q3', 'Q4', str(curr_year + 1), str(curr_year + 2), str(curr_year + 3), '5yr Avg']
+
+    # Apply formatting for column names (white font color)
+    font_white = Font(color="FFFFFFFF")
+    for i, names in enumerate(column_names):
+        for j, name in enumerate(names):
+            cell = sheet.cell(row=j+1, column=i+1)
+            cell.value = name
+            cell.font = font_white
+
+    # Apply formatting for columns (black bold font)
+    font_black_bold = Font(color="00000000", bold=True)
+    for i, cols in enumerate(columns):
+        for j, col in enumerate(cols):
+            cell = sheet.cell(row=len(rows)+2, column=j+1+i*len(cols))
+            cell.value = col
+            cell.font = font_black_bold
+
+    # Apply formatting for rows (black bold font)
+    for i, row in enumerate(rows):
+        cell = sheet.cell(row=i+2, column=len(column_names)+1)
+        cell.value = row
+        cell.font = font_black_bold
