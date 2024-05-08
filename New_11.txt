@@ -4411,3 +4411,27 @@ for row in ws.iter_rows():
             if isinstance(cell.value, (int, float)):
                 # Round off numerical values to 1 decimal point
                 cell.value = round(cell.value, 1)
+
+
+
+
+
+
+
+
+lightest_grey = 'E0E0E0'
+
+# Iterate through all sheets
+for sheet in wb.sheetnames:
+    ws = wb[sheet]
+    # Iterate through all rows and columns
+    for row in ws.iter_rows():
+        for cell in row:
+            # Check if the cell contains a numerical value
+            if isinstance(cell.value, (int, float)):
+                # Round off numerical values to 1 decimal point
+                cell.value = round(cell.value, 1)
+                # Grey out cells with negative numbers
+                if cell.value < 0:
+                    grey_fill = PatternFill(start_color=lightest_grey, end_color=lightest_grey, fill_type='solid')
+                    cell.fill = grey_fill
