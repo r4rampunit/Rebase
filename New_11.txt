@@ -4332,3 +4332,29 @@ def format_sheet(sheet):
         cell = sheet.cell(row=i+2, column=len(column_names)+1)
         cell.value = row
         cell.font = font_black_bold
+
+
+
+
+
+
+
+
+
+
+
+
+
+from openpyxl.styles import Font
+
+def format_sheet(sheet):
+    # Define the names to be discovered and formatted with white font color
+    names_to_discover = ['IFRS9 1Q24 Scenarios', 'IFRS9 4Q23 Scenarios', "Moody's", 'Upside', 'Central', 'Down 1', 'Down 2', 'Weighted', '10% UP', 'Central', '10% DN', '4% DN']
+
+    # Apply formatting for names with white font color
+    font_white = Font(color="FFFFFFFF")
+    for name in names_to_discover:
+        for row in sheet.iter_rows():
+            for cell in row:
+                if cell.value == name:
+                    cell.font = font_white
