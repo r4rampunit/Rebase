@@ -4242,3 +4242,44 @@ def format_sheet(sheet):
 
     sheet.sheet_view.showGridLines = True  # Enable grid lines
     sheet.sheet_view.tabColor = "FFFFFFFF"  # Set tab color to white
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+from openpyxl.styles import Border
+from openpyxl.utils import range_boundaries
+
+def format_sheet(sheet):
+    # Set the border style with white color
+    white_border = Border(left=Side(style='thin', color='FFFFFFFF'),
+                          right=Side(style='thin', color='FFFFFFFF'),
+                          top=Side(style='thin', color='FFFFFFFF'),
+                          bottom=Side(style='thin', color='FFFFFFFF'))
+
+    # Apply white border to all cells
+    for row in sheet.iter_rows():
+        for cell in row:
+            cell.border = white_border
+
+    # Set tab color to white
+    sheet.sheet_view.tabColor = "FFFFFFFF"  # Set tab color to white
+
+    # Handle merged cells
+    for merged_cell_range in sheet.merged_cells.ranges:
+        min_row, min_col, max_row, max_col = range_boundaries(merged_cell_range)
+        for row in range(min_row, max_row + 1):
+            for col in range(min_col, max_col + 1):
+                cell = sheet.cell(row=row, column=col)
+                cell.border = white_border
