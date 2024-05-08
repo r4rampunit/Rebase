@@ -4358,3 +4358,39 @@ def format_sheet(sheet):
             for cell in row:
                 if cell.value == name:
                     cell.font = font_white
+
+
+
+
+
+
+
+
+
+
+
+
+from openpyxl.styles import Font, PatternFill
+import re
+
+def format_sheet(sheet):
+    # Define the names to be discovered and formatted with white font color
+    names_to_discover = ['IFRS9 1Q24 Scenarios', 'IFRS9 4Q23 Scenarios', "Moody's", 'Upside', 'Central', 'Down 1', 'Down 2', 'Weighted', '10% UP', 'Central', '10% DN', '4% DN']
+
+    # Define pattern to match numbers with one decimal place
+    decimal_pattern = re.compile(r'\b\d+\.\d\b')
+
+    # Apply formatting for names with white font color
+    font_white = Font(color="FFFFFFFF")
+    for name in names_to_discover:
+        for row in sheet.iter_rows():
+            for cell in row:
+                if cell.value == name:
+                    cell.font = font_white
+
+    # Apply lightest grey fill to cells containing numbers with one decimal place
+    lightest_grey_fill = PatternFill(start_color="FFDDDDDD", end_color="FFDDDDDD", fill_type="solid")
+    for row in sheet.iter_rows():
+        for cell in row:
+            if isinstance(cell.value, float) and decimal_pattern.match(str(cell.value)):
+                cell.fill = lightest_grey_fill
