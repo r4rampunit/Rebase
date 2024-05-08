@@ -4582,3 +4582,47 @@ for sheet in wb.sheetnames:
 
 # Save the modified Excel file
 wb.save('greyed_excel_file.xlsx')
+
+
+
+
+
+
+
+
+
+
+
+
+
+from openpyxl import load_workbook
+from openpyxl.styles import PatternFill, Font
+import numpy as np
+
+# Load the Excel file
+wb = load_workbook('your_excel_file.xlsx')
+
+# Define the sheet name font color and background colors
+white_font_color = 'FFFFFFFF'
+red_fill_color = 'FF0000'
+
+# Iterate through all sheets
+for sheet_name in wb.sheetnames:
+    ws = wb[sheet_name]
+    # Iterate through all cells in the sheet
+    for row in ws.iter_rows():
+        for cell in row:
+            # Find the cell with value 'IFRS 1Q24 Scenarios'
+            if cell.value == 'IFRS 1Q24 Scenarios':
+                # Get the cell position
+                cell_position = cell.coordinate
+                # Write the sheet name in the cell to its left with white font color
+                left_cell = ws[cell.column_letter + str(cell.row)]
+                left_cell.value = sheet_name
+                left_cell.font = Font(color=white_font_color)
+                # Set the background color of the cell just below 'IFRS 1Q24 Scenarios' to red
+                below_cell = ws[cell.column_letter + str(cell.row + 1)]
+                below_cell.fill = PatternFill(start_color=red_fill_color, end_color=red_fill_color, fill_type='solid')
+
+# Save the modified Excel file
+wb.save('modified_excel_file.xlsx')
