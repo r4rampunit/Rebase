@@ -4059,3 +4059,54 @@ dfs = [pd.DataFrame(columns=pd.MultiIndex.from_product([name, cols]), index=rows
 
 # Concatenate the DataFrames along columns
 df_table = pd.concat(dfs, axis=1)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import openpyxl
+from openpyxl.styles import Font, PatternFill, Border, Side
+
+def format_sheet(sheet):
+    # Set the colors for column cells and other cells
+    grey_fill = PatternFill(start_color="FFAFAFAF", end_color="FFAFAFAF", fill_type="solid")
+    red_fill = PatternFill(start_color="FFFF0000", end_color="FFFF0000", fill_type="solid")
+
+    # Set the border style
+    thin_border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
+
+    # Set the cell colors and border
+    for row in sheet.iter_rows():
+        for cell in row:
+            if cell.column_letter in ['D', 'H', 'L', 'P']:  # Assuming columns D, H, L, and P are column headers
+                cell.fill = red_fill
+            else:
+                cell.fill = grey_fill
+            cell.border = thin_border
+
+    # Set grid lines color to white
+    sheet.sheet_view.showGridLines = False
+
+# Your existing code
+for Isocode in country_list:
+    col_list = Table_List["MEV"].loc[Table_List["Country"] == Isocode].tolist()
+    with pd.ExcelWriter("2401_GBIC_Tables_29022024.xlsx", engine='openpyxl', mode="a", if_sheet_exists='overlay') as writer:
+        start_row = 6
+        start_col = 4
+        for col in col_list:
+            table = construct_and_populate_tables(Isocode, tzero_date, col)
+            table.to_excel(writer, sheet_name=Isocode, startrow=start_row, startcol=start_col, index=True)
+            workbook = writer.book
+            worksheet = writer.sheets[Isocode]
+            format_sheet(worksheet)
+            start_col += len(table.columns) + 4
