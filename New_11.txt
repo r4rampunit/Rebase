@@ -4201,3 +4201,44 @@ def format_sheet(sheet):
 
     sheet.sheet_view.showGridLines = True  # Enable grid lines
     sheet.sheet_view.tabColor = "FFFFFFFF"  # Set tab color to white
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+from openpyxl.styles import PatternFill, Border
+
+def format_sheet(sheet):
+    # Set the colors for column cells and other cells
+    light_grey_fill = PatternFill(start_color="FFD3D3D3", end_color="FFD3D3D3", fill_type="solid")  # Light grey
+    red_fill = PatternFill(start_color="FFFF0000", end_color="FFFF0000", fill_type="solid")  # Red
+
+    # Set the border style
+    thin_border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
+
+    # Apply formatting to cells
+    for row in sheet.iter_rows():
+        for cell in row:
+            if cell.column_letter in ['D', 'H', 'L', 'P']:  # Assuming columns D, H, L, and P are column headers
+                cell.fill = red_fill
+            else:
+                cell.fill = light_grey_fill
+            cell.border = thin_border
+
+    # Set grid lines color to white
+    for row in sheet.iter_rows():
+        for cell in row:
+            cell.border = thin_border
+            cell.style = "Normal"  # Reset any existing styles
+
+    sheet.sheet_view.showGridLines = True  # Enable grid lines
+    sheet.sheet_view.tabColor = "FFFFFFFF"  # Set tab color to white
