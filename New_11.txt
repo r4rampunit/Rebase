@@ -4394,3 +4394,20 @@ def format_sheet(sheet):
         for cell in row:
             if isinstance(cell.value, float) and decimal_pattern.match(str(cell.value)):
                 cell.fill = lightest_grey_fill
+
+
+
+
+
+
+
+
+
+
+
+for row in ws.iter_rows():
+        for cell in row:
+            # Check if the cell contains a numerical value
+            if isinstance(cell.value, (int, float)):
+                # Round off numerical values to 1 decimal point
+                cell.value = round(cell.value, 1)
