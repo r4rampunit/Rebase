@@ -4671,3 +4671,121 @@ for sheet_name in wb.sheetnames:
 
 # Save the modified Excel file
 wb.save('modified_excel_file.xlsx')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+from openpyxl import load_workbook
+from openpyxl.styles import Border, Side
+from openpyxl.utils import get_column_letter
+from statistics import mean
+
+# Load the Excel file
+wb = load_workbook('your_excel_file.xlsx')
+ws = wb.active
+
+# Find the cell with value '5yr Avg'
+for row in ws.iter_rows():
+    for cell in row:
+        if cell.value == '5yr Avg':
+            start_row = cell.row + 5
+            # Create a box starting 5 rows below '5yr Avg'
+            for i in range(start_row, start_row + 5):
+                for j in range(5):
+                    ws.cell(row=i, column=j+1).border = Border(left=Side(border_style='thin'),
+                                                                right=Side(border_style='thin'),
+                                                                top=Side(border_style='thin'),
+                                                                bottom=Side(border_style='thin'))
+
+            # Write 'Min' in the first cell after 5 rows
+            ws.cell(row=start_row, column=6).value = 'Min'
+            # Calculate and write the minimum of E7 to H20
+            min_value = min(ws[get_column_letter(col) + str(row)].value for row in range(7, 21) for col in range(5, 9))
+            ws.cell(row=start_row, column=7).value = min_value
+
+            # Write 'LT' in the cell next to 'Min'
+            ws.cell(row=start_row + 1, column=6).value = 'LT'
+            # Calculate and write the average of F22 and F23
+            avg_value = mean([ws['F22'].value, ws['F23'].value])
+            ws.cell(row=start_row + 1, column=7).value = avg_value
+
+            # Write 'Max' in the cell next to 'LT'
+            ws.cell(row=start_row + 2, column=6).value = 'Max'
+            # Calculate and write the maximum of E7 to H20
+            max_value = max(ws[get_column_letter(col) + str(row)].value for row in range(7, 21) for col in range(5, 9))
+            ws.cell(row=start_row + 2, column=7).value = max_value
+
+            # Apply border to the box
+            for i in range(5):
+                ws.cell(row=start_row + i, column=6).border = Border(left=Side(border_style='thin'))
+
+# Save the modified Excel file
+wb.save('modified_excel_file.xlsx')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+from openpyxl import load_workbook
+from openpyxl.styles import PatternFill
+from openpyxl.utils import get_column_letter
+
+# Load the Excel file
+wb = load_workbook('your_excel_file.xlsx')
+ws = wb.active
+
+# Find the cell with value 'Moody's'
+for row in ws.iter_rows():
+    for cell in row:
+        if cell.value == "Moody's":
+            col = cell.column
+            # Apply grey color to cells in that column from row 2 to row 38
+            for i in range(2, 39):
+                ws[get_column_letter(col) + str(i)].fill = PatternFill(start_color="E0E0E0", end_color="E0E0E0", fill_type="solid")
+                # Set the width of the cell to half of the actual cell width
+                ws.column_dimensions[get_column_letter(col)].width = ws.column_dimensions[get_column_letter(col)].width / 2
+            # Exit the loop after finding 'Moody's'
+            break
+    # Exit the loop after finding 'Moody's'
+    else:
+        continue
+    break
+
+# Save the modified Excel file
+wb.save('modified_excel_file.xlsx')
