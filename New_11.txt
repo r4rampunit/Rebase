@@ -4482,3 +4482,55 @@ for sheet in wb.sheetnames:
 
 # Save the modified Excel file
 wb.save('rounded_and_greyed_excel_file.xlsx')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+from openpyxl import load_workbook
+from openpyxl.styles import PatternFill
+import numpy as np
+
+# Load the Excel file
+wb = load_workbook('your_excel_file.xlsx')
+
+# Define the lightest grey color
+lightest_grey = 'E0E0E0'
+
+# Define the index rows
+index_rows = ['Q1', 'Q2', 'Q3', 'Q4']
+
+# Iterate through all sheets
+for sheet in wb.sheetnames:
+    ws = wb[sheet]
+    # Iterate through the rows
+    for row in ws.iter_rows():
+        # Check if the row index corresponds to the specified index rows
+        if row[0].value in index_rows:
+            # Iterate through all cells in the row
+            for cell in row:
+                # Check if the cell contains a numeric value
+                if isinstance(cell.value, (int, float)):
+                    # Round off numerical values to 1 decimal point
+                    cell.value = round(cell.value, 1)
+            # Apply lightest grey color to all cells in the row
+            for cell in row:
+                grey_fill = PatternFill(start_color=lightest_grey, end_color=lightest_grey, fill_type='solid')
+                cell.fill = grey_fill
+
+# Save the modified Excel file
+wb.save('rounded_and_greyed_excel_file.xlsx')
