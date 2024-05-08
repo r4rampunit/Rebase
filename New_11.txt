@@ -4626,3 +4626,48 @@ for sheet_name in wb.sheetnames:
 
 # Save the modified Excel file
 wb.save('modified_excel_file.xlsx')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+from openpyxl import load_workbook
+from openpyxl.styles import Font
+
+# Load the Excel file
+wb = load_workbook('your_excel_file.xlsx')
+
+# Iterate through all sheets
+for sheet_name in wb.sheetnames:
+    ws = wb[sheet_name]
+    # Iterate through all cells in the sheet
+    for row in ws.iter_rows():
+        for cell in row:
+            # Find the cell with value 'IFRS9 4Q23 Scenarios'
+            if cell.value == 'IFRS9 4Q23 Scenarios':
+                # Iterate through cells below 'IFRS9 4Q23 Scenarios' in the same column
+                for row_below in ws.iter_rows(min_row=cell.row + 1, min_col=cell.column, max_col=cell.column):
+                    for cell_below in row_below:
+                        # Check if the cell contains a numeric value
+                        if isinstance(cell_below.value, (int, float)):
+                            # Set font to italic
+                            cell_below.font = Font(italic=True)
+                # Exit the loop as we found the target cell
+                break
+        # Exit the outer loop as we found the target cell
+        else:
+            continue
+        break
+
+# Save the modified Excel file
+wb.save('modified_excel_file.xlsx')
