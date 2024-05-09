@@ -5377,3 +5377,62 @@ for row in sheet.iter_rows():
             sheet.cell(row=start_row + 2, column=cell.column + 1).value = max_value
             sheet.cell(row=start_row + 3, column=cell.column).value = 'LT'
             sheet.cell(row=start_row + 3, column=cell.column + 1).value = lt_value
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+from openpyxl.utils import get_column_letter
+import numpy as np
+
+for row in sheet.iter_rows():
+    for cell in row:
+        if cell.value == '5yr Avg':
+            start_row = cell.row + 5
+            ifrs_row_index = None
+            for r_idx, row_data in enumerate(sheet.iter_rows(), start=1):
+                for c_idx, cell_data in enumerate(row_data, start=1):
+                    if cell_data.value == 'IFRS9 1Q24 Scenarios':
+                        ifrs_row_index = r_idx
+                        break
+                if ifrs_row_index:
+                    break
+
+            # Finding the max value
+            max_value_range = sheet.iter_rows(min_row=ifrs_row_index + 2, max_row=start_row - 2, min_col=cell.column, max_col=cell.column)
+            max_values = [cell.value for row in max_value_range for cell in row if isinstance(cell.value, (int, float))]
+            max_value = max(max_values) if max_values else None
+
+            # Finding the min value
+            min_value_range = sheet.iter_rows(min_row=ifrs_row_index + 2, max_row=start_row - 2, min_col=cell.column, max_col=cell.column)
+            min_values = [cell.value for row in min_value_range for cell in row if isinstance(cell.value, (int, float))]
+            min_value = min(min_values) if min_values else None
+
+            # Finding the avg value
+            avg_value_range = sheet.iter_rows(min_row=ifrs_row_index + 2, max_row=start_row - 2, min_col=cell.column + 1, max_col=cell.column + 1)
+            avg_values = [cell.value for row in avg_value_range for cell in row if isinstance(cell.value, (int, float))]
+            avg_value = np.mean(avg_values) if avg_values else None
+
+            sheet.cell(row=start_row, column=cell.column).value = 'Min'
+            sheet.cell(row=start_row, column=cell.column + 1).value = min_value
+
+            sheet.cell(row=start_row + 1, column=cell.column).value = 'LT'
+            sheet.cell(row=start_row + 1, column=cell.column + 1).value = avg_value
+
+            sheet.cell(row=start_row + 2, column=cell.column).value = 'Max'
+            sheet.cell(row=start_row + 2, column=cell.column + 1).value = max_value
