@@ -5149,3 +5149,56 @@ for row in sheet.iter_rows():
             sheet[f'B{ifrs_row_index + 5}'].value = min_value
             sheet[f'A{ifrs_row_index + 6}'].value = 'Max'
             sheet[f'B{ifrs_row_index + 6}'].value = max_value
+
+
+
+
+
+
+
+
+from openpyxl import load_workbook
+from openpyxl.utils import column_index_from_string
+
+# Load the Excel file
+wb = load_workbook('your_excel_file.xlsx')
+sheet = wb.active
+
+# Iterate through all occurrences of '5yr Avg'
+for row in sheet.iter_rows():
+    for cell in row:
+        if cell.value == '5yr Avg':
+            # Get the row index for '5yr Avg'
+            avg_row_index = cell.row
+
+            # Find the row index for 'IFRS 1Q24 Scenarios' and row index of 2025
+            ifrs_row_index = None
+            row_2025_index = None
+            for r in sheet.iter_rows(min_row=avg_row_index):
+                for c in r:
+                    if c.value == 'IFRS 1Q24 Scenarios':
+                        ifrs_row_index = c.row
+                    if c.value == 2025:
+                        row_2025_index = c.row
+                        break
+                if ifrs_row_index is not None and row_2025_index is not None:
+                    break
+
+            # Define the range for min and max calculations
+            min_range = sheet[f'A{ifrs_row_index + 1}:Z{row_2025_index - 1}']
+            max_range = sheet[f'A{ifrs_row_index + 1}:Z{row_2025_index - 1}']
+
+            # Calculate min and max values
+            min_value = min(cell.value for r in min_range for cell in r if isinstance(cell.value, (int, float)))
+            max_value = max(cell.value for r in max_range for cell in r if isinstance(cell.value, (int, float)))
+
+            # Write min and max values to the corresponding cells
+            sheet[f'A{row_2025_index + 1}'].value = 'Min'
+            sheet[f'B{row_2025_index + 1}'].value = min_value
+            sheet[f'A{row_2025_index + 2}'].value = 'Max'
+            sheet[f'B{row_2025_index + 2}'].value = max_value
+
+# Save the modified Excel file
+wb.save('modified_excel_file.xlsx')
+
+
