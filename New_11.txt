@@ -5099,3 +5099,53 @@ for row in sheet.iter_rows():
 
 # Save the modified Excel file
 wb.save('modified_excel_file.xlsx')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+from openpyxl import load_workbook
+from openpyxl.styles import Border, Side
+from openpyxl.utils import get_column_letter
+from statistics import mean
+
+# Load the Excel file
+wb = load_workbook('your_excel_file.xlsx')
+sheet = wb.active
+
+# Iterate through all occurrences of '5yr Avg'
+for row in sheet.iter_rows():
+    for cell in row:
+        if cell.value == '5yr Avg':
+            # Find the row index for 'IFRS 1Q24 Scenarios'
+            ifrs_row_index = None
+            for r in sheet.iter_rows(min_row=cell.row, max_row=cell.row + 10):
+                for c in r:
+                    if c.value == 'IFRS 1Q24 Scenarios':
+                        ifrs_row_index = c.row
+                        break
+                if ifrs_row_index is not None:
+                    break
+            # Define the range for min and max calculations
+            min_range = sheet[f'A{ifrs_row_index + 1}:Z2025']
+            max_range = sheet[f'A{ifrs_row_index + 1}:Z2025']
+            # Calculate min and max values
+            min_value = min(cell.value for row in min_range for cell in row if isinstance(cell.value, (int, float)))
+            max_value = max(cell.value for row in max_range for cell in row if isinstance(cell.value, (int, float)))
+            # Write min and max values to the corresponding cells
+            sheet[f'A{ifrs_row_index + 5}'].value = 'Min'
+            sheet[f'B{ifrs_row_index + 5}'].value = min_value
+            sheet[f'A{ifrs_row_index + 6}'].value = 'Max'
+            sheet[f'B{ifrs_row_index + 6}'].value = max_value
