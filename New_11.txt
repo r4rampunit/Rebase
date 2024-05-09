@@ -5509,3 +5509,145 @@ for row in sheet.iter_rows(min_row=central_row_index + 5):
             # Assign the average value to the 'LT' cell in the same column as the '5yr Avg' cell
             sheet.cell(row=start_row + 1, column=central_column_index).value = 'LT'
             sheet.cell(row=start_row + 1, column=central_column_index + 1).value = avg_value
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+from openpyxl.utils import get_column_letter
+import numpy as np
+
+# Find the column index for 'IFRS9 1Q24 Scenarios' and the row index for 'Central'
+ifrs_column_index = None
+central_row_index = None
+
+for row in sheet.iter_rows():
+    for cell in row:
+        if cell.value == 'IFRS9 1Q24 Scenarios':
+            ifrs_column_index = cell.column
+        elif cell.value == 'Central':
+            central_row_index = cell.row
+
+# Iterate through each cell in the range below 'IFRS9 1Q24 Scenarios' and then below 'Upside', 'Central', 'Down 1', and 'Down 2' cells as columns
+for row in sheet.iter_rows(min_row=central_row_index + 5):
+    for cell in row:
+        if cell.value == '5yr Avg':
+            start_row = cell.row + 5
+            max_values = []
+            min_values = []
+            avg_values = []
+            max_row_index = cell.row - 4
+
+            # Iterate through each column
+            for col_index in range(ifrs_column_index, ifrs_column_index + 4):
+                # Collect numeric values from rows above the three rows containing '5yr Avg'
+                for r_idx, r in enumerate(sheet.iter_rows(min_row=1, max_row=max_row_index, min_col=col_index, max_col=col_index), start=1):
+                    for c in r:
+                        if isinstance(c.value, (int, float)):
+                            max_values.append(c.value)
+                            min_values.append(c.value)
+
+                # Find maximum and minimum values
+                max_value = max(max_values) if max_values else None
+                min_value = min(min_values) if min_values else None
+
+                # Assign maximum and minimum values to 'Max' and 'Min' cells in the same column as the '5yr Avg' cell
+                sheet.cell(row=start_row, column=col_index).value = 'Min'
+                sheet.cell(row=start_row, column=col_index + 1).value = min_value
+
+                sheet.cell(row=start_row + 2, column=col_index).value = 'Max'
+                sheet.cell(row=start_row + 2, column=col_index + 1).value = max_value
+
+            # Find the column index for 'Central'
+            central_column_index = None
+            for col_index, c in enumerate(sheet[cell.row - 5], start=1):
+                if c.value == 'Central':
+                    central_column_index = col_index
+                    break
+
+            # Iterate through each column below 'IFRS9 1Q24 Scenarios' and then 'Central'
+            for col_index in range(ifrs_column_index, central_column_index + 1):
+                # Collect numeric values from rows below '2025' and above '5yr Avg'
+                for r_idx, r in enumerate(sheet.iter_rows(min_row=cell.row + 1, max_row=start_row - 2, min_col=col_index, max_col=col_index), start=1):
+                    for c in r:
+                        if isinstance(c.value, (int, float)):
+                            avg_values.append(c.value)
+
+            # Calculate the average using NumPy's np.mean() function
+            avg_value = np.mean(avg_values) if avg_values else None
+
+            # Assign the average value to the 'LT' cell in the same column as the '5yr Avg' cell
+            sheet.cell(row=start_row + 1, column=central_column_index).value = 'LT'
+            sheet.cell(row=start_row + 1, column=central_column_index + 1).value = avg_value
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+from openpyxl.styles import PatternFill
+from openpyxl.formatting.rule import CellIsRule
+
+# Define fill colors for min_value, avg_value, and max_value
+red_fill = PatternFill(start_color="FFCCCC", end_color="FFCCCC", fill_type="solid")
+white_fill = PatternFill(start_color="FFFFFF", end_color="FFFFFF", fill_type="solid")
+green_fill = PatternFill(start_color="CCFFCC", end_color="CCFFCC", fill_type="solid")
+
+# Apply conditional formatting for min_value
+for row in range(1, sheet.max_row + 1):
+    for col in range(1, sheet.max_column + 1):
+        cell = sheet.cell(row=row, column=col)
+        value = cell.value
+        if isinstance(value, (int, float)) and row < start_row:
+            rule = CellIsRule(operator="equal", formula=[f"{min_value}"], stopIfTrue=True, fill=red_fill)
+            cell.font = cell.font.copy(color="FFFFFF")  # Change font color to white for better visibility
+            sheet.conditional_formatting.add(cell.coordinate, rule)
+
+# Apply conditional formatting for avg_value
+for row in range(1, sheet.max_row + 1):
+    for col in range(1, sheet.max_column + 1):
+        cell = sheet.cell(row=row, column=col)
+        value = cell.value
+        if isinstance(value, (int, float)) and row > start_row and row < start_row + 5:
+            rule = CellIsRule(operator="equal", formula=[f"{avg_value}"], stopIfTrue=True, fill=white_fill)
+            sheet.conditional_formatting.add(cell.coordinate, rule)
+
+# Apply conditional formatting for max_value
+for row in range(1, sheet.max_row + 1):
+    for col in range(1, sheet.max_column + 1):
+        cell = sheet.cell(row=row, column=col)
+        value = cell.value
+        if isinstance(value, (int, float)) and row > start_row + 5:
+            rule = CellIsRule(operator="equal", formula=[f"{max_value}"], stopIfTrue=True, fill=green_fill)
+            sheet.conditional_formatting.add(cell.coordinate, rule)
