@@ -5202,3 +5202,55 @@ for row in sheet.iter_rows():
 wb.save('modified_excel_file.xlsx')
 
 
+from openpyxl import load_workbook
+
+# Load the Excel file
+wb = load_workbook('your_excel_file.xlsx')
+sheet = wb.active
+
+# Iterate through all occurrences of '5yr Avg'
+for row in sheet.iter_rows():
+    for cell in row:
+        if cell.value == '5yr Avg':
+            # Get the row index for '5yr Avg'
+            avg_row_index = cell.row
+
+            # Find the row index for 'IFRS 1Q24 Scenarios' and the row indices containing '2025'
+            ifrs_row_index = None
+            row_2025_indices = []
+            for r in sheet.iter_rows(min_row=avg_row_index):
+                for c in r:
+                    if c.value == 'IFRS 1Q24 Scenarios':
+                        ifrs_row_index = c.row
+                    if c.value == 2025:
+                        row_2025_indices.append(c.row)
+                if ifrs_row_index is not None and row_2025_indices:
+                    break
+
+            # Check if 'IFRS 1Q24 Scenarios' and '2025' rows were found
+            if ifrs_row_index is not None and row_2025_indices:
+                # Calculate min and max values for each column
+                min_values = []
+                max_values = []
+                for col in range(1, sheet.max_column + 1):
+                    # Skip columns before 'IFRS 1Q24 Scenarios'
+                    if col < cell.column:
+                        continue
+                    # Skip columns after '2025'
+                    if col > row_2025_indices[0]:
+                        break
+                    # Calculate min and max values for the current column
+                    column_values = [cell.value for cell in sheet.iter_rows(min_row=ifrs_row_index + 1, max_row=row_2025_indices[0] - 1, min_col=col, max_col=col)]
+                    column_values = [value for value in column_values if isinstance(value, (int, float))]
+                    min_values.append(min(column_values) if column_values else None)
+                    max_values.append(max(column_values) if column_values else None)
+
+                # Write min and max values to the corresponding cells
+                min_row = max(row_2025_indices) + 1
+                max_row = max(row_2025_indices) + 2
+                for i, (min_val, max_val) in enumerate(zip(min_values, max_values), start=1):
+                    sheet.cell(row=min_row, column=i).value = min_val
+                    sheet.cell(row=max_row, column=i).value = max_val
+
+# Save the modified Excel file
+wb.save('modified_excel_file.xlsx')
