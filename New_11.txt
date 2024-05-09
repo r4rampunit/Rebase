@@ -4849,3 +4849,72 @@ for row_index, row in enumerate(ws.iter_rows(), start=1):
 
 # Save the modified Excel file
 wb.save('modified_excel_file.xlsx')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+from openpyxl import load_workbook
+from openpyxl.styles import Border, Side
+from openpyxl.utils import get_column_letter
+from statistics import mean
+
+# Load the Excel file
+wb = load_workbook('your_excel_file.xlsx')
+ws = wb.active
+
+# Iterate through all cells in the sheet
+for row in ws.iter_rows():
+    for cell in row:
+        if cell.value == '5yr Avg':
+            start_row = cell.row + 5
+            # Create a box starting 5 rows below '5yr Avg'
+            for i in range(start_row, start_row + 5):
+                for j in range(5):
+                    ws.cell(row=i, column=j+1).border = Border(left=Side(border_style='thin'),
+                                                                right=Side(border_style='thin'),
+                                                                top=Side(border_style='thin'),
+                                                                bottom=Side(border_style='thin'))
+
+                # Write 'Min' in the first cell after 5 rows
+                ws.cell(row=i, column=6).value = 'Min'
+                # Calculate and write the minimum of E7 to H20
+                min_value = min(ws[get_column_letter(col) + str(row)].value for row in range(7, 21) for col in range(5, 9))
+                ws.cell(row=i, column=7).value = min_value
+
+                # Write 'LT' in the cell next to 'Min'
+                ws.cell(row=i, column=8).value = 'LT'
+                # Calculate and write the average of F22 and F23
+                avg_value = mean([ws['F22'].value, ws['F23'].value])
+                ws.cell(row=i, column=9).value = avg_value
+
+                # Write 'Max' in the cell next to 'LT'
+                ws.cell(row=i, column=10).value = 'Max'
+                # Calculate and write the maximum of E7 to H20
+                max_value = max(ws[get_column_letter(col) + str(row)].value for row in range(7, 21) for col in range(5, 9))
+                ws.cell(row=i, column=11).value = max_value
+
+# Save the modified Excel file
+wb.save('modified_excel_file.xlsx')
