@@ -5310,3 +5310,70 @@ for row in sheet.iter_rows():
             sheet.cell(row=start_row + 1, column=cell.column + 1).value = min_value
             sheet.cell(row=start_row + 2, column=cell.column).value = 'Max'
             sheet.cell(row=start_row + 2, column=cell.column + 1).value = max_value
+
+
+
+
+
+
+
+
+
+
+from openpyxl.utils import get_column_letter
+import numpy as np
+
+# Iterate through all rows in the sheet
+for row in sheet.iter_rows():
+    for cell in row:
+        if cell.value == '5yr Avg':
+            # Define start_row as the row index of the '5yr Avg' cell
+            start_row = cell.row
+
+            # Find the maximum row index containing data (2025)
+            max_row_index = max((row_index for row_index, row in enumerate(sheet.iter_rows(), start=1) if '2025' in str(row)), default=1)
+
+            # Find the column index of the 'IFRS9 1Q24 Scenarios' column
+            ifrs_column_index = None
+            for col in sheet.iter_cols():
+                if col[0].value == 'IFRS9 1Q24 Scenarios':
+                    ifrs_column_index = col[0].column
+                    break
+
+            # Find the min and max values in the specified range
+            data_range = sheet.iter_rows(min_row=1, max_row=max_row_index, min_col=ifrs_column_index, max_col=ifrs_column_index)
+            data_values = [cell.value for row in data_range for cell in row if isinstance(cell.value, (int, float))]
+            min_value = min(data_values) if data_values else None
+            max_value = max(data_values) if data_values else None
+
+            # Find the row index of 'IFRS9 1Q24 Scenarios'
+            ifrs_row_index = None
+            for row_index, row in enumerate(sheet.iter_rows(), start=1):
+                for col_index, cell in enumerate(row, start=1):
+                    if cell.value == 'IFRS9 1Q24 Scenarios':
+                        ifrs_row_index = row_index
+                        break
+                if ifrs_row_index:
+                    break
+
+            # Find the 'Central' column
+            central_column_index = None
+            for col_index, cell in enumerate(sheet[ifrs_row_index], start=1):
+                if cell.value == 'Central':
+                    central_column_index = col_index
+                    break
+
+            # Find the LT (Average) value
+            if central_column_index:
+                central_data_values = [cell.value for cell in sheet.iter_rows(min_row=ifrs_row_index + 1, max_row=max_row_index, min_col=central_column_index, max_col=central_column_index)][0]
+                lt_value = np.mean(central_data_values)
+            else:
+                lt_value = None
+
+            # Write the min, max, and LT values below the '5yr Avg' cell
+            sheet.cell(row=start_row + 1, column=cell.column).value = 'Min'
+            sheet.cell(row=start_row + 1, column=cell.column + 1).value = min_value
+            sheet.cell(row=start_row + 2, column=cell.column).value = 'Max'
+            sheet.cell(row=start_row + 2, column=cell.column + 1).value = max_value
+            sheet.cell(row=start_row + 3, column=cell.column).value = 'LT'
+            sheet.cell(row=start_row + 3, column=cell.column + 1).value = lt_value
