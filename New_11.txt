@@ -5651,3 +5651,72 @@ for row in range(1, sheet.max_row + 1):
         if isinstance(value, (int, float)) and row > start_row + 5:
             rule = CellIsRule(operator="equal", formula=[f"{max_value}"], stopIfTrue=True, fill=green_fill)
             sheet.conditional_formatting.add(cell.coordinate, rule)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+from openpyxl.styles import PatternFill
+import numpy as np
+
+# Define fill colors
+min_color = 'FFCCCC'  # Light Red
+mid_color = 'FFFFFF'  # White
+max_color = 'CCFFCC'  # Light Green
+
+# Iterate through each row and cell in the worksheet
+for row in worksheet.iter_rows():
+    for cell in row:
+        if cell.value == '5yr Avg':
+            # Find the range for max value calculation
+            max_value_range = worksheet.iter_rows(min_row=cell.row + 18, max_row=cell.row - 3, min_col=cell.column + 1, max_col=cell.column + 4)
+            max_values = [cell.value for row in max_value_range for cell in row if isinstance(cell.value, (int, float))]
+            max_value = max(max_values) if max_values else None
+
+            # Find the range for min value calculation
+            min_value_range = worksheet.iter_rows(min_row=cell.row - 18, max_row=cell.row - 3, min_col=cell.column + 1, max_col=cell.column + 4)
+            min_values = [cell.value for row in min_value_range for cell in row if isinstance(cell.value, (int, float))]
+            min_value = min(min_values) if min_values else None
+
+            # Find the range for average value calculation
+            avg_value_range = worksheet.iter_rows(min_row=cell.row + 2, max_row=cell.row, min_col=cell.column + 2, max_col=cell.column + 2)
+            avg_values = [cell.value for row in avg_value_range for cell in row if isinstance(cell.value, (int, float))]
+            avg_value = np.mean(avg_values) if avg_values else None
+
+            # Apply color to each cell within the range
+            for r in range(cell.row + 1, cell.row - 2):
+                for c in range(cell.column + 1, cell.column + 5):
+                    cell_value = worksheet.cell(row=r, column=c).value
+                    if isinstance(cell_value, (int, float)):
+                        if cell_value < avg_value:
+                            # Calculate color intensity for light red to white transition
+                            color_intensity = int(255 * (cell_value - min_value) / (avg_value - min_value))
+                            # Generate fill color for light red to white transition
+                            fill = PatternFill(start_color=min_color, end_color=mid_color, fill_type="gradient", fgColor=f'FF{color_intensity:02X}00', bgColor=mid_color)
+                        else:
+                            # Calculate color intensity for white to light green transition
+                            color_intensity = int(255 * (cell_value - avg_value) / (max_value - avg_value))
+                            # Generate fill color for white to light green transition
+                            fill = PatternFill(start_color=mid_color, end_color=max_color, fill_type="gradient", fgColor=mid_color, bgColor=f'FF00{color_intensity:02X}')
+                        worksheet.cell(row=r, column=c).fill = fill
