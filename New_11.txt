@@ -5786,3 +5786,51 @@ def formatting_red(sheet):
 
 # Usage example
 formatting_red("Data_Edget")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+from openpyxl import load_workbook
+
+def date_write(sheet_name):
+    workbook_path = r"C:\Users\45363901\PycharmProjects\pythonProject\pythonProject2\GBIC Workings Data\Input Mapping File - Copy.xlsx"
+    workbook = load_workbook(workbook_path)
+    sheet = workbook[sheet_name]
+
+    dates = [
+        '31-Mar-23', '30-Jun-23', '30-Sep-23', '31-Dec-23',
+        '',  # Blank date
+        '31-Mar-24', '30-Jun-24', '30-Sep-24', '31-Dec-24',
+        '',  # Blank date
+        '31-Mar-25', '30-Jun-25', '30-Sep-25', '31-Dec-25'
+    ]
+
+    irfs_row = None
+    for row in sheet.iter_rows(values_only=True):
+        if 'IRFS 1Q24 Scenarios' in row:
+            irfs_row = row
+            break
+
+    if irfs_row is None:
+        raise ValueError("IRFS 1Q24 Scenarios not found in sheet")
+
+    irfs_index = irfs_row.index('IRFS 1Q24 Scenarios')
+    start_row = sheet.max_row + 4  # Four rows below the IRFS row
+
+    for i, date in enumerate(dates):
+        sheet.cell(row=start_row + i, column=1, value=date)
+
+    workbook.save(workbook_path)
+
+# Usage example
+date_write("Data_Edget")
