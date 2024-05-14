@@ -6062,3 +6062,14 @@ def formatting_red(sheet_name):
 
 # Usage example
 formatting_red("Data_Edget")
+
+
+
+
+
+
+
+for i, date_str in enumerate(dates):
+        date_obj = datetime.strptime(date_str, '%d-%b-%y')
+        formatted_date = date_obj.strftime('%m/%d/%Y')
+        sheet.cell(row=start_row + i, column=1, value=formatted_date)
