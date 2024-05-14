@@ -5868,3 +5868,44 @@ def date_write(sheet):
 # Usage example
 # Assuming you have the 'sheet' object already loaded
 date_write(sheet)
+
+
+
+
+
+
+
+def date_write(sheet):
+    # List of dates
+    dates = [
+        '31-Mar-23', '30-Jun-23', '30-Sep-23', '31-Dec-23',
+        '31-Mar-24', '30-Jun-24', '30-Sep-24', '31-Dec-24',
+        '31-Mar-25', '30-Jun-25', '30-Sep-25', '31-Dec-25',
+        ''  # Blank cell
+    ]
+
+    # Find the row index containing 'IRFS9 1Q24 Scenarios'
+    irfs_row_index = None
+    for row in sheet.iter_rows(min_row=1, max_row=100, min_col=1, max_col=1):  # Adjust the max_row value as needed
+        for cell in row:
+            if cell.value == 'IRFS9 1Q24 Scenarios':
+                irfs_row_index = cell.row
+                break
+        if irfs_row_index is not None:
+            break
+
+    if irfs_row_index is None:
+        raise ValueError("IRFS9 1Q24 Scenarios not found in the first column of the sheet")
+
+    # Calculate the start row for writing dates (four rows below the IRFS row)
+    start_row = irfs_row_index + 4
+
+    # Write dates to the first column
+    for i, date in enumerate(dates):
+        sheet.cell(row=start_row + i, column=1, value=date)
+
+    # No need to save the workbook here
+
+# Usage example
+# Assuming you have the 'sheet' object already loaded
+date_write(sheet)
