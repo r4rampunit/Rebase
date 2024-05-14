@@ -5720,3 +5720,69 @@ for row in worksheet.iter_rows():
                             # Generate fill color for white to light green transition
                             fill = PatternFill(start_color=mid_color, end_color=max_color, fill_type="gradient", fgColor=mid_color, bgColor=f'FF00{color_intensity:02X}')
                         worksheet.cell(row=r, column=c).fill = fill
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import pandas as pd
+from openpyxl import load_workbook
+from openpyxl.styles import Font
+
+def formatting_red(sheet):
+    workbook_path = r"C:\Users\45363901\PycharmProjects\pythonProject\pythonProject2\GBIC Workings Data\Input Mapping File - Copy.xlsx"
+    workbook = load_workbook(workbook_path)
+    worksheet = workbook[sheet]
+
+    data_edge = pd.read_excel(workbook_path, sheet_name="Data_Edget")
+
+    red_font_color = 'FFFF0000'
+
+    dates = [
+        '31-Mar-23', '30-Jun-23', '30-Sep-23', '31-Dec-23',
+        '31-Mar-24', '30-Jun-24', '30-Sep-24', '31-Dec-24',
+        '31-Mar-25', '30-Jun-25', '30-Sep-25', '31-Dec-25'
+    ]
+
+    for index, row in data_edge.iterrows():
+        for col_name, cell_value in row.items():
+            if cell_value == 'IFRS9 1024 Scenarios':
+                isocodes = row['ISOCODES']
+                checks = row['Checks']
+                if index > 1 and data_edge.at[index - 1, 'ISOCODES'] == isocodes and data_edge.at[index - 1, 'Checks'] == checks:
+                    date = row['Q1_Data_Edge']
+                    if date in dates:
+                        for sheet_row in worksheet.iter_rows(min_row=4, min_col=1, max_col=1):
+                            for cell in sheet_row:
+                                if cell.value == date:
+                                    range_to_change_font_color = worksheet.iter_rows(
+                                        min_row=cell.row,
+                                        max_row=cell.row + index - 1,
+                                        min_col=cell.column,
+                                        max_col=cell.column
+                                    )
+                                    for row_to_change in range_to_change_font_color:
+                                        for cell_to_change in row_to_change:
+                                            cell_to_change.font = Font(color=red_font_color, name='Univers Next for HSBC Light')
+
+    workbook.save(workbook_path)
+
+# Usage example
+formatting_red("Data_Edget")
