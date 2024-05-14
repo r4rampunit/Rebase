@@ -6129,3 +6129,16 @@ def formatting_red(sheet_name):
 
 # Usage example
 formatting_red("Data_Edget")
+
+
+
+
+
+
+
+
+
+
+
+
+date_column = [datetime.strptime(date, '%m/%d/%Y') for date in date_column if date and isinstance(date, str) and date.strip()]
