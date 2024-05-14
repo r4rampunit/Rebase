@@ -6172,3 +6172,18 @@ import pandas as pd
 dates = ['12/31/2023', '', '01/15/2024', '', '02/28/2024', '']
 
 datetime_index = pd.to_datetime([date for date in dates if date], format='%m/%d/%Y', errors='coerce')
+
+
+
+
+import pandas as pd
+
+dates = [None, '12/31/2023', '', '01/15/2024', '', '02/28/2024', '']
+
+# Convert the non-empty dates to datetime objects
+datetime_index = pd.to_datetime([date for date in dates if date and date != ''], format='%m/%d/%Y', errors='coerce')
+
+# Convert the datetime objects to the desired format
+formatted_dates = [date.strftime('%Y-%m-%d') if pd.notnull(date) else None for date in datetime_index]
+
+print(formatted_dates)
