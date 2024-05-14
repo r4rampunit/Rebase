@@ -5944,3 +5944,59 @@ def date_write(sheet):
 # Usage example
 # Assuming you have the 'sheet' object already loaded
 date_write(sheet)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import pandas as pd
+from openpyxl import load_workbook
+from openpyxl.styles import Font
+
+def formatting_red(sheet):
+    workbook_path = r"C:\Users\45363901\PycharmProjects\pythonProject\pythonProject2\GBIC Workings Data\Input Mapping File - Copy.xlsx"
+    workbook = load_workbook(workbook_path)
+    worksheet = workbook[sheet]
+
+    data_edge = pd.read_excel(workbook_path, sheet_name="Data_Edget")
+
+    red_font_color = 'FFFF0000'
+
+    for index, row in data_edge.iterrows():
+        if row['Variable'] == 'IFRS9 1024 Scenarios':
+            isocodes = row['ISOCODES']
+            checks = row['Checks']
+            date = row['Q1_Data_Edge']
+
+            for sheet_row in worksheet.iter_rows(min_row=4, min_col=1, max_col=1):
+                for cell in sheet_row:
+                    if cell.value == date:
+                        range_to_change_font_color = worksheet.iter_rows(
+                            min_row=cell.row - 2,
+                            max_row=cell.row - 2,
+                            min_col=cell.column,
+                            max_col=cell.column
+                        )
+
+                        for row_to_change in range_to_change_font_color:
+                            for cell_to_change in row_to_change:
+                                cell_to_change.font = Font(color=red_font_color, name='Univers Next for HSBC Light')
+
+    workbook.save(workbook_path)
+
+# Usage example
+formatting_red("Data_Edget")
