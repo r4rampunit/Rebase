@@ -5834,3 +5834,37 @@ def date_write(sheet_name):
 
 # Usage example
 date_write("Data_Edget")
+
+
+
+
+
+
+
+
+
+
+
+
+def date_write(sheet):
+    # List of dates
+    dates = [
+        '31-Mar-23', '30-Jun-23', '30-Sep-23', '31-Dec-23',
+        '31-Mar-24', '30-Jun-24', '30-Sep-24', '31-Dec-24',
+        '31-Mar-25', '30-Jun-25', '30-Sep-25', '31-Dec-25',
+        ''  # Blank cell
+    ]
+
+    # Calculate the start row for writing dates (four rows below the IRFS row)
+    irfs_row_index = sheet['A'].index('IRFS9 1Q24 Scenarios') + 1
+    start_row = irfs_row_index + 4
+
+    # Write dates to the first column
+    for i, date in enumerate(dates):
+        sheet.cell(row=start_row + i, column=1, value=date)
+
+    # No need to save the workbook here
+
+# Usage example
+# Assuming you have the 'sheet' object already loaded
+date_write(sheet)
