@@ -5909,3 +5909,38 @@ def date_write(sheet):
 # Usage example
 # Assuming you have the 'sheet' object already loaded
 date_write(sheet)
+
+
+
+
+
+
+
+def date_write(sheet):
+    start_row = None
+    # Find the start row for writing dates
+    for row in sheet.iter_rows():
+        for cell in row:
+            if cell.value == 'IFRS9 1Q24 Scenarios':
+                start_row = cell.row + 4
+                break
+        if start_row is not None:
+            break
+
+    if start_row is None:
+        raise ValueError("IFRS9 1Q24 Scenarios not found in the sheet")
+
+    # List of dates
+    dates = [
+        '31-Mar-23', '30-Jun-23', '30-Sep-23', '31-Dec-23',
+        '31-Mar-24', '30-Jun-24', '30-Sep-24', '31-Dec-24',
+        '31-Mar-25', '30-Jun-25', '30-Sep-25', '31-Dec-25'
+    ]
+
+    # Write dates to the first column starting from start_row
+    for i, date in enumerate(dates):
+        sheet.cell(row=start_row + i, column=1, value=date)
+
+# Usage example
+# Assuming you have the 'sheet' object already loaded
+date_write(sheet)
