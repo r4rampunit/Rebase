@@ -131,3 +131,77 @@ for index, row in df.iterrows():
 
 for iso_code in iso_dict:
     iso_dict[iso_code] = tuple(iso_dict[iso_code])
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+change_name(sheet):
+
+This function is responsible for renaming the column headers in the given sheet based on the country code.
+It uses a dictionary A that maps country codes to lists of column names.
+It iterates over each row and cell in the sheet and checks if the cell value matches the country code.
+If a match is found, it replaces the cell value with the corresponding column name from the list associated with that country code.
+
+
+add_output_columns(sheet):
+
+This function calculates additional columns based on the existing columns in the given sheet.
+It reads the data from the sheet into a Pandas DataFrame df.
+It calculates year-over-year (YoY) and quarter-over-quarter (QoQ) percentage changes for various columns (e.g., GDP, CPI, PH, PH_DUBAI, PCOM).
+It rounds the calculated values to one decimal place and returns the updated DataFrame.
+
+
+calculate_5year_avg(frame, Isocode, tzero_date, col):
+
+This function calculates the 5-year average for a given column col and country code Isocode.
+It finds the row in the DataFrame frame that matches the Isocode and tzero_date.
+It then calculates the mean of the next 20 values (representing the 5-year period) for the specified column.
+It returns the calculated 5-year average.
+
+
+calculate_weights(df_table, Isocode):
+
+This function calculates and assigns weights to the rows of the DataFrame df_table based on the country code Isocode.
+It reads scenario weights from a mapping file and merges them with the DataFrame based on the country code.
+It calculates the weighted sum of the values in specific columns using the scenario weights.
+It updates the DataFrame df_table with the calculated weighted values.
+
+
+construct_and_populate_tables(Isocode, tzero_date, col):
+
+This function constructs and populates a table (DataFrame) with data for a given country code Isocode, time zero date tzero_date, and column col.
+It initializes a DataFrame df_table with a predefined column structure.
+It iterates over the data frames in the All list and populates the df_table with the corresponding values based on the country code and dates.
+It calculates additional columns like the 5-year average and weighted values using helper functions.
+It rounds the values in the DataFrame and returns the populated df_table.
+
+
+format_sheet(sheet):
+
+This function formats the given sheet by applying various formatting rules.
+It rounds the numeric values to one decimal place.
+It applies a specific font to all cells.
+It applies white font color to certain named ranges.
+It applies a light gray fill color to certain rows and columns.
+It applies bold formatting to specific rows and columns.
+It applies conditional formatting based on decimal patterns and fills cells with a light gray color accordingly.
+It applies thin borders to all cells.
+It applies red and blue fill colors to specific named ranges.
+
+
+
+The remaining functions perform tasks like conditional formatting, date writing, handling formatting for specific scenarios (e.g., IFRS1Q_1, IFRS1Q_2, IFRS1Q_3, IFRS_FIRST_Q, IFRS4Q), and more.
+The overall logic seems to involve reading data from various sources, performing calculations and transformations, constructing tables (DataFrames) with the processed data, and formatting the tables according to specific rules and requirements. The code appears to be tailored for a specific data processing and reporting workflow.
