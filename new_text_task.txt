@@ -108,3 +108,26 @@ with load_workbook(file_path) as wb:
     wb.save(output_file_path)
 
 print(f"Workbook saved successfully to {output_file_path}")
+
+
+
+
+
+
+
+
+
+
+df = pd.DataFrame(data)
+iso_dict = {}
+for index, row in df.iterrows():
+    iso_code = row['ISOCODES']
+    check = row['Checks']
+
+    if iso_code not in iso_dict:
+        iso_dict[iso_code] = []
+
+    iso_dict[iso_code].append(check)
+
+for iso_code in iso_dict:
+    iso_dict[iso_code] = tuple(iso_dict[iso_code])
