@@ -205,3 +205,58 @@ It applies red and blue fill colors to specific named ranges.
 
 The remaining functions perform tasks like conditional formatting, date writing, handling formatting for specific scenarios (e.g., IFRS1Q_1, IFRS1Q_2, IFRS1Q_3, IFRS_FIRST_Q, IFRS4Q), and more.
 The overall logic seems to involve reading data from various sources, performing calculations and transformations, constructing tables (DataFrames) with the processed data, and formatting the tables according to specific rules and requirements. The code appears to be tailored for a specific data processing and reporting workflow.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+from datetime import datetime
+from dateutil import relativedelta
+
+zero_date = "2024-03-31"
+zero_date = datetime.strptime(zero_date, "%Y-%m-%d")
+
+zero_date_1 = zero_date.replace(year=zero_date.year - 1)
+start_date = datetime.strptime(str(zero_date_1), "%Y-%m-%d")
+
+date1 = start_date
+
+date2 = (date1 + relativedelta(months=3)).replace(day=1) - relativedelta(months=1, days=-1)
+date3 = (date2 + relativedelta(months=3)).replace(day=1) - relativedelta(months=1, days=-1)
+date4 = (date3 + relativedelta(months=3)).replace(day=1) - relativedelta(months=1, days=-1)
+date5 = (date4 + relativedelta(months=3)).replace(day=1) - relativedelta(months=1, days=-1)
+
+date6 = (date5 + relativedelta(months=3)).replace(day=1) - relativedelta(months=1, days=-1)
+date7 = (date6 + relativedelta(months=3)).replace(day=1) - relativedelta(months=1, days=-1)
+date8 = (date7 + relativedelta(months=3)).replace(day=1) - relativedelta(months=1, days=-1)
+date9 = (date8 + relativedelta(months=3)).replace(day=1) - relativedelta(months=1, days=-1)
+date10 = (date9 + relativedelta(months=3)).replace(day=1) - relativedelta(months=1, days=-1)
+date11 = (date10 + relativedelta(months=3)).replace(day=1) - relativedelta(months=1, days=-1)
+
+dates = [
+    date1.strftime("%d-%b-%y"), date2.strftime("%d-%b-%y"), date3.strftime("%d-%b-%y"), date4.strftime("%d-%b-%y"),
+    date5.strftime("%d-%b-%y"), date6.strftime("%d-%b-%y"), date7.strftime("%d-%b-%y"), date8.strftime("%d-%b-%y"),
+    date9.strftime("%d-%b-%y"), date10.strftime("%d-%b-%y"), date11.strftime("%d-%b-%y")
+]
+
+print(dates)
