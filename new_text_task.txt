@@ -259,4 +259,74 @@ dates = [
     date9.strftime("%d-%b-%y"), date10.strftime("%d-%b-%y"), date11.strftime("%d-%b-%y")
 ]
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import pandas as pd
+from datetime import datetime, timedelta
+
+# Read the data from the Excel file
+data = pd.read_excel('mev-nz.xlsx')
+
+# Create a list of unique country ISO codes
+countries = data['ISOCODES'].unique().tolist()
+
+# Create a list of column names for the dates
+date_cols = [f"{d.strftime('%m/%d/%Y')}" for d in pd.date_range(start='12/31/2022', end='12/31/2052', freq='Q')]
+
+# Create an empty DataFrame with the desired structure
+mev_data = pd.DataFrame(index=data['GDP'].unique(), columns=['MEV Key', 'MEV Variable', 'Country ISO Code'] + date_cols + ['Region Mapped'])
+
+# Iterate over each row in the original data
+for row in data.itertuples(index=False):
+    country = row.ISOCODES
+    mev_key = row.GDP
+    mev_var = row._fields[3]  # Assuming the variable name is in the 4th column
+
+    # Create a new row in the mev_data DataFrame
+    mev_data.loc[mev_key, 'MEV Key'] = mev_key
+    mev_data.loc[mev_key, 'MEV Variable'] = mev_var
+    mev_data.loc[mev_key, 'Country ISO Code'] = country
+
+    # Get the start date and end date for the variable
+    start_date = datetime(year=row.GDP_YR, month=1, day=1)
+    end_date = start_date + timedelta(days=365)
+
+    # Populate the values in the date columns
+    for date_col in date_cols:
+        date = datetime.strptime(date_col, '%m/%d/%Y')
+        if start_date <= date < end_date:
+            mev_data.loc[mev_key, date_col] = row._fields.index(mev_var)
+
+# Write the data to a new Excel file
+mev_data.to_excel('mev_data.xlsx', index=False)
+
 print(dates)
