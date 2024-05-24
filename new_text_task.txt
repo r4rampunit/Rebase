@@ -535,3 +535,73 @@ for _, row in data.iterrows():
 mev_data.to_excel('mev_data.xlsx', index=False)
 
 print(dates)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import pandas as pd
+from datetime import datetime, timedelta
+
+# Read the data from the Excel file
+data = pd.read_excel('mev-nz.xlsx')
+
+# Create a list of unique country ISO codes
+countries = data['ISOCODES'].unique().tolist()
+
+# Create a list of column names for the dates
+date_cols = ['3/31/2021', '6/30/2021', '9/30/2021', '12/31/2021', '3/31/2022', '6/30/2022', '9/30/2022', '12/31/2022', '3/31/2023'] + [f"{d.strftime('%m/%d/%Y')}" for d in pd.date_range(start='6/30/2023', end='12/31/2052', freq='Q')]
+
+# Create an empty DataFrame with the desired structure
+mev_data = pd.DataFrame(columns=['MEV Key', 'MEV Variable', 'Country ISO Code', 'Region Mapped'] + date_cols)
+
+# Iterate over each row in the original data
+for _, row in data.iterrows():
+    country = row['ISOCODES']
+    mev_var = row.iloc[3]  # Assuming the variable name is in the 4th column
+    region_mapped = row['GDP']
+
+    # Ensure GDP_YR can be converted to an integer, if not, skip this row
+    try:
+        gdp_year = int(row['GDP_YR'])
+        if gdp_year < 1:
+            continue
+    except (ValueError, TypeError):
+        continue
+
+    # Create the MEV Key based on the Region Mapped and MEV Variable
+    mev_key = f"{region_mapped}_{mev_var}"
+
+    # Get the start date and end date for the variable
+    start_date = datetime(year=gdp_year, month=1, day=1)
+    end_date = start_date + timedelta(days=365)
+
+    # Check if the key exists in mev_data, if not, add it
+    if mev_key not in mev_data.index:
+        mev_data.loc[mev_key] = [mev_key, mev_var, country, region_mapped] + [None] * len(date_cols)
+
+    # Populate the values in the date columns
+    for date_col in date_cols:
+        date = datetime.strptime(date_col, '%m/%d/%Y')
+        if start_date <= date < end_date:
+            if pd.isna(mev_data.loc[mev_key, date_col]):
+                mev_data.loc[mev_key, date_col] = mev_var
+            else:
+                mev_data.loc[mev_key, date_col] = f"{mev_data.loc[mev_key, date_col]}, {mev_var}"
+
+# Write the data to a new Excel file
+mev_data.to_excel('mev_data.xlsx', index=False)
