@@ -791,3 +791,92 @@ df_table = pd.DataFrame(columns=pd.MultiIndex.from_tuples(column_1), index=rows)
 
 # Display the DataFrame structure
 print(df_table)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import pandas as pd
+from datetime import datetime
+import tkinter as tk
+from tkinter import simpledialog
+
+# Initialize Tkinter
+root = tk.Tk()
+root.withdraw()  # Hide the root window
+
+# Function to get user input for parts of the column names
+def get_user_input(prompt, cache={}):
+    if prompt not in cache:
+        cache[prompt] = simpledialog.askstring("Input", prompt)
+    return cache[prompt]
+
+# Define the prompts for unique parts of the column names
+prompts = {
+    "Unemployment Rate (%)": "Enter the name for 'Unemployment Rate (%)': ",
+    "IFRS9 1024 Scenarios": "Enter the name for 'IFRS9 1024 Scenarios': ",
+    "IFRS9 4023 Scenarios": "Enter the name for 'IFRS9 4023 Scenarios': ",
+    "Hoody's": "Enter the name for 'Hoody's': ",
+    "Upside": "Enter the name for 'Upside': ",
+    "Central": "Enter the name for 'Central': ",
+    "Down 1": "Enter the name for 'Down 1': ",
+    "Down 2": "Enter the name for 'Down 2': ",
+    "Weighted": "Enter the name for 'Weighted': ",
+    "10% UP": "Enter the name for '10% UP': ",
+    "10% DN": "Enter the name for '10% DN': ",
+    "4% DN": "Enter the name for '4% DN': "
+}
+
+# Get user inputs for the column names
+column_1 = [
+    (get_user_input(prompts["Unemployment Rate (%)"]), get_user_input(prompts["IFRS9 1024 Scenarios"]), get_user_input(prompts["Upside"])),
+    (get_user_input(prompts["Unemployment Rate (%)"]), get_user_input(prompts["IFRS9 1024 Scenarios"]), get_user_input(prompts["Central"])),
+    (get_user_input(prompts["Unemployment Rate (%)"]), get_user_input(prompts["IFRS9 1024 Scenarios"]), get_user_input(prompts["Down 1"])),
+    (get_user_input(prompts["Unemployment Rate (%)"]), get_user_input(prompts["IFRS9 1024 Scenarios"]), get_user_input(prompts["Down 2"])),
+    (get_user_input(prompts["Unemployment Rate (%)"]), get_user_input(prompts["IFRS9 4023 Scenarios"]), get_user_input(prompts["Upside"])),
+    (get_user_input(prompts["Unemployment Rate (%)"]), get_user_input(prompts["IFRS9 4023 Scenarios"]), get_user_input(prompts["Central"])),
+    (get_user_input(prompts["Unemployment Rate (%)"]), get_user_input(prompts["IFRS9 4023 Scenarios"]), get_user_input(prompts["Down 1"])),
+    (get_user_input(prompts["Unemployment Rate (%)"]), get_user_input(prompts["IFRS9 4023 Scenarios"]), get_user_input(prompts["Down 2"])),
+    (get_user_input(prompts["Unemployment Rate (%)"]), get_user_input(prompts["IFRS9 4023 Scenarios"]), get_user_input(prompts["Weighted"])),
+    (get_user_input(prompts["Unemployment Rate (%)"]), get_user_input(prompts["Hoody's"]), get_user_input(prompts["10% UP"])),
+    (get_user_input(prompts["Unemployment Rate (%)"]), get_user_input(prompts["Hoody's"]), get_user_input(prompts["Central"])),
+    (get_user_input(prompts["Unemployment Rate (%)"]), get_user_input(prompts["Hoody's"]), get_user_input(prompts["10% DN"])),
+    (get_user_input(prompts["Unemployment Rate (%)"]), get_user_input(prompts["Hoody's"]), get_user_input(prompts["4% DN"]))
+]
+
+# Define the current year
+curr_year = datetime.now().year
+
+# Define the row indices
+rows = [
+    'Q1', 'Q2', 'Q3', 'Q4',
+    str(curr_year), 'Q1', 'Q2', 'Q3', 'Q4',
+    str(curr_year + 1), str(curr_year + 2), str(curr_year + 3),
+    '5yr Avg'
+]
+
+# Create the DataFrame with the specified structure
+df_table = pd.DataFrame(columns=pd.MultiIndex.from_tuples(column_1), index=rows)
+
+# Display the DataFrame structure
+print(df_table)
+
+# Close the Tkinter root window
+root.destroy()
