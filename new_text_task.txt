@@ -974,3 +974,93 @@ print(df_table)
 
 # Close the Tkinter root window
 root.destroy()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import pandas as pd
+from datetime import datetime
+import tkinter as tk
+from tkinter import simpledialog
+
+# Initialize Tkinter
+root = tk.Tk()
+root.withdraw()  # Hide the root window
+
+# Define the prompts for unique parts of the column names
+prompts = {
+    "Unemployment Rate (%)": "Enter the name for 'Unemployment Rate (%)': ",
+    "IFRS9 1024 Scenarios": "Enter the name for 'IFRS9 1024 Scenarios': ",
+    "IFRS9 4023 Scenarios": "Enter the name for 'IFRS9 4023 Scenarios': ",
+    "Hoody's": "Enter the name for 'Hoody's': ",
+    "Upside": "Enter the name for 'Upside': ",
+    "Central": "Enter the name for 'Central': ",
+    "Down 1": "Enter the name for 'Down 1': ",
+    "Down 2": "Enter the name for 'Down 2': ",
+    "Weighted": "Enter the name for 'Weighted': ",
+    "10% UP": "Enter the name for '10% UP': ",
+    "10% DN": "Enter the name for '10% DN': ",
+    "4% DN": "Enter the name for '4% DN': "
+}
+
+# Get user inputs for the unique parts of the column names
+input_cache = {prompt: simpledialog.askstring("Input", prompt) for prompt in prompts.values()}
+
+# Define the column names
+column_1 = [
+    (input_cache[prompts["Unemployment Rate (%)"]], input_cache[prompts["IFRS9 1024 Scenarios"]], input_cache[prompts["Upside"]]),
+    (input_cache[prompts["Unemployment Rate (%)"]], input_cache[prompts["IFRS9 1024 Scenarios"]], input_cache[prompts["Central"]]),
+    (input_cache[prompts["Unemployment Rate (%)"]], input_cache[prompts["IFRS9 1024 Scenarios"]], input_cache[prompts["Down 1"]]),
+    (input_cache[prompts["Unemployment Rate (%)"]], input_cache[prompts["IFRS9 1024 Scenarios"]], input_cache[prompts["Down 2"]]),
+    (input_cache[prompts["Unemployment Rate (%)"]], input_cache[prompts["IFRS9 4023 Scenarios"]], input_cache[prompts["Upside"]]),
+    (input_cache[prompts["Unemployment Rate (%)"]], input_cache[prompts["IFRS9 4023 Scenarios"]], input_cache[prompts["Central"]]),
+    (input_cache[prompts["Unemployment Rate (%)"]], input_cache[prompts["IFRS9 4023 Scenarios"]], input_cache[prompts["Down 1"]]),
+    (input_cache[prompts["Unemployment Rate (%)"]], input_cache[prompts["IFRS9 4023 Scenarios"]], input_cache[prompts["Down 2"]]),
+    (input_cache[prompts["Unemployment Rate (%)"]], input_cache[prompts["IFRS9 4023 Scenarios"]], input_cache[prompts["Weighted"]]),
+    (input_cache[prompts["Unemployment Rate (%)"]], input_cache[prompts["Hoody's"]], input_cache[prompts["10% UP"]]),
+    (input_cache[prompts["Unemployment Rate (%)"]], input_cache[prompts["Hoody's"]], input_cache[prompts["Central"]]),
+    (input_cache[prompts["Unemployment Rate (%)"]], input_cache[prompts["Hoody's"]], input_cache[prompts["10% DN"]]),
+    (input_cache[prompts["Unemployment Rate (%)"]], input_cache[prompts["Hoody's"]], input_cache[prompts["4% DN"]])
+]
+
+# Define the current year
+curr_year = datetime.now().year
+
+# Define the row indices
+rows = [
+    'Q1', 'Q2', 'Q3', 'Q4',
+    str(curr_year), 'Q1', 'Q2', 'Q3', 'Q4',
+    str(curr_year + 1), str(curr_year + 2), str(curr_year + 3),
+    '5yr Avg'
+]
+
+# Create the DataFrame with the specified structure
+df_table = pd.DataFrame(columns=pd.MultiIndex.from_tuples(column_1), index=rows)
+
+# Display the DataFrame structure
+print(df_table)
+
+# Close the Tkinter root window
+root.destroy()
