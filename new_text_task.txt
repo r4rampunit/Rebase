@@ -1171,3 +1171,89 @@ print(df_table)
 
 # Close the Tkinter root window
 root.destroy()
+
+
+
+
+
+
+
+
+
+
+
+import pandas as pd
+from datetime import datetime
+import tkinter as tk
+from tkinter import simpledialog
+
+# Initialize Tkinter
+root = tk.Tk()
+root.withdraw()  # Hide the root window
+
+# Define the prompts for unique parts of the column names
+prompts = [
+    "Enter the name for 'Unemployment Rate (%)': ",
+    "Enter the name for 'IFRS9 1024 Scenarios': ",
+    "Enter the name for 'IFRS9 4023 Scenarios': ",
+    "Enter the name for 'Hoody's': ",
+    "Enter the name for 'Upside': ",
+    "Enter the name for 'Central': ",
+    "Enter the name for 'Down 1': ",
+    "Enter the name for 'Down 2': ",
+    "Enter the name for 'Weighted': ",
+    "Enter the name for '10% UP': ",
+    "Enter the name for '10% DN': ",
+    "Enter the name for '4% DN': "
+]
+
+# Get user inputs for the unique parts of the column names
+user_inputs = []
+for prompt in prompts:
+    user_input = simpledialog.askstring("Input", prompt)
+    if user_input is None:
+        break
+    user_inputs.append(user_input)
+
+# Check if all inputs were provided
+if len(user_inputs) != len(prompts):
+    print("Incomplete inputs provided. Exiting...")
+    root.destroy()
+    exit()
+
+# Define the column names
+column_1 = [
+    (user_inputs[0], user_inputs[1], user_inputs[4]),
+    (user_inputs[0], user_inputs[1], user_inputs[5]),
+    (user_inputs[0], user_inputs[1], user_inputs[6]),
+    (user_inputs[0], user_inputs[1], user_inputs[7]),
+    (user_inputs[0], user_inputs[2], user_inputs[4]),
+    (user_inputs[0], user_inputs[2], user_inputs[5]),
+    (user_inputs[0], user_inputs[2], user_inputs[6]),
+    (user_inputs[0], user_inputs[2], user_inputs[7]),
+    (user_inputs[0], user_inputs[2], user_inputs[8]),
+    (user_inputs[0], user_inputs[3], user_inputs[9]),
+    (user_inputs[0], user_inputs[3], user_inputs[5]),
+    (user_inputs[0], user_inputs[3], user_inputs[10]),
+    (user_inputs[0], user_inputs[3], user_inputs[11])
+]
+
+# Define the current year
+curr_year = datetime.now().year
+
+# Define the row indices
+rows = [
+    'Q1', 'Q2', 'Q3', 'Q4',
+    str(curr_year), 'Q1', 'Q2', 'Q3', 'Q4',
+    str(curr_year + 1), str(curr_year + 2), str(curr_year + 3),
+    '5yr Avg'
+]
+
+# Create the DataFrame with the specified structure
+df_table = pd.DataFrame(columns=pd.MultiIndex.from_tuples(column_1), index=rows)
+
+# Display the DataFrame structure
+print(df_table)
+
+# Close the Tkinter root window
+root.destroy()
