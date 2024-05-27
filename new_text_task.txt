@@ -742,3 +742,52 @@ mev_data[date_cols] = mev_data[date_cols].apply(lambda x: x.apply(lambda y: ', '
 
 # Write the data to a new Excel file
 mev_data.to_excel('mev_data.xlsx', index=False)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import pandas as pd
+from datetime import datetime
+
+# Function to get user input for column names
+def get_column_names():
+    columns = []
+    num_columns = int(input("Enter the number of columns: "))
+    for i in range(num_columns):
+        mev_variable = input(f"Enter the MEV Variable for column {i+1}: ")
+        scenario_type = input(f"Enter the Scenario Type for column {i+1}: ")
+        scenario_detail = input(f"Enter the Scenario Detail for column {i+1}: ")
+        columns.append(('Unemployment Rate (%)', scenario_type, scenario_detail))
+    return columns
+
+# Define the current year
+curr_year = datetime.now().year
+
+# Get user input for the multi-level column names
+column_1 = get_column_names()
+
+# Define the row indices
+rows = [
+    'Q1', 'Q2', 'Q3', 'Q4',
+    str(curr_year), 'Q1', 'Q2', 'Q3', 'Q4',
+    str(curr_year + 1), str(curr_year + 2), str(curr_year + 3),
+    '5yr Avg'
+]
+
+# Create the DataFrame with the specified structure
+df_table = pd.DataFrame(columns=pd.MultiIndex.from_tuples(column_1), index=rows)
+
+# Display the DataFrame structure
+print(df_table)
