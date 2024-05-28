@@ -1547,3 +1547,79 @@ tzero_date = "2024-03-31"
 # Example loop calling the create_data function
 for _ in range(2):  # Replace 2 with the desired number of iterations
     create_data(tzero_date)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import pandas as pd
+from openpyxl import load_workbook
+from openpyxl.styles import PatternFill
+from openpyxl.formatting.rule import ColorScaleRule
+import numpy as np
+
+# Load the Excel file
+file_path = 'path_to_your_excel_file.xlsx'  # Update with your file path
+wb = load_workbook(filename=file_path)
+sheet = wb['data edge']
+
+# Load the sheet into a DataFrame
+df = pd.read_excel(file_path, sheet_name='data edge')
+
+# Check the condition
+if 'Conditional_Formatting_Required' in df.columns and any(df['Conditional_Formatting_Required'] == 'Yes'):
+    # Iterate through the sheet and apply formatting based on the specified conditions
+    for row in sheet.iter_rows():
+        for cell in row:
+            if cell.value == '5yr Avg':
+                # Define the ranges for max, min, and avg values
+                max_value_range = sheet.iter_rows(min_row=cell.row-18, max_row=cell.row-3, min_col=cell.column, max_col=cell.column+4)
+                min_value_range = sheet.iter_rows(min_row=cell.row-18, max_row=cell.row-3, min_col=cell.column, max_col=cell.column+4)
+                avg_value_range = sheet.iter_rows(min_row=cell.row-2, max_row=cell.row, min_col=cell.column+2, max_col=cell.column+2)
+
+                # Extract values from the ranges
+                max_values = [c.value for r in max_value_range for c in r if isinstance(c.value, (int, float))]
+                min_values = [c.value for r in min_value_range for c in r if isinstance(c.value, (int, float))]
+                avg_values = [c.value for r in avg_value_range for c in r if isinstance(c.value, (int, float))]
+
+                # Calculate max, min, and avg values
+                max_value = max(max_values) if max_values else None
+                min_value = min(min_values) if min_values else None
+                avg_value = np.mean(avg_values) if avg_values else None
+
+                # Define the data range for conditional formatting
+                data_range = f'{sheet.cell(row=cell.row-2, column=cell.column).coordinate}:{sheet.cell(row=cell.row-1, column=cell.column+4).coordinate}'
+
+                # Define colors
+                min_color = "FFCCCC"
+                mid_color = "FFFFCC"
+                max_color = "CCFFCC"
+
+                # Create the color scale rule
+                rule = ColorScaleRule(start_type='num', start_value=min_value, start_color=min_color,
+                                      mid_type='num', mid_value=avg_value, mid_color=mid_color,
+                                      end_type='num', end_value=max_value, end_color=max_color)
+
+                # Apply the conditional formatting
+                sheet.conditional_formatting.add(data_range, rule)
+
+# Save the workbook
+wb.save('path_to_your_output_file.xlsx')  # Update with your desired output file path
