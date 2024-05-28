@@ -1402,3 +1402,148 @@ for row in sheet.iter_rows(min_row=4, max_row=24, min_col=1, max_col=1):
 
 # Save the workbook
 workbook.save('your_workbook_colored.xlsx')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import pandas as pd
+from datetime import datetime
+import tkinter as tk
+from tkinter import simpledialog
+from PIL import Image, ImageTk
+
+# Initialize Tkinter
+root = tk.Tk()
+root.withdraw()  # Hide the root window
+
+# Function to display the input dialog with logo and custom size
+def show_dialog_with_logo(prompt):
+    dialog = tk.Toplevel()
+    dialog.geometry("500x300")  # Set the size of the dialog
+    dialog.title(prompt)
+
+    # Load the image
+    img = Image.open("hsbc_1.png")
+    img = img.resize((100, 100), Image.ANTIALIAS)  # Resize the image if needed
+    logo = ImageTk.PhotoImage(img)
+
+    # Create a label for the image
+    img_label = tk.Label(dialog, image=logo)
+    img_label.image = logo  # Keep a reference to avoid garbage collection
+    img_label.pack(side="left", padx=10, pady=10)
+
+    # Create an entry widget for user input
+    entry = tk.Entry(dialog, width=40)
+    entry.pack(side="right", padx=10, pady=10)
+
+    # Function to close the dialog and return the entry value
+    def on_ok():
+        user_input = entry.get()
+        dialog.destroy()
+        return user_input
+
+    # Create OK button
+    ok_button = tk.Button(dialog, text="OK", command=on_ok)
+    ok_button.pack(side="bottom", pady=10)
+
+    # Center the dialog on the screen
+    dialog.update_idletasks()
+    width = dialog.winfo_width()
+    height = dialog.winfo_height()
+    x = (dialog.winfo_screenwidth() // 2) - (width // 2)
+    y = (dialog.winfo_screenheight() // 2) - (height // 2)
+    dialog.geometry('{}x{}+{}+{}'.format(width, height, x, y))
+
+    root.wait_window(dialog)
+    return entry.get()
+
+# Global cache for user inputs
+input_cache = {}
+
+# Function to get user input for parts of the column names, using a cache to avoid duplicate prompts
+def get_user_input(prompt):
+    if prompt not in input_cache:
+        input_cache[prompt] = show_dialog_with_logo(prompt)
+    return input_cache[prompt]
+
+# Function to create data
+def create_data(tzero_date):
+    # Get user inputs for the column names
+    unemployment_rate = get_user_input("Enter the name for 'Unemployment Rate (%)': ")
+    ifrs9_1024 = get_user_input("Enter the name for 'IFRS9 1024 Scenarios': ")
+    ifrs9_4023 = get_user_input("Enter the name for 'IFRS9 4023 Scenarios': ")
+    hoodys = get_user_input("Enter the name for 'Hoody's': ")
+    upside = get_user_input("Enter the name for 'Upside': ")
+    central = get_user_input("Enter the name for 'Central': ")
+    down1 = get_user_input("Enter the name for 'Down 1': ")
+    down2 = get_user_input("Enter the name for 'Down 2': ")
+    weighted = get_user_input("Enter the name for 'Weighted': ")
+    ten_percent_up = get_user_input("Enter the name for '10% UP': ")
+    ten_percent_dn = get_user_input("Enter the name for '10% DN': ")
+    four_percent_dn = get_user_input("Enter the name for '4% DN': ")
+
+    # Define the columns using the collected inputs
+    column_1 = [
+        (unemployment_rate, ifrs9_1024, upside),
+        (unemployment_rate, ifrs9_1024, central),
+        (unemployment_rate, ifrs9_1024, down1),
+        (unemployment_rate, ifrs9_1024, down2),
+        (unemployment_rate, ifrs9_4023, upside),
+        (unemployment_rate, ifrs9_4023, central),
+        (unemployment_rate, ifrs9_4023, down1),
+        (unemployment_rate, ifrs9_4023, down2),
+        (unemployment_rate, ifrs9_4023, weighted),
+        (unemployment_rate, hoodys, ten_percent_up),
+        (unemployment_rate, hoodys, central),
+        (unemployment_rate, hoodys, ten_percent_dn),
+        (unemployment_rate, hoodys, four_percent_dn)
+    ]
+
+    # Define the current year
+    curr_year = datetime.now().year
+
+    # Define the row indices
+    rows = [
+        'Q1', 'Q2', 'Q3', 'Q4',
+        str(curr_year), 'Q1', 'Q2', 'Q3', 'Q4',
+        str(curr_year + 1), str(curr_year + 2), str(curr_year + 3),
+        '5yr Avg'
+    ]
+
+    # Create the DataFrame with the specified structure
+    df_table = pd.DataFrame(columns=pd.MultiIndex.from_tuples(column_1), index=rows)
+
+    # Display the DataFrame structure
+    print(f"tzero_date: {tzero_date}")
+    print(df_table)
+
+# Close the Tkinter root window when done
+root.destroy()
+
+# Set tzero_date as a fixed string value
+tzero_date = "2024-03-31"
+
+# Example loop calling the create_data function
+for _ in range(2):  # Replace 2 with the desired number of iterations
+    create_data(tzero_date)
