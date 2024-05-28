@@ -1358,3 +1358,47 @@ Create_data(user_inputs)
 
 # Close the Tkinter root window
 root.destroy()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+from openpyxl import load_workbook
+from openpyxl.styles import PatternFill
+
+# Load the workbook and select the sheet
+workbook = load_workbook('your_workbook.xlsx')
+sheet = workbook['your_sheet_name']
+
+# Define the color fill
+sky_blue_fill = PatternFill(start_color="FF87CEFA", end_color="FF87CEFA", fill_type="solid")
+
+# Iterate over the rows to find the cell with the desired value
+for row in sheet.iter_rows(min_row=4, max_row=24, min_col=1, max_col=1):
+    for cell in row:
+        if cell.value == 'IFRS9 1024 Scenarios':
+            cell_position = cell.coordinate
+            row_idx = cell.row
+            col_idx = cell.column
+
+            # Fill the cells with the sky blue color
+            for r in range(row_idx, row_idx + 3):
+                for c in range(col_idx, col_idx + 4):
+                    sheet.cell(row=r, column=c).fill = sky_blue_fill
+
+# Save the workbook
+workbook.save('your_workbook_colored.xlsx')
