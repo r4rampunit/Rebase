@@ -1794,3 +1794,63 @@ if __name__ == "__main__":
 
 
 data_range = f'(sheet.cell(row=target_cell.row 7, column=target_cell.column + 1).coordinate): (sheet.cell(row=target_cell.row - 4, column=target_cell.column + 4).coordinate)'
+
+
+
+
+
+
+
+
+
+
+
+
+
+import pandas as pd
+import openpyxl
+import numpy as np
+
+def conditional_formatting_IFRS10_1(sheet):
+    # Define the path to the workbook
+    workbook_path = r"C:\Users\45363901\PycharmProjects\pythonProject\pythonProject2 GBIC Workings Data\Input\Mapping File Copy.xlsx"
+
+    # Read the Excel file and load the specified sheet into a DataFrame
+    df = pd.read_excel(workbook_path, sheet_name="Data_Edge")
+
+    # Iterate over the rows in the sheet
+    for row in sheet.iter_rows():
+        for cell in row:
+            # Get the check values that contain 'QoQ' and have conditional formatting required as 'Yes'
+            checks_value = df.loc[
+                (df['ISOCODES'] == sheet.title) &
+                (df['Checks'].str.contains('QoQ')) &
+                (df['Conditional_Formatting_Required'] == 'Yes'),
+                'Checks'
+            ].tolist()
+
+            # Check if the cell value matches any of the check values
+            for value in checks_value:
+                if cell.value == value:
+                    if cell.col_idx > 1:
+                        target_cell = sheet.cell(row=cell.row, column=cell.col_idx - 1)
+                        if target_cell.value == '5yr Avg':
+                            # Define the data range based on the target cell
+                            data_range = f'{sheet.cell(row=target_cell.row + 7, column=target_cell.column + 1).coordinate}:{sheet.cell(row=target_cell.row - 4, column=target_cell.column + 4).coordinate}'
+                            # Clear the numbers in the specified range
+                            for cell_range in sheet[data_range]:
+                                for target in cell_range:
+                                    if isinstance(target.value, (int, float)):
+                                        target.value = None
+
+# Example usage
+file_path = r"C:\Users\45363901\PycharmProjects\pythonProject\pythonProject2 GBIC Workings Data\Input\Mapping File Copy.xlsx"
+workbook = openpyxl.load_workbook(file_path)
+
+# Iterate over each sheet in the workbook
+for sheet_name in workbook.sheetnames:
+    sheet = workbook[sheet_name]
+    conditional_formatting_IFRS10_1(sheet)
+
+# Save the updated workbook
+workbook.save(file_path)
