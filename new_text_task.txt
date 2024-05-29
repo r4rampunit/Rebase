@@ -1696,3 +1696,90 @@ for sheet_name in workbook.sheetnames:
 
 # Save the updated workbook
 workbook.save(file_path)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import pandas as pd
+import openpyxl
+from openpyxl.formatting.rule import ColorScaleRule
+import numpy as np
+
+def apply_conditional_formatting(sheet, checks_value):
+    for row in sheet.iter_rows():
+        for cell in row:
+            if cell.value == checks_value:
+                # Look for '5yr Avg' in the previous column of the same row
+                if cell.col_idx > 1:  # Ensure we don't go out of bounds
+                    target_cell = sheet.cell(row=cell.row, column=cell.col_idx - 1)
+                    if target_cell.value == '5yr Avg':
+                        max_value_range = sheet.iter_rows(min_row=cell.row - 18, max_row=cell.row - 3, min_col=cell.col_idx + 1, max_col=cell.col_idx + 4)
+                        min_value_range = sheet.iter_rows(min_row=cell.row - 18, max_row=cell.row - 3, min_col=cell.col_idx + 1, max_col=cell.col_idx + 4)
+                        avg_value_range = sheet.iter_rows(min_row=cell.row - 2, max_row=cell.row, min_col=cell.col_idx + 2, max_col=cell.col_idx + 2)
+
+                        max_values = [c.value for r in max_value_range for c in r if isinstance(c.value, (int, float))]
+                        min_values = [c.value for r in min_value_range for c in r if isinstance(c.value, (int, float))]
+                        avg_values = [c.value for r in avg_value_range for c in r if isinstance(c.value, (int, float))]
+
+                        max_value = max(max_values) if max_values else None
+                        min_value = min(min_values) if min_values else None
+                        avg_value = np.mean(avg_values) if avg_values else None
+
+                        data_range = f'{sheet.cell(row=cell.row - 2, column=cell.col_idx + 1).coordinate}:{sheet.cell(row=cell.row - 1, column=cell.col_idx + 4).coordinate}'
+                        min_color = "FFCCCC"
+                        mid_color = "FFFFFF"
+                        max_color = 'CCFFCC'
+
+                        rule = ColorScaleRule(start_type='num', start_value=max_value, start_color=min_color, mid_type='num', mid_value=avg_value, mid_color=mid_color, end_type='num', end_value=min_value, end_color=max_color)
+                        sheet.conditional_formatting.add(data_range, rule)
+
+def formatting_1(sheet, morpho_df):
+    # Get the current sheet name (ISOCODES)
+    isocode = sheet.title
+
+    # Filter DataFrame for the current ISOCODES
+    filtered_df = morpho_df[morpho_df['ISOCODES'] == isocode]
+
+    # Iterate over the filtered rows
+    for _, row in filtered_df.iterrows():
+        checks_value = row['Checks']
+        conditional_formatting_required = row['Conditional_Formatting_Required']
+
+        # Check if conditional formatting is required
+        if conditional_formatting_required == 'Yes':
+            apply_conditional_formatting(sheet, checks_value)
+
+def main():
+    # Paths to the files
+    file_path = r'c:/pat/ram.xlsx'
+    morpho_path = r'c:/pat/morpho_1.xlsx'
+
+    # Load the main Excel file
+    workbook = openpyxl.load_workbook(file_path)
+
+    # Read the morpho_1.xlsx file
+    morpho_df = pd.read_excel(morpho_path, sheet_name='Data_Edge')
+
+    # Iterate over each sheet in the workbook
+    for sheet_name in workbook.sheetnames:
+        sheet = workbook[sheet_name]
+        formatting_1(sheet, morpho_df)
+
+    # Save the updated workbook
+    workbook.save(file_path)
+
+# Execute the main function
+if __name__ == "__main__":
+    main()
