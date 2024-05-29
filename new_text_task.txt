@@ -1854,3 +1854,38 @@ for sheet_name in workbook.sheetnames:
 
 # Save the updated workbook
 workbook.save(file_path)
+
+
+
+
+
+
+
+import openpyxl
+
+def insert_empty_column_after_weighted(sheet):
+    for row in sheet.iter_rows():
+        for cell in row:
+            if cell.value == "Weighted":
+                # Insert a new column after the column containing "Weighted"
+                col_idx = cell.column
+                sheet.insert_cols(col_idx + 1)
+
+                # Set the width of the new column to 0.32
+                new_col_letter = openpyxl.utils.get_column_letter(col_idx + 1)
+                sheet.column_dimensions[new_col_letter].width = 0.32
+
+                # Break to avoid processing the same row multiple times
+                break
+
+# Example usage
+file_path = r"C:\Users\45363901\PycharmProjects\pythonProject\pythonProject2 GBIC Workings Data\Input\Mapping File Copy.xlsx"
+workbook = openpyxl.load_workbook(file_path)
+
+# Iterate over each sheet in the workbook
+for sheet_name in workbook.sheetnames:
+    sheet = workbook[sheet_name]
+    insert_empty_column_after_weighted(sheet)
+
+# Save the updated workbook
+workbook.save(file_path)
