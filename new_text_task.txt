@@ -1783,3 +1783,14 @@ def main():
 # Execute the main function
 if __name__ == "__main__":
     main()
+
+
+
+
+
+
+
+
+
+
+data_range = f'(sheet.cell(row=target_cell.row 7, column=target_cell.column + 1).coordinate): (sheet.cell(row=target_cell.row - 4, column=target_cell.column + 4).coordinate)'
