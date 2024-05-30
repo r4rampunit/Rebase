@@ -1889,3 +1889,79 @@ for sheet_name in workbook.sheetnames:
 
 # Save the updated workbook
 workbook.save(file_path)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def calculate_weights(df_table, Isocode):
+    mapping_file_path = r"C:\Users\45363901\PycharmProjects\pythonProject\pythonProject2\GBIC_Workings\Data\Input\Mapping_File Copy.xlsx"
+    Country_sheet = pd.read_excel(mapping_file_path, sheet_name="Country")
+    Scenario_Weights_sheet = pd.read_excel(mapping_file_path, sheet_name='Scenario_weights')
+    merged_sheet = Scenario_Weights_sheet.merge(Country_sheet)
+
+    u1 = merged_sheet[(merged_sheet['ISOCODE'] == Isocode) & (merged_sheet['SCENARIO_NAME'] == '1')].WEIGHT.values
+    cn = merged_sheet[(merged_sheet['ISOCODE'] == Isocode) & (merged_sheet['SCENARIO_NAME'] == 'CN')].WEIGHT.values
+    d1 = merged_sheet[(merged_sheet['ISOCODE'] == Isocode) & (merged_sheet['SCENARIO_NAME'] == 'D1')].WEIGHT.values
+    d2 = merged_sheet[(merged_sheet['ISOCODE'] == Isocode) & (merged_sheet['SCENARIO_NAME'] == 'D2')].WEIGHT.values
+
+    for i in range(0, 18):
+        df_table.iloc[i, 4] = (df_table.iloc[i, 0] * u1 + df_table.iloc[i, 1] * cn + df_table.iloc[i, 2] * d1 + df_table.iloc[i, 3] * d2).round(1)
+        df_table.iloc[i, 9] = (df_table.iloc[i, 5] * u1 + df_table.iloc[i, 6] * cn + df_table.iloc[i, 7] * d1 + df_table.iloc[i, 8] * d2).round(1)
+
+    return df_table
+
+
+
+
+def construct_and_populate_tables(Isocode, tzero_date, col):
+    curr_year = 2024
+    column_1 = [
+        ('Unemployment Rate (%)', 'IFRS9 2024 Scenarios', 'Upside'),
+        ('Unemployment Rate (%)', 'IFRS9 2024 Scenarios', 'Central'),
+        ('Unemployment Rate (%)', 'IFRS9 2024 Scenarios', 'Down 1'),
+        ('Unemployment Rate (%)', 'IFRS9 2024 Scenarios', 'Down 2'),
+        ('Unemployment Rate (%)', 'IFRS9 2024 Scenarios', 'Weighted'),
+
+        ('Unemployment Rate (%)', 'IFRS9 2023 Scenarios', 'Upside'),
+        ('Unemployment Rate (%)', 'IFRS9 2023 Scenarios', 'Central'),
+        ('Unemployment Rate (%)', 'IFRS9 2023 Scenarios', 'Down 1'),
+        ('Unemployment Rate (%)', 'IFRS9 2023 Scenarios', 'Down 2'),
+        ('Unemployment Rate (%)', 'IFRS9 2023 Scenarios', 'Weighted'),
+
+        ('Unemployment Rate (%)', 'Moody\'s', '10% UP'),
+        ('Unemployment Rate (%)', 'Moody\'s', 'Central'),
+        ('Unemployment Rate (%)', 'Moody\'s', '10% DN'),
+        ('Unemployment Rate (%)', 'Moody\'s', '4% DN')
+    ]
+
+    rows = ['Q1', 'Q2', 'Q3', 'Q4', str(curr_year - 1), 'Q1', 'Q2', 'Q3', 'Q4', str(curr_year), 'Q1', 'Q2', 'Q3', 'Q4', str(curr_year + 1), str(curr_year + 2), str(curr_year + 3), '5Yr Avg']
+
+    df_table = pd.DataFrame(columns=pd.MultiIndex.from_tuples(column_1), index=rows)
+
+    year3_sum = year4_sum = 0
+    col_index = 0
+
+    for frame in All:
+        for row in frame.itertuples():
+            # Populating the table similar to the existing logic
+            # The code below assumes 'getattr(row, col)' gives the right data for each 'row'
+            if row.ISOCODES == Isocode:
+                if row.date == datetime.strptime(f"{curr_year - 1}-03-31 00:00:00", "%Y-%m-%d %H:%M:%S"):
+                    df_table.iloc[0, col_index] = round(getattr(row, col), 1)
+                # Repeat for other dates and quarters
+                # ...
+
+    df_table = df_table.round(1)
+    df_table = calculate_weights(df_table, Isocode)
+
+    return df_table
