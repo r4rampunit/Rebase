@@ -1965,3 +1965,83 @@ def construct_and_populate_tables(Isocode, tzero_date, col):
     df_table = calculate_weights(df_table, Isocode)
 
     return df_table
+
+
+
+
+
+
+
+
+import openpyxl
+import pandas as pd
+from openpyxl import load_workbook, Workbook
+from openpyxl.styles import Font, PatternFill, Side, Border, Alignment
+from openpyxl.formatting.rule import ColorScaleRule
+from openpyxl.styles.borders import Border, Side, BORDER_THIN
+from openpyxl.utils import get_column_letter
+from datetime import datetime
+from dateutil.relativedelta import relativedelta
+
+def add_output_columns(sheet, df):
+    df["GDP_YR"] = df.groupby(["ISOCODES"])["GDP"].pct_change(4) * 100
+    df["CPI_YR"] = df.groupby(["ISOCODES"])["CPI"].pct_change(4) * 100
+    df["PH_YR"] = df.groupby(["ISOCODES"])["PH"].pct_change(4) * 100
+    df["PH_DUBAI_YR"] = df.groupby(["ISOCODES"])["PH_DUBAI"].pct_change(4) * 100
+    df["PCOM_YR"] = df.groupby(["ISOCODES"])["PCOM"].pct_change(4) * 100
+    df["GDP_QoQ"] = df.groupby(["ISOCODES"])["GDP"].pct_change(1) * 100
+    df["CPI_QoQ"] = df.groupby(["ISOCODES"])["CPI"].pct_change(1) * 100
+    df["PH_QoQ"] = df.groupby(["ISOCODES"])["PH"].pct_change(1) * 100
+    df["PH_DUBAI_QoQ"] = df.groupby(["ISOCODES"])["PH_DUBAI"].pct_change(1) * 100
+    df["PCOM_QoQ"] = df.groupby(["ISOCODES"])["PCOM"].pct_change(1) * 100
+    return df.round(1)
+
+input_file = r"C:\Users\45363901\PycharmProjects\pythonProject\pythonProject2\GBIC_Workings Data\Input\Data - Copy.xlsx"
+workbook = openpyxl.load_workbook(input_file)
+sheetNames = workbook.sheetnames
+All = list()
+for sheet in sheetNames:
+    df = pd.read_excel(input_file, sheet_name=sheet)
+    df = add_output_columns(sheet, df)
+    All.append(df)
+
+def calculate_5year_avg(frame, Isocode, tzero_date, col):
+    index = frame[(frame['ISOCODES'] == Isocode) & (frame['date'] == datetime.strptime(tzero_date + " 00:00:00", "%Y-%m-%d %H:%M:%S"))].index
+    index = index[0] + 1
+    avg = frame[col].iloc[index: (index + 20)].mean()
+    return avg
+
+def calculate_weights(df_table, Isocode):
+    mapping_file_path = "C:\Users\45363901\PycharmProjects\pythonProject\pythonProject2\GBIC_Workings Data\Input\Mapping_File Copy.xlsx"
+    Country_sheet = pd.read_excel(mapping_file_path, sheet_name='Country')
+    Scenario_Weights_sheet = pd.read_excel(mapping_file_path, sheet_name='Scenario_Weights')
+    merged_sheet = Scenario_Weights_sheet.merge(Country_sheet)
+    u1 = merged_sheet[(merged_sheet['ISOCODE'] == Isocode) & (merged_sheet['SCENARIO_NAME'] == 'U1')]['WEIGHT'].values[0]
+    cn = merged_sheet[(merged_sheet['ISOCODE'] == Isocode) & (merged_sheet['SCENARIO_NAME'] == 'CN')]['WEIGHT'].values[0]
+    d1 = merged_sheet[(merged_sheet['ISOCODE'] == Isocode) & (merged_sheet['SCENARIO_NAME'] == 'D1')]['WEIGHT'].values[0]
+    d2 = merged_sheet[(merged_sheet['ISOCODE'] == Isocode) & (merged_sheet['SCENARIO_NAME'] == 'D2')]['WEIGHT'].values[0]
+
+    for i in range(0, 18):
+        df_table.values[i][8] = ((df_table.values[i][4] * u1) + (df_table.values[i][5] * cn) + (df_table.values[i][6] * d1) + (df_table.values[i][7] * d2))[0]
+        df_table.values[i][9] = ((df_table.values[i][5] * u1) + (df_table.values[i][6] * cn) + (df_table.values[i][7] * d1) + (df_table.values[i][8] * d2))[0]
+        df_table.values[i][4] = ((df_table.values[i][0] * u1) + (df_table.values[i][1] * cn) + (df_table.values[i][2] * d1) + (df_table.values[i][3] * d2))[0]
+
+def construct_and_populate_tables(Isocode, tzero_date, col):
+    # curr_year = int(input("enter the current year: "))
+    curr_year = 2024
+    column_1 = [('Unemployment Rate (%)', 'IFRS9 2024 Scenarios', 'Upside'), ('Unemployment Rate (%)', 'IFRS9 2024 Scenarios', 'Central'), ('Unemployment Rate (%)', 'IFRS9 2024 Scenarios', 'Down 1'), ('Unemployment Rate (%)', 'IFRS9 2024 Scenarios', 'Down 2'), ('Unemployment Rate (%)', 'IFRS9 2024 Scenarios', 'Weighted'), ('Unemployment Rate (%)', 'IFRS9 2023 Scenarios', 'Upside'), ('Unemployment Rate (%)', 'IFRS9 2023 Scenarios', 'Central'), ('Unemployment Rate (%)', 'IFRS9 2023 Scenarios', 'Down 1'), ('Unemployment Rate (%)', 'IFRS9 2023 Scenarios', 'Weighted'), ('Unemployment Rate (%)', "Moody's", '10% UP'), ('Unemployment Rate (%)', 'Moody\'s', 'Central'), ('Unemployment Rate (%)', 'Moody\'s', '10% DN'), ('Unemployment Rate (%)', 'Moody\'s', '4% DN')]
+    rows = ['Q1', 'Q2', 'Q3', 'Q4', str(curr_year-1), 'Q1', 'Q2', 'Q3', 'Q4', str(curr_year), 'Q1', 'Q2', 'Q3', 'Q4', str(curr_year + 1), str(curr_year + 2), str(curr_year + 3), 'Syr Avg']
+
+    # Creating DataFrames for each element in column_names
+    df_table = pd.DataFrame(columns=pd.MultiIndex.from_tuples(column_1), index=rows)
+    year3_sum = 0
+    year4_sum = 0
+    col_index = 0
+
+    # tzero_date = input("please give the tzero input: ")
+    for frame in All:
+        for row in frame.itertuples():
+            # for previous year
+            if row.ISOCODES == Isocode and row.date == datetime.strptime(str(curr_year - 1) + "-03-31 00:00:00", "%Y-%m-%d %H:%M:%S"):
+                df_table.values[0][col_index] = round(getattr(row, col), 1)
+            if row.ISOCODES ==
