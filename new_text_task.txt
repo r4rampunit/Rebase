@@ -2045,3 +2045,101 @@ def construct_and_populate_tables(Isocode, tzero_date, col):
             if row.ISOCODES == Isocode and row.date == datetime.strptime(str(curr_year - 1) + "-03-31 00:00:00", "%Y-%m-%d %H:%M:%S"):
                 df_table.values[0][col_index] = round(getattr(row, col), 1)
             if row.ISOCODES ==
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import openpyxl
+from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.worksheet import Worksheet
+
+def find_column_index(sheet: Worksheet, header_text: str) -> int:
+    """
+    Find the column index based on the header text.
+
+    Parameters:
+    sheet (openpyxl.worksheet.worksheet.Worksheet): The sheet to search in.
+    header_text (str): The text to search for in the headers.
+
+    Returns:
+    int: The index (1-based) of the column containing the header text, or -1 if not found.
+    """
+    for row in sheet.iter_rows(min_row=1, max_row=1):
+        for cell in row:
+            if cell.value == header_text:
+                return cell.column
+    return -1
+
+def adjust_merged_cells(sheet: Worksheet, col_idx: int):
+    """
+    Adjust the merged cell ranges to include the new column.
+
+    Parameters:
+    sheet (openpyxl.worksheet.worksheet.Worksheet): The sheet containing merged cells.
+    col_idx (int): The index (1-based) of the new column to be inserted.
+    """
+    for merged_range in list(sheet.merged_cells.ranges):
+        min_col, min_row, max_col, max_row = openpyxl.utils.range_boundaries(str(merged_range))
+        if min_col <= col_idx <= max_col:
+            # If the column to be inserted is within the merged cell range
+            new_max_col = max_col + 1
+            sheet.unmerge_cells(start_row=min_row, start_column=min_col, end_row=max_row, end_column=max_col)
+            sheet.merge_cells(start_row=min_row, start_column=min_col, end_row=max_row, end_column=new_max_col)
+        elif col_idx <= min_col:
+            # If the column to be inserted is before the merged cell range
+            new_min_col = min_col + 1
+            new_max_col = max_col + 1
+            sheet.unmerge_cells(start_row=min_row, start_column=min_col, end_row=max_row, end_column=max_col)
+            sheet.merge_cells(start_row=min_row, start_column=new_min_col, end_row=max_row, end_column=new_max_col)
+
+def insert_empty_column_after_weighted(sheet: Worksheet, width=0.33):
+    """
+    Inserts an empty column after the column containing 'Weighted'.
+
+    Parameters:
+    sheet (openpyxl.worksheet.worksheet.Worksheet): The sheet where the column will be inserted.
+    width (float): The width of the new column.
+    """
+    col_idx = find_column_index(sheet, 'Weighted')
+    if col_idx == -1:
+        raise ValueError("Column with header 'Weighted' not found.")
+
+    col_idx += 1  # Insert after the 'Weighted' column
+
+    # Adjust the merged cell ranges
+    adjust_merged_cells(sheet, col_idx)
+
+    # Insert the column
+    sheet.insert_cols(col_idx)
+
+    # Set the width of the new column
+    col_letter = get_column_letter(col_idx)
+    sheet.column_dimensions[col_letter].width = width
+
+# Example usage:
+# Load your workbook and sheet
+input_file = r"C:\Users\45363901\PycharmProjects\pythonProject\pythonProject2\GBIC_Workings Data\Input\Data - Copy.xlsx"
+workbook = openpyxl.load_workbook(input_file)
+sheet = workbook.active
+
+# Insert an empty column after the column containing 'Weighted'
+insert_empty_column_after_weighted(sheet)
+
+# Save the workbook
+workbook.save(input_file)
