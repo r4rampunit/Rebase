@@ -2143,3 +2143,67 @@ insert_empty_column_after_weighted(sheet)
 
 # Save the workbook
 workbook.save(input_file)
+
+
+
+
+
+
+
+
+
+
+
+
+import openpyxl
+from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.worksheet import Worksheet
+
+def insert_empty_column_after_weighted(sheet: Worksheet):
+    # Find the cell with the value "Weighted"
+    def find_cell(sheet: Worksheet, text: str):
+        for row in sheet.iter_rows():
+            for cell in row:
+                if cell.value == text:
+                    return cell
+        return None
+
+    # Adjust merged cells to include the new column
+    def adjust_merged_cells(sheet: Worksheet, col_idx: int):
+        for merged_range in list(sheet.merged_cells.ranges):
+            min_col, min_row, max_col, max_row = openpyxl.utils.range_boundaries(str(merged_range))
+            if min_col <= col_idx <= max_col:
+                new_max_col = max_col + 1
+                sheet.unmerge_cells(start_row=min_row, start_column=min_col, end_row=max_row, end_column=max_col)
+                sheet.merge_cells(start_row=min_row, start_column=min_col, end_row=max_row, end_column=new_max_col)
+            elif col_idx <= min_col:
+                new_min_col = min_col + 1
+                new_max_col = max_col + 1
+                sheet.unmerge_cells(start_row=min_row, start_column=min_col, end_row=max_row, end_column=max_col)
+                sheet.merge_cells(start_row=min_row, start_column=new_min_col, end_row=max_row, end_column=new_max_col)
+
+    # Find the cell with the text "Weighted"
+    weighted_cell = find_cell(sheet, 'Weighted')
+    if not weighted_cell:
+        raise ValueError("Cell with value 'Weighted' not found.")
+
+    col_idx = weighted_cell.column + 1  # Insert after the column containing "Weighted"
+
+    # Adjust the merged cell ranges
+    adjust_merged_cells(sheet, col_idx)
+
+    # Insert the column
+    sheet.insert_cols(col_idx)
+
+    # Set the width of the new column
+    col_letter = get_column_letter(col_idx)
+    sheet.column_dimensions[col_letter].width = 0.33
+
+# Example usage:
+input_file = r"C:\Users\45363901\PycharmProjects\pythonProject\pythonProject2\GBIC_Workings Data\Input\Data - Copy.xlsx"
+workbook = openpyxl.load_workbook(input_file)
+sheet = workbook.active
+
+insert_empty_column_after_weighted(sheet)
+
+workbook.save(input_file)
