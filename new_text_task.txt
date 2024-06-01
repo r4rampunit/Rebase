@@ -2327,3 +2327,30 @@ def empty_column_width(sheet):
 
     for col_idx in range(col_down_2, col_weighted):
         sheet.column_dimensions[get_column_letter(col_idx)].width = 6.14
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def row_height(sheet):
+    # Set the height of all rows to 14.5
+    for row in sheet.iter_rows():
+        for cell in row:
+            sheet.row_dimensions[cell.row].height = 14.5
