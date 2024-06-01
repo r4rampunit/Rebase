@@ -2371,3 +2371,61 @@ def delete_hidden_rows(sheet):
         # Check if the row is hidden
         if sheet.row_dimensions[row[0].row].hidden:
             sheet.delete_rows(row[0].row, 1)
+
+
+
+
+
+
+
+
+
+
+
+
+
+from openpyxl.utils import get_column_letter
+
+def empty_column_width(sheet):
+    col_weighted = None
+    col_down_2 = None
+
+    # Find the column index of "Down 2"
+    for row in sheet.iter_rows(min_row=1, max_row=1):
+        for cell in row:
+            if cell.value == "Down 2":
+                col_down_2 = cell.column
+                break
+
+    # Find the column index of "Weighted"
+    for row in sheet.iter_rows(min_row=1, max_row=1):
+        for cell in row:
+            if cell.value == "Weighted":
+                col_weighted = cell.column
+                break
+
+    # Check if both columns were found
+    if col_down_2 is None or col_weighted is None:
+        print("Error: 'Down 2' or 'Weighted' column not found in the first row.")
+        return
+
+    # Set the width of columns after "Down 2" and before "Weighted" to 0.33
+    for row in sheet.iter_rows():
+        for cell in row:
+            if cell.column > col_down_2 and cell.column < col_weighted:
+                sheet.column_dimensions[get_column_letter(cell.column)].width = 0.33
+
+    # Set the width of columns after "Weighted" to 0.33
+    for row in sheet.iter_rows():
+        for cell in row:
+            if cell.column > col_weighted:
+                sheet.column_dimensions[get_column_letter(cell.column)].width = 0.33
+
+    # Set the width of the "Weighted" column to 7.57
+    sheet.column_dimensions[get_column_letter(col_weighted)].width = 7.57
+
+    # Set the width of all other columns to 6.14
+    for row in sheet.iter_rows():
+        for cell in row:
+            if cell.column < col_down_2 or (cell.column > col_down_2 and cell.column < col_weighted):
+                sheet.column_dimensions[get_column_letter(cell.column)].width = 6.14
