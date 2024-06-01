@@ -2354,3 +2354,20 @@ def row_height(sheet):
     for row in sheet.iter_rows():
         for cell in row:
             sheet.row_dimensions[cell.row].height = 14.5
+
+
+
+
+
+
+
+
+
+
+
+def delete_hidden_rows(sheet):
+    # Iterate over rows in reverse order
+    for row in reversed(list(sheet.iter_rows())):
+        # Check if the row is hidden
+        if sheet.row_dimensions[row[0].row].hidden:
+            sheet.delete_rows(row[0].row, 1)
