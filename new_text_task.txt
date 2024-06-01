@@ -2263,3 +2263,67 @@ sheet = workbook.active
 empty_column_width(sheet)
 
 workbook.save(input_file)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+from openpyxl.utils import get_column_letter
+
+def empty_column_width(sheet):
+    # Find the column index of "Down 2"
+    col_down_2 = None
+    for col in sheet.iter_cols(min_row=1, max_row=1):
+        cell = col[0]
+        if cell.value == "Down 2":
+            col_down_2 = cell.column
+            break
+
+    # Find the column index of "Weighted"
+    col_weighted = None
+    for col in sheet.iter_cols(min_row=1, max_row=1):
+        cell = col[0]
+        if cell.value == "Weighted":
+            col_weighted = cell.column
+            break
+
+    # Set the width of columns after "Down 2" and "Weighted" to 0.33
+    for col_idx in range(col_down_2 + 1, col_weighted):
+        sheet.column_dimensions[get_column_letter(col_idx)].width = 0.33
+
+    for col_idx in range(col_weighted + 1, sheet.max_column + 1):
+        sheet.column_dimensions[get_column_letter(col_idx)].width = 0.33
+
+    # Set the width of the "Weighted" column to 7.57
+    sheet.column_dimensions[get_column_letter(col_weighted)].width = 7.57
+
+    # Set the width of all other columns to 6.14
+    for col_idx in range(1, col_down_2):
+        sheet.column_dimensions[get_column_letter(col_idx)].width = 6.14
+
+    for col_idx in range(col_down_2, col_weighted):
+        sheet.column_dimensions[get_column_letter(col_idx)].width = 6.14
