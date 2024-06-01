@@ -2207,3 +2207,59 @@ sheet = workbook.active
 insert_empty_column_after_weighted(sheet)
 
 workbook.save(input_file)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import openpyxl
+from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.worksheet import Worksheet
+
+def empty_column_width(sheet: Worksheet):
+    # Find the columns containing "Down 2" and "Weighted"
+    down2_col = None
+    weighted_col = None
+
+    for row in sheet.iter_rows():
+        for cell in row:
+            if cell.value == "Down 2":
+                down2_col = cell.column
+            if cell.value == "Weighted":
+                weighted_col = cell.column
+            if down2_col and weighted_col:
+                break
+        if down2_col and weighted_col:
+            break
+
+    if down2_col is None or weighted_col is None:
+        raise ValueError("One or both of the columns with 'Down 2' or 'Weighted' not found.")
+
+    # Set the width of all columns after the largest column index found
+    start_col_idx = max(down2_col, weighted_col)
+    for col_idx in range(start_col_idx + 1, sheet.max_column + 1):
+        col_letter = get_column_letter(col_idx)
+        sheet.column_dimensions[col_letter].width = 0.33
+
+# Example usage:
+input_file = r"C:\Users\45363901\PycharmProjects\pythonProject\pythonProject2\GBIC_Workings Data\Input\Data - Copy.xlsx"
+workbook = openpyxl.load_workbook(input_file)
+sheet = workbook.active
+
+empty_column_width(sheet)
+
+workbook.save(input_file)
