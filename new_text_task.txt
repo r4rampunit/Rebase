@@ -2612,3 +2612,56 @@ sheet = workbook.active
 column_width(sheet)
 
 workbook.save(input_file)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+from openpyxl import load_workbook
+
+def set_column_widths(sheet):
+    weighted_columns = []
+    narrow_columns = []
+
+    for row in sheet.iter_rows():
+        for cell in row:
+            if cell.value == 'Down 2':
+                narrow_columns.append(cell.column + 1)  # Column just after 'Down 2'
+            if cell.value == 'Weighted':
+                weighted_columns.append(cell.column)  # Column containing 'Weighted'
+                narrow_columns.append(cell.column + 1)  # Column just after 'Weighted'
+
+    # Set default column width
+    for col in range(1, sheet.max_column + 1):
+        sheet.column_dimensions[sheet.cell(row=1, column=col).column_letter].width = 6.14
+
+    # Set column width for 'Weighted'
+    for col in weighted_columns:
+        sheet.column_dimensions[sheet.cell(row=1, column=col).column_letter].width = 7.57
+
+    # Set column width for columns after 'Down 2' and 'Weighted'
+    for col in narrow_columns:
+        sheet.column_dimensions[sheet.cell(row=1, column=col).column_letter].width = 0.33
+
+# Example usage
+input_file = "your_excel_file.xlsx"
+wb = load_workbook(input_file)
+sheet = wb.active  # Adjust if you need a specific sheet
+
+set_column_widths(sheet)
+
+wb.save("your_modified_excel_file.xlsx")
