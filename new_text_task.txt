@@ -2542,3 +2542,73 @@ def column_width(sheet):
     for col_idx in range(1, sheet.max_column + 1):
         if col_idx not in columns_with_down_2 and col_idx not in columns_with_weighted and col_idx + 1 not in columns_with_down_2 and col_idx + 1 not in columns_with_weighted:
             sheet.column_dimensions[get_column_letter(col_idx)].width = 6.14
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import openpyxl
+from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.worksheet import Worksheet
+
+def column_width(sheet: Worksheet):
+    weighted_columns = set()
+    down2_columns = set()
+
+    # Identify the columns containing "Down 2" and "Weighted"
+    for row in sheet.iter_rows():
+        for cell in row:
+            if cell.value == "Down 2":
+                down2_columns.add(cell.column)
+            if cell.value == "Weighted":
+                weighted_columns.add(cell.column)
+
+    # Set the width of all columns to 6.14 initially
+    for col_idx in range(1, sheet.max_column + 1):
+        col_letter = get_column_letter(col_idx)
+        sheet.column_dimensions[col_letter].width = 6.14
+
+    # Set the width for columns containing "Weighted"
+    for col_idx in weighted_columns:
+        col_letter = get_column_letter(col_idx)
+        sheet.column_dimensions[col_letter].width = 7.57
+
+    # Set the width of the columns immediately after "Down 2" and "Weighted" to 0.33
+    for col_idx in down2_columns.union(weighted_columns):
+        next_col_idx = col_idx + 1
+        if next_col_idx <= sheet.max_column:
+            next_col_letter = get_column_letter(next_col_idx)
+            sheet.column_dimensions[next_col_letter].width = 0.33
+
+# Example usage:
+input_file = r"C:\Users\45363901\PycharmProjects\pythonProject\pythonProject2\GBIC_Workings Data\Input\Data - Copy.xlsx"
+workbook = openpyxl.load_workbook(input_file)
+sheet = workbook.active
+
+column_width(sheet)
+
+workbook.save(input_file)
