@@ -2789,3 +2789,81 @@ column_of_trough(sheet)
 
 wb.save("your_modified_excel_file.xlsx")
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+from openpyxl import load_workbook
+
+def column_of_trough(sheet):
+    def find_cells(value):
+        """Find all cells that match the provided value."""
+        cells = []
+        for row in sheet.iter_rows():
+            for cell in row:
+                if cell.value == value:
+                    cells.append(cell)
+        return cells
+
+    # Find all occurrences of '5yr Avg'
+    five_year_avg_cells = find_cells('5yr Avg')
+
+    # Iterate over each '5yr Avg' cell and write the required values in appropriate locations
+    for cell in five_year_avg_cells:
+        row, col = cell.row, cell.column
+
+        # Write 'Start to trough' and 'Peak to trough'
+        sheet.cell(row=row + 3, column=col, value='Start to trough')
+        sheet.cell(row=row + 4, column=col, value='Peak to trough')
+
+        # Write scenarios in the next rows and specific columns
+        scenarios_offsets = [
+            (2, 1, 'Upside'), (2, 2, 'Central'), (2, 3, 'Down 1'), (2, 4, 'Down 2'),
+            (2, 8, 'Upside'), (2, 9, 'Central'), (2, 10, 'Down 1'), (2, 11, 'Down 2')
+        ]
+
+        for r_offset, c_offset, text in scenarios_offsets:
+            sheet.cell(row=row + r_offset, column=col + c_offset, value=text)
+
+        # Write numerical values in the appropriate locations
+        num_values_offsets = [
+            (3, 1, 1), (3, 2, 2), (3, 3, 31), (3, 4, 42),
+            (3, 8, 5), (3, 9, 6), (3, 10, 71), (3, 11, 82),
+            (4, 1, 9), (4, 2, 10), (4, 3, 11), (4, 4, 12),
+            (4, 8, 13), (4, 9, 14), (4, 10, 15), (4, 11, 16)
+        ]
+
+        for r_offset, c_offset, value in num_values_offsets:
+            sheet.cell(row=row + r_offset, column=col + c_offset, value=value)
+
+# Example usage
+input_file = "your_excel_file.xlsx"
+wb = load_workbook(input_file)
+sheet = wb.active  # Adjust if you need a specific sheet
+
+column_of_trough(sheet)
+
+wb.save("your_modified_excel_file.xlsx")
+
