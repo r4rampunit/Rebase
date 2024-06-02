@@ -2726,3 +2726,66 @@ column_of_trough(sheet)
 
 wb.save("your_modified_excel_file.xlsx")
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+from openpyxl import load_workbook
+
+def column_of_trough(sheet):
+    # Helper function to find all cells with a specific value
+    def find_cells(value):
+        cells = []
+        for row in sheet.iter_rows():
+            for cell in row:
+                if cell.value == value:
+                    cells.append(cell)
+        return cells
+
+    # Find all occurrences of '5yr Avg'
+    five_year_avg_cells = find_cells('5yr Avg')
+
+    # Iterate over each '5yr Avg' cell and write the required values in appropriate locations
+    for cell in five_year_avg_cells:
+        row, col = cell.row, cell.column
+
+        # Write 'Start to trough' and 'Peak to trough'
+        sheet.cell(row=row + 3, column=col, value='Start to trough')
+        sheet.cell(row=row + 4, column=col, value='Peak to trough')
+
+        # Write scenarios in the next rows and specific columns
+        scenarios = ['Upside', 'Central', 'Down 1', 'Down 2']
+        offsets = [(2, 1), (2, 2), (2, 3), (2, 4), (2, 6), (2, 7), (2, 8), (2, 9)]
+
+        for scenario, (r_offset, c_offset) in zip(scenarios * 2, offsets):
+            sheet.cell(row=row + r_offset, column=col + c_offset, value=scenario)
+
+        # Write numerical values in the appropriate locations
+        num_values = [
+            (3, 1, 44), (3, 2, 56), (3, 3, 76), (3, 4, 87),
+            (4, 6, 77), (4, 7, 78), (4, 8, 89), (4, 9, 91)
+        ]
+
+        for r_offset, c_offset, value in num_values:
+            sheet.cell(row=row + r_offset, column=col + c_offset, value=value)
+
+# Example usage
+input_file = "your_excel_file.xlsx"
+wb = load_workbook(input_file)
+sheet = wb.active  # Adjust if you need a specific sheet
+
+column_of_trough(sheet)
+
+wb.save("your_modified_excel_file.xlsx")
+
