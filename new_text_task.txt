@@ -2665,3 +2665,64 @@ sheet = wb.active  # Adjust if you need a specific sheet
 set_column_widths(sheet)
 
 wb.save("your_modified_excel_file.xlsx")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+from openpyxl import load_workbook
+
+def column_of_trough(sheet):
+    # Helper function to find cells with specific values
+    cells_to_find = ['5yr Avg', 'Upside', 'Central', 'Down 1', 'Down 2']
+    found_cells = {key: [] for key in cells_to_find}
+
+    for row in sheet.iter_rows():
+        for cell in row:
+            if cell.value in found_cells:
+                found_cells[cell.value].append(cell)
+
+    # Write 'Start to trough' and 'Peak to trough' after three and four rows from '5yr Avg'
+    for cell in found_cells['5yr Avg']:
+        sheet.cell(row=cell.row + 3, column=cell.column, value='Start to trough')
+        sheet.cell(row=cell.row + 4, column=cell.column, value='Peak to trough')
+
+    # Write 'Upside', 'Central', 'Down 1', 'Down 2' after 21 rows
+    scenarios = ['Upside', 'Central', 'Down 1', 'Down 2']
+    for scenario in scenarios:
+        for cell in found_cells[scenario]:
+            for i, sc in enumerate(scenarios):
+                sheet.cell(row=cell.row + 21, column=cell.column, value=sc)
+            if scenario in ['Central', 'Down 1', 'Down 2']:
+                extra_values = ['3+4', '5+7', '2', '3', '5', '7', '7', '9']
+                for i, val in enumerate(extra_values):
+                    sheet.cell(row=cell.row + 22 + i, column=cell.column, value=val)
+
+# Example usage
+input_file = "your_excel_file.xlsx"
+wb = load_workbook(input_file)
+sheet = wb.active  # Adjust if you need a specific sheet
+
+column_of_trough(sheet)
+
+wb.save("your_modified_excel_file.xlsx")
+
