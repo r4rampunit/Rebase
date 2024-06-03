@@ -2942,3 +2942,58 @@ column_of_trough(sheet)
 
 wb.save("your_modified_excel_file.xlsx")
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+from openpyxl.styles import Border, Side
+import pandas as pd
+
+def red_marking(sheet, user_inputs):
+    thin_border = Border(
+        left=Side(border_style='thin', color='FFFF0000'),
+        right=Side(border_style='thin', color='FFFF0000'),
+        top=Side(border_style='thin', color='FFFF0000'),
+        bottom=Side(border_style='thin', color='FFFF0000')
+    )
+
+    for row in sheet.iter_rows():
+        for cell in row:
+            if cell.value == 'IFRS9 1Q23 Scenarios':
+                date_column = list(cell[0].value for cell in sheet.iter_rows(min_row=4, max_row=24, min_col=1, max_col=1))
+                datetime_index = pd.to_datetime([date for date in date_column if date and date != ''], format='%m/%d/%Y', errors='coerce')
+                formatted_dates = [date.strftime('%Y-%m-%d') if pd.notnull(date) else None for date in datetime_index]
+
+                above_date, below_date = user_inputs
+                above_date = pd.to_datetime(above_date, format='%Y-%m-%d', errors='coerce')
+                below_date = pd.to_datetime(below_date, format='%Y-%m-%d', errors='coerce')
+
+                above_row = None
+                below_row = None
+
+                for date in formatted_dates:
+                    if date == above_date.strftime('%Y-%m-%d'):
+                        above_row = formatted_dates.index(date) + 4  # Adjusted for min_row=4
+                    if date == below_date.strftime('%Y-%m-%d'):
+                        below_row = formatted_dates.index(date) + 4  # Adjusted for min_row=4
+
+                if above_row and below_row:
+                    for row in sheet.iter_rows(min_row=above_row, max_row=below_row, min_col=cell.column+1, max_col=cell.column+1):
+                        for cell in row:
+                            cell.border = thin_border
+
+# Example usage
+# user_inputs = ['2023-01-01', '2023-03-31']
+# red_marking(sheet, user_inputs)
