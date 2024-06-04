@@ -3916,3 +3916,25 @@ for row in ws[start_cell:end_cell]:
         # Apply left and right borders to the middle rows
         else:
             cell.border = Border(left=Side(style='thick', color='FF0000'), right=Side(style='thick', color='FF0000'))
+
+
+
+
+
+
+
+
+
+
+
+def all_font(sheet):
+    # Iterate through all cells in the sheet
+    for row in sheet.iter_rows():
+        for cell in row:
+            # Preserve existing font properties and only change the size to 9
+            current_font = cell.font
+            new_font = Font(name=current_font.name, size=9, bold=current_font.bold,
+                            italic=current_font.italic, vertAlign=current_font.vertAlign,
+                            underline=current_font.underline, strike=current_font.strike,
+                            color=current_font.color)
+            cell.font = new_font
