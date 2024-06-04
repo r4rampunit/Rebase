@@ -3791,3 +3791,43 @@ def red_marking(sheet, user_inputs):
 # Example usage
 # user_inputs = ['2023-01-01', '2023-03-31']
 # red_marking(sheet, user_inputs)
+
+
+
+
+
+
+
+from openpyxl import load_workbook
+from openpyxl.styles import Border, Side
+
+# Load your workbook and select the worksheet
+workbook = load_workbook('your_workbook.xlsx')
+sheet = workbook['Sheet1']  # Replace with your sheet name
+
+# Define the range you want to apply the border to
+start_row, start_col = 2, 2  # Change to your starting cell row and column
+end_row, end_col = 5, 5      # Change to your ending cell row and column
+
+# Create border style
+medium_red = Side(border_style="medium", color="FF0000")
+border_top = Border(top=medium_red)
+border_left = Border(left=medium_red)
+border_right = Border(right=medium_red)
+border_bottom = Border(bottom=medium_red)
+
+# Apply border to the outer cells of the range
+for row in range(start_row, end_row + 1):
+    for col in range(start_col, end_col + 1):
+        cell = sheet.cell(row=row, column=col)
+        if row == start_row:
+            cell.border = Border(top=medium_red)
+        if row == end_row:
+            cell.border = Border(bottom=medium_red)
+        if col == start_col:
+            cell.border = Border(left=medium_red)
+        if col == end_col:
+            cell.border = Border(right=medium_red)
+
+# Save the workbook
+workbook.save('your_workbook.xlsx')
