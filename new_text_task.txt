@@ -3866,3 +3866,53 @@ cell_range[0][0].border = Border(top=Side(style='thick', color='FF0000'), left=S
 cell_range[-1][0].border = Border(bottom=Side(style='thick', color='FF0000'), left=Side(style='thick', color='FF0000'), right=Side(style='thick', color='FF0000'))
 for cell in cell_range[1:-1]:
     cell[0].border = Border(left=Side(style='thick', color='FF0000'), right=Side(style='thick', color='FF0000'))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+start_cell = 'A3'
+end_cell = 'A7'
+
+# Define the red border style
+red_border = Border(
+    left=Side(style='thick', color='FF0000'),
+    right=Side(style='thick', color='FF0000'),
+    top=Side(style='thick', color='FF0000'),
+    bottom=Side(style='thick', color='FF0000')
+)
+
+# Apply the red border to the outer edges of the range A3:A7
+for row in ws[start_cell:end_cell]:
+    for cell in row:
+        # Apply top border to the first row in the range
+        if cell.row == ws[start_cell].row:
+            cell.border = Border(top=Side(style='thick', color='FF0000'), left=Side(style='thick', color='FF0000'), right=Side(style='thick', color='FF0000'))
+        # Apply bottom border to the last row in the range
+        elif cell.row == ws[end_cell].row:
+            cell.border = Border(bottom=Side(style='thick', color='FF0000'), left=Side(style='thick', color='FF0000'), right=Side(style='thick', color='FF0000'))
+        # Apply left and right borders to the middle rows
+        else:
+            cell.border = Border(left=Side(style='thick', color='FF0000'), right=Side(style='thick', color='FF0000'))
