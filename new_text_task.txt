@@ -3280,3 +3280,76 @@ def red_marking(sheet, user_inputs):
 # Example usage
 # user_inputs = ['2023-01-01', '2023-03-31']
 # red_marking(sheet, user_inputs)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+from openpyxl.styles import Border, Side
+import pandas as pd
+
+def red_marking(sheet, user_inputs):
+    thick_border = Border(
+        left=Side(border_style='thick', color='FFFF0000'),
+        right=Side(border_style='thick', color='FFFF0000'),
+        top=Side(border_style='thick', color='FFFF0000'),
+        bottom=Side(border_style='thick', color='FFFF0000')
+    )
+
+    for row in sheet.iter_rows():
+        for cell in row:
+            if cell.value == 'IFRS9 1Q23 Scenarios':
+                date_column = [c.value for c in sheet.iter_rows(min_row=4, max_row=24, min_col=1, max_col=1)]
+                datetime_index = pd.to_datetime([date for date in date_column if date and date != ''], format='%m/%d/%Y', errors='coerce')
+                formatted_dates = [date.strftime('%Y-%m-%d') if pd.notnull(date) else None for date in datetime_index]
+
+                above_date, below_date = user_inputs
+                above_date = pd.to_datetime(above_date, format='%Y-%m-%d', errors='coerce')
+                below_date = pd.to_datetime(below_date, format='%Y-%m-%d', errors='coerce')
+
+                above_row = None
+                below_row = None
+
+                for i, date in enumerate(formatted_dates):
+                    if date == above_date.strftime('%Y-%m-%d'):
+                        above_row = i + 4  # Adjusted for min_row=4
+                    if date == below_date.strftime('%Y-%m-%d'):
+                        below_row = i + 4  # Adjusted for min_row=4
+
+                if above_row is not None and below_row is not None:
+                    col = cell.column + 1  # The column after the 'IFRS9 1Q23 Scenarios' column
+
+                    # Apply borders to the top row
+                    for cell in sheet.iter_rows(min_row=above_row, max_row=above_row, min_col=col, max_col=col):
+                        cell[0].border = Border(top=thick_border.top, left=thick_border.left, right=thick_border.right)
+
+                    # Apply borders to the bottom row
+                    for cell in sheet.iter_rows(min_row=below_row, max_row=below_row, min_col=col, max_col=col):
+                        cell[0].border = Border(bottom=thick_border.bottom, left=thick_border.left, right=thick_border.right)
+
+                    # Apply borders to the left and right sides
+                    for row in sheet.iter_rows(min_row=above_row + 1, max_row=below_row - 1, min_col=col, max_col=col):
+                        for cell in row:
+                            cell.border = Border(left=thick_border.left, right=thick_border.right)
+
+                    # Apply borders to the corners
+                    sheet.cell(row=above_row, column=col).border = Border(top=thick_border.top, left=thick_border.left, right=thick_border.right)
+                    sheet.cell(row=below_row, column=col).border = Border(bottom=thick_border.bottom, left=thick_border.left, right=thick_border.right)
+
+# Example usage
+# user_inputs = ['2023-01-01', '2023-03-31']
+# red_marking(sheet, user_inputs)
+
