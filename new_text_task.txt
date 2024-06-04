@@ -3831,3 +3831,38 @@ for row in range(start_row, end_row + 1):
 
 # Save the workbook
 workbook.save('your_workbook.xlsx')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+cell_range[0][0].border = Border(top=Side(style='thick', color='FF0000'), left=Side(style='thick', color='FF0000'), right=Side(style='thick', color='FF0000'))
+cell_range[-1][0].border = Border(bottom=Side(style='thick', color='FF0000'), left=Side(style='thick', color='FF0000'), right=Side(style='thick', color='FF0000'))
+for cell in cell_range[1:-1]:
+    cell[0].border = Border(left=Side(style='thick', color='FF0000'), right=Side(style='thick', color='FF0000'))
