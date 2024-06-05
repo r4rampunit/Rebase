@@ -4058,3 +4058,76 @@ def calculate_trough(sheet_name, All, tzero_date):
         peak_values.append(peak_value)
 
     return start_to_trough_values, peak_values
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+from datetime import datetime
+
+def calculate_trough(sheet_name, All, tzero_date):
+    # Initialize lists to store peak and start_to_trough values
+    peak_values = []
+    start_to_trough_values = []
+
+    # Define the columns to calculate
+    columns = ['GDP YR', 'CPI YR', 'PHYR', 'PH DUBAI YR', 'PCOM YR', 'GDP QOQ', 'CPI_QOQ', 'PH_QOQ', 'PH_DUBAI_QOQ', 'PCOM_QOQ']
+
+    # Iterate over frames and rows
+    for frame in All:
+        for row in frame.itertuples(index=False):
+            if row.ISOCODES == sheet_name:
+                # Convert date column to datetime format
+                row_date = datetime.strptime(row.date, '%d-%b-%y').date()
+
+                # Check if the row_date matches the tzero_date
+                if row_date == tzero_date:
+                    t_zero_index = row.Index
+
+                    for column in columns:
+                        # Calculate t_zero_value
+                        t_zero_value = getattr(row, column)
+
+                        # Calculate trough value (minimum of next 20 values)
+                        trough_values = [getattr(next_row, column) for next_row in frame.itertuples(index=False)[t_zero_index:t_zero_index + 20]]
+                        trough_value = min(trough_values)
+
+                        # Calculate start_to_trough_value
+                        start_to_trough_value = t_zero_value - trough_value
+                        start_to_trough_values.append(start_to_trough_value)
+
+                        # Calculate Ab_value (maximum of t_zero_value and 7 previous values)
+                        ab_values = [getattr(prev_row, column) for prev_row in frame.itertuples(index=False)[max(0, t_zero_index - 7):t_zero_index + 1]]
+                        ab_value = max(ab_values)
+
+                        # Calculate peak_value
+                        peak_value = ab_value - trough_value
+                        peak_values.append(peak_value)
+
+                    # Break out of the inner loop since we found the tzero_date
+                    break
+
+    if not start_to_trough_values:
+        print(f"No data found for the given tzero_date: {tzero_date} and sheet: {sheet_name}")
+
+    return start_to_trough_values, peak_values
