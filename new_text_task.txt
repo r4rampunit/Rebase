@@ -3990,3 +3990,71 @@ def construct_and_populate_tables(Isocode, user_input):
     start_to_trough_values, peak_values = calculate_peak_trough(Isocode, user_input)
     print("Start to Trough Values:", start_to_trough_values)
     print("Peak Values:", peak_values)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+from datetime import datetime
+
+def calculate_trough(sheet_name, All, tzero_date):
+    # Initialize lists to store peak and start_to_trough values
+    peak_values = []
+    start_to_trough_values = []
+
+    # Filter data based on ISOCODES column
+    filtered_data = []
+    for frame in All:
+        for row in frame.itertuples(index=False):
+            if row.ISOCODES == sheet_name:
+                filtered_data.append(row)
+
+    # Convert date column to datetime format
+    for row in filtered_data:
+        row.date = datetime.strptime(row.date, '%d-%b-%y').date()
+
+    # Get the index of the row where the date matches the tzero_date
+    t_zero_index = next((i for i, row in enumerate(filtered_data) if row.date == tzero_date), None)
+    if t_zero_index is None:
+        print(f"No data found for the given tzero_date: {tzero_date} and sheet: {sheet_name}")
+        return [], []
+
+    # Define the columns to calculate
+    columns = ['GDP YR', 'CPI YR', 'PHYR', 'PH DUBAI YR', 'PCOM YR', 'GDP QOQ', 'CPI_QOQ', 'PH_QOQ', 'PH_DUBAI_QOQ', 'PCOM_QOQ']
+
+    for column in columns:
+        # Calculate t_zero_value
+        t_zero_value = getattr(filtered_data[t_zero_index], column)
+
+        # Calculate trough value (minimum of next 20 values)
+        trough_values = [getattr(row, column) for row in filtered_data[t_zero_index:t_zero_index + 20]]
+        trough_value = min(trough_values)
+
+        # Calculate start_to_trough_value
+        start_to_trough_value = t_zero_value - trough_value
+        start_to_trough_values.append(start_to_trough_value)
+
+        # Calculate Ab_value (maximum of t_zero_value and 7 previous values)
+        ab_values = [getattr(row, column) for row in filtered_data[t_zero_index - 7:t_zero_index + 1]]
+        ab_value = max(ab_values)
+
+        # Calculate peak_value
+        peak_value = ab_value - trough_value
+        peak_values.append(peak_value)
+
+    return start_to_trough_values, peak_values
