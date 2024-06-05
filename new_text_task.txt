@@ -3938,3 +3938,55 @@ def all_font(sheet):
                             underline=current_font.underline, strike=current_font.strike,
                             color=current_font.color)
             cell.font = new_font
+
+
+
+
+
+
+
+
+def calculate_peak_trough(Isocode, user_input):
+    start_to_trough_values = []
+    peak_values = []
+    cols = ['GDP YR', 'CPI YR', 'PHYR', 'PH_DUBAI_YR', 'PCOM YR', 'GDP QOQ', 'CPI_QOQ', 'PH_QOQ', 'PH_DUBAI_QOQ', 'PCOM QOQ']
+
+    for frame in All:
+        for row in frame.itertuples(index=False):
+            if row.ISOCODES == Isocode and row.date == user_input:
+                # Calculate t_zero_values
+                t_zero_values = [getattr(row, col) for col in cols]
+
+                # Calculate trough_values
+                trough_values = []
+                for col in cols:
+                    trough_value = min(getattr(row, col), *[getattr(frame[frame['date'] == row.date + pd.DateOffset(months=i)], col).values[0] for i in range(1, 21)])
+                    trough_values.append(trough_value)
+
+                # Calculate start_to_trough_values
+                start_to_trough_values = [t_zero - trough for t_zero, trough in zip(t_zero_values, trough_values)]
+
+                # Calculate Ab_values
+                Ab_values = []
+                for col in cols:
+                    Ab_value = max(getattr(row, col), *[getattr(frame[frame['date'] == row.date - pd.DateOffset(months=i)], col).values[0] for i in range(1, 8)])
+                    Ab_values.append(Ab_value)
+
+                # Calculate peak_values
+                peak_values = [Ab - trough for Ab, trough in zip(Ab_values, trough_values)]
+
+                return start_to_trough_values, peak_values
+
+    return [], []  # Return empty lists if the user-provided date and ISOCODE are not found
+
+def construct_and_populate_tables(Isocode, user_input):
+    All = []
+    sheetNames = ['sheet1', 'sheet2', ...]  # Replace with your actual sheet names
+
+    for sheet in sheetNames:
+        df = add_output_columns(sheet)  # Assuming you have a function to add output columns
+        All.append(df)
+
+    start_to_trough_values, peak_values = calculate_peak_trough(Isocode, user_input)
+    print("Start to Trough Values:", start_to_trough_values)
+    print("Peak Values:", peak_values)
