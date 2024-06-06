@@ -4195,3 +4195,123 @@ def calculate_trough(sheet_name, All, tzero_date):
         print(f"No data found for the given tzero_date: {tzero_date} and sheet: {sheet_name}")
 
     return start_to_trough_values, peak_values
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+from datetime import datetime
+
+def calculate_trough(sheet_name, All, tzero_date):
+    # Initialize lists to store peak and start_to_trough values
+    peak_values = []
+    start_to_trough_values = []
+
+    # Define the columns to calculate
+    columns = ['GDP YR', 'CPI YR', 'PHYR', 'PH DUBAI YR', 'PCOM YR', 'GDP QOQ', 'CPI_QOQ', 'PH_QOQ', 'PH_DUBAI_QOQ', 'PCOM_QOQ']
+
+    # Convert tzero_date to datetime.date
+    tzero_date = datetime.strptime(tzero_date, '%d-%b-%y').date()
+
+    # Iterate over frames and rows
+    for frame in All:
+        # Convert the date column to datetime.date
+        frame['date'] = pd.to_datetime(frame['date'], format='%d-%b-%y').dt.date
+
+        # Filter rows matching the sheet_name
+        filtered_frame = frame[frame['ISOCODES'] == sheet_name]
+
+        if not filtered_frame.empty:
+            # Find the row corresponding to the tzero_date
+            tzero_row = filtered_frame[filtered_frame['date'] == tzero_date]
+
+            if not tzero_row.empty:
+                t_zero_index = tzero_row.index[0]
+
+                for column in columns:
+                    # Calculate t_zero_value
+                    t_zero_value = tzero_row.iloc[0][column]
+
+                    # Calculate trough value (minimum of next 20 values or remaining values if fewer than 20)
+                    next_rows = filtered_frame.loc[t_zero_index+1:t_zero_index+20, column]
+                    if not next_rows.empty:
+                        trough_value = next_rows.min()
+
+                        # Calculate start_to_trough_value
+                        start_to_trough_value = t_zero_value - trough_value
+                        start_to_trough_values.append(start_to_trough_value)
+
+                        # Calculate Ab_value (maximum of t_zero_value and 7 previous values)
+                        prev_rows = filtered_frame.loc[max(0, t_zero_index-7):t_zero_index, column]
+                        ab_value = max(prev_rows.max(), t_zero_value)
+
+                        # Calculate peak_value
+                        peak_value = ab_value - trough_value
+                        peak_values.append(peak_value)
+
+    if not start_to_trough_values:
+        print(f"No data found for the given tzero_date: {tzero_date} and sheet: {sheet_name}")
+
+    return start_to_trough_values, peak_values
+
+# Example usage
+sheet_name = 'GBR'
+tzero_date = '31-Mar-22'
+
+# Example DataFrames (should be replaced with actual data)
+data = {
+    'ISOCODES': ['GBR', 'GBR', 'GBR', 'GBR', 'GBR'],
+    'date': ['31-Mar-21', '30-Sep-21', '31-Dec-21', '31-Mar-22', '30-Jun-22'],
+    'GDP YR': [109.59, 114.23, 111.80, 116.38, 120.72],
+    'CPI YR': [509261, 564407, 555956, 567396, 567889],
+    'PHYR': [93.05, 1.5, 555956, 8.77, 9.96],
+    'PH DUBAI YR': [110.60, 111.80, 1.5, 6.20, 120.72],
+    'PCOM YR': [546579, 564407, 555956, 567396, 567889],
+    'GDP QOQ': [95.20, 1.5, 1.5, 8.77, 9.96],
+    'CPI_QOQ': [0.72, 0.46, 555956, 8.77, 9.96],
+    'PH_QOQ': [7.3, 1.5, 555956, 8.77, 9.96],
+    'PH_DUBAI_QOQ': [0.10, 0.10, 1.5, 8.77, 9.96],
+    'PCOM_QOQ': [0.9, 0.46, 555956, 8.77, 9.96]
+}
+df = pd.DataFrame(data)
+
+All = [df]
+
+start_to_trough_values, peak_values = calculate_trough(sheet_name, All, tzero_date)
+
+print("Start to Trough Values:", start_to_trough_values)
+print("Peak Values:", peak_values)
