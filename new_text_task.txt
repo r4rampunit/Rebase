@@ -4427,3 +4427,30 @@ start_to_trough_values, peak_values = calculate_trough(sheet_name, All, tzero_da
 print("Start to Trough Values:", start_to_trough_values)
 print("Peak Values:", peak_values)
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def convert_date(date_val):
+    if isinstance(date_val, datetime):
+        return date_val.date()
+    elif isinstance(date_val, str):
+        for fmt in ('%d-%b-%Y', '%Y-%m-%d'):
+            try:
+                return datetime.strptime(date_val, fmt).date()
+            except ValueError:
+                pass
+    raise ValueError(f"Date format for {date_val} is not recognized")
