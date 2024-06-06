@@ -4315,3 +4315,115 @@ start_to_trough_values, peak_values = calculate_trough(sheet_name, All, tzero_da
 
 print("Start to Trough Values:", start_to_trough_values)
 print("Peak Values:", peak_values)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import pandas as pd
+from datetime import datetime
+
+# Function to convert date with multiple possible formats
+def convert_date(date_str):
+    for fmt in ('%d-%b-%Y', '%Y-%m-%d'):
+        try:
+            return datetime.strptime(date_str, fmt).date()
+        except ValueError:
+            pass
+    raise ValueError(f"Date format for {date_str} is not recognized")
+
+# Function to calculate trough values
+def calculate_trough(sheet_name, All, tzero_date):
+    # Initialize lists to store peak and start_to_trough values
+    peak_values = []
+    start_to_trough_values = []
+
+    # Define the columns to calculate
+    columns = ['GDP YR', 'CPI YR', 'PHYR', 'PH DUBAI YR', 'PCOM YR', 'GDP QOQ', 'CPI_QOQ', 'PH_QOQ', 'PH_DUBAI_QOQ', 'PCOM_QOQ']
+
+    # Convert tzero_date to datetime.date
+    tzero_date = convert_date(tzero_date)
+
+    # Iterate over frames and rows
+    for frame in All:
+        # Convert the date column to datetime.date
+        frame['date'] = frame['date'].apply(convert_date)
+
+        # Filter rows matching the sheet_name
+        filtered_frame = frame[frame['ISOCODES'] == sheet_name]
+
+        if not filtered_frame.empty:
+            # Find the row corresponding to the tzero_date
+            tzero_row = filtered_frame[filtered_frame['date'] == tzero_date]
+
+            if not tzero_row.empty:
+                t_zero_index = tzero_row.index[0]
+
+                for column in columns:
+                    # Calculate t_zero_value
+                    t_zero_value = tzero_row.iloc[0][column]
+
+                    # Calculate trough value (minimum of next 20 values or remaining values if fewer than 20)
+                    next_rows = filtered_frame.loc[t_zero_index + 1:t_zero_index + 21, column]
+                    if not next_rows.empty:
+                        trough_value = next_rows.min()
+
+                        # Calculate start_to_trough_value
+                        start_to_trough_value = t_zero_value - trough_value
+                        start_to_trough_values.append(start_to_trough_value)
+
+                        # Calculate Ab_value (maximum of t_zero_value and 7 previous values)
+                        prev_rows = filtered_frame.loc[max(0, t_zero_index - 7):t_zero_index, column]
+                        ab_value = max(prev_rows.max(), t_zero_value)
+
+                        # Calculate peak_value
+                        peak_value = ab_value - trough_value
+                        peak_values.append(peak_value)
+
+    if not start_to_trough_values:
+        print(f"No data found for the given tzero_date: {tzero_date} and sheet: {sheet_name}")
+
+    return start_to_trough_values, peak_values
+
+# Example usage
+input_file = "C:\\Users\\45363901\\PycharmProjects\\pythonProject\\pythonProject2\\GBIC_Workings Data\\Input\\Data Copy.xlsx"
+workbook = openpyxl.load_workbook(input_file)
+sheetNames = workbook.sheetnames
+
+All = []
+
+for sheet in sheetNames:
+    df = add_output_columns(sheet)
+    All.append(df)
+
+sheet_name = 'GBR'
+tzero_date = '2024-03-31'  # Example date in 'YYYY-MM-DD' format
+
+start_to_trough_values, peak_values = calculate_trough(sheet_name, All, tzero_date)
+
+print("Start to Trough Values:", start_to_trough_values)
+print("Peak Values:", peak_values)
+
