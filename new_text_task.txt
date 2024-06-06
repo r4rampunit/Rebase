@@ -4679,3 +4679,183 @@ start_to_trough_values, peak_values = calculate_trough(sheet_name, All, tzero_da
 
 print("Start to Trough Values:", start_to_trough_values)
 print("Peak Values:", peak_values)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import pandas as pd
+from datetime import datetime
+import openpyxl
+from openpyxl.styles import Alignment, Font
+
+def convert_date(date_val):
+    if isinstance(date_val, datetime):
+        return date_val.date()
+    elif isinstance(date_val, str):
+        for fmt in ('%d-%b-%Y', '%Y-%m-%d'):
+            try:
+                return datetime.strptime(date_val, fmt).date()
+            except ValueError:
+                pass
+    raise ValueError(f"Date format for {date_val} is not recognized")
+
+def calculate_trough(sheet_name, All, tzero_date, df_mapping):
+    peak_values = []
+    start_to_trough_values = []
+
+    tzero_date = convert_date(tzero_date)
+
+    checks_value = df_mapping.loc[
+        (df_mapping['ISOCODES'] == sheet_name) &
+        (df_mapping['Trough_required'] == 'Yes'), 'Description'].tolist()
+
+    trans_variables = df_mapping.loc[df_mapping['Description'].isin(checks_value), 'Trans_variable'].tolist()
+    columns = trans_variables
+
+    for frame in All:
+        filtered_frame = [row for row in frame.itertuples() if row.ISOCODES == sheet_name]
+
+        if filtered_frame:
+            tzero_row = next((row for row in filtered_frame if convert_date(row.date) == tzero_date), None)
+
+            if tzero_row:
+                t_zero_index = filtered_frame.index(tzero_row)
+
+                for column in columns:
+                    t_zero_value = getattr(tzero_row, column)
+                    trough_values = [getattr(filtered_frame[i], column) for i in range(t_zero_index + 1, min(t_zero_index + 21, len(filtered_frame)))]
+                    trough_value = min(trough_values) if trough_values else float('inf')
+
+                    start_to_trough_value = t_zero_value - trough_value
+                    start_to_trough_values.append(start_to_trough_value)
+
+                    ab_values = [getattr(filtered_frame[i], column) for i in range(max(0, t_zero_index - 7), t_zero_index + 1)]
+                    ab_value = max(ab_values) if ab_values else float('-inf')
+
+                    peak_value = ab_value - trough_value
+                    peak_values.append(peak_value)
+
+    if not start_to_trough_values:
+        print(f"No data found for the given tzero_date: {tzero_date} and sheet: {sheet_name}")
+
+    return start_to_trough_values, peak_values
+
+def column_of_trough(sheet):
+    from openpyxl.styles import Alignment
+
+    workbook_path = r"C:\Users\45363901\PycharmProjects\pythonProject\pythonProject2\GBIC_Workings Data\Input\Mapping_File Copy.xlsx"
+    df_mapping = pd.read_excel(workbook_path, sheet_name="Data_Edge")
+
+    for row in sheet.iter_rows():
+        for cell in row:
+            checks_value = df_mapping.loc[
+                (df_mapping['ISOCODES'] == sheet.title) &
+                (df_mapping['Trough_required'] == 'Yes'), 'Description'].tolist()
+
+            for value in checks_value:
+                if cell.value == value:
+                    if cell.col_idx > 1:
+                        target_cell = sheet.cell(row=cell.row + 21, column=cell.col_idx - 1)
+                        if target_cell.value == 'Syr Avg':
+                            sheet_name = sheet.title
+                            tzero_date = df_mapping.loc[df_mapping['Description'] == value, 'user_inputs'].values[0][15]
+                            tzero_date = convert_date(tzero_date)
+
+                            start_to_trough_values, peak_values = calculate_trough(sheet_name, All, tzero_date, df_mapping)
+
+                            row, col = target_cell.row, target_cell.column
+                            sheet.cell(row=row + 3, column=col, value='Start to trough')
+                            sheet.cell(row=row + 4, column=col, value='Peak to trough')
+
+                            tg_cell_1 = sheet.cell(row=row + 3, column=col)
+                            tg_cell_2 = sheet.cell(row=row + 4, column=col)
+                            tg_cell_1.alignment = Alignment(wrap_text=True, vertical='center', horizontal='center')
+                            tg_cell_2.alignment = Alignment(wrap_text=True, vertical='center', horizontal='center')
+                            tg_cell_1.font = Font(bold=True, name='Univers Next for HSBC Light')
+                            tg_cell_2.font = Font(bold=True, name='Univers Next for HSBC Light')
+
+                            scenarios_offsets = [
+                                (2, 1, user_inputs[3]), (2, 2, user_inputs[4]),
+                                (2, 3, user_inputs[5]), (2, 4, user_inputs[6]),
+                                (2, 8, user_inputs[3]), (2, 9, user_inputs[4]),
+                                (2, 10, user_inputs[5]), (2, 11, user_inputs[6])
+                            ]
+
+                            for r_offset, c_offset, text in scenarios_offsets:
+                                sheet.cell(row=row + r_offset, column=col + c_offset, value=text)
+                                cell = sheet.cell(row=row + r_offset, column=col + c_offset)
+                                cell.alignment = Alignment(wrap_text=True, vertical='center', horizontal='center')
+                                cell.font = Font(color="FFFFFFFF", name='Univers Next for HSBC Light')
+
+                            A = start_to_trough_values[0]
+                            B = start_to_trough_values[1]
+                            C = start_to_trough_values[2]
+                            D = start_to_trough_values[3]
+                            E = start_to_trough_values[4]
+                            F = start_to_trough_values[5]
+                            G = start_to_trough_values[6]
+                            H = start_to_trough_values[7]
+                            I = peak_values[0]
+                            J = peak_values[1]
+                            K = peak_values[2]
+                            L = peak_values[3]
+                            M = peak_values[4]
+                            N = peak_values[5]
+                            O = peak_values[6]
+                            P = peak_values[7]
+
+                            num_values_offsets = [
+                                (3, 1, A), (3, 2, B), (3, 3, C), (3, 4, D),
+                                (3, 8, E), (3, 9, F), (3, 10, G), (3, 11, H),
+                                (4, 1, I), (4, 2, J), (4, 3, K), (4, 4, L),
+                                (4, 8, M), (4, 9, N), (4, 10, O), (4, 11, P)
+                            ]
+
+                            for r_offset, c_offset, value in num_values_offsets:
+                                cell = sheet.cell(row=row + r_offset, column=col + c_offset, value=value)
+                                cell.alignment = Alignment(horizontal='center')
+
+input_file = "C:\\Users\\45363901\\PycharmProjects\\pythonProject\\pythonProject2\\GBIC_Workings Data\\Input\\Data Copy.xlsx"
+workbook = openpyxl.load_workbook(input_file)
+sheetNames = workbook.sheetnames
+
+All = []
+
+for sheet_name in sheetNames:
+    df = add_output_columns(sheet_name)
+    All.append(df)
+
+for sheet_name in sheetNames:
+    sheet = workbook[sheet_name]
+    column_of_trough(sheet)
+
+workbook.save(input_file)
