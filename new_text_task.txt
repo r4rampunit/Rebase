@@ -382,3 +382,108 @@ mev_data.to_excel('mev_data.xlsx', index=False)
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import pandas as pd
+from datetime import datetime
+
+# Read the data from the Excel file
+workbook_path = r"C:\Users\45363901\PycharmProjects\pythonProject\pythonProject1\Revenue_Balance_Forcast\Balance_Forecast_FRP_V4 NZ.xlsx"
+data = pd.read_excel(workbook_path, sheet_name="MEV - NZ")
+
+# Extract the necessary columns
+columns = data.columns
+date_columns = [col for col in columns if col not in ['Country', 'ISOCODES', 'MEV_Variable', 'Region_Mapped']]
+
+# Define the structure of the new DataFrame
+mev_data_columns = ['MEV Key', 'MEV Variable', 'Country', 'ISO Code', 'Region Mapped'] + date_columns
+mev_data = pd.DataFrame(columns=mev_data_columns)
+
+# Hardcoded MEV Key and MEV Variable
+mev_keys_and_variables = [
+    ['EOE_GDP', 'GDP', 'Eurozone', 'EUZ', 'EOE'],
+    ['Asia ex-GSC/GLT_GDP_DOL', 'GDP DOL', 'Asia Pacific', 'APC', 'Asia ex-GSC/GLT'],
+    ['HBUK_GDP', 'GDP', 'UK', 'GBR', 'HBUK'],
+    ['LATAM_GDP_DOL', 'GDP DOL', 'Latin America', 'LAM', 'LATAM'],
+    ['MENAT_GDP', 'GDP', 'World', 'GBL', 'MENAT'],
+    ['US_GDP', 'GDP', 'US', 'USA', 'US'],
+    ['Canada_GDP', 'GDP', 'Canada', 'CAN', 'Canada'],
+    ['ROG_(Rest of Group)_NA', 'NA', 'NA', 'NA', 'ROG (Rest of Group)'],
+    ['Asia ex-GSC/GLT_PH_ROA', 'PH', 'Hong Kong', 'HKG', 'Asia ex-GSC/GLT'],
+    ['HBUK_PH', 'PH', 'UK', 'GBR', 'HBUK'],
+    ['LATAM_PH', 'PH', 'Mexico', 'MEX', 'LATAM'],
+    ['MENAT_PH', 'PH', 'U.A.E', 'ARE', 'MENAT'],
+    ['US_PH', 'PH', 'US', 'USA', 'US'],
+    ['Canada_PH', 'PH', 'Canada', 'CAN', 'Canada'],
+    ['Asia Pacific_PH', 'PH', 'Asia Pacific', 'APC', 'Asia ex-GSC/GLT'],
+    ['EOE_PH', 'PH', 'France', 'FRA', 'EOE'],
+    ['HBUK_PH', 'PH', 'UK', 'GBR', 'HBUK'],
+    ['LATAM_PH', 'PH', 'Latin America', 'LAM', 'LATAM'],
+    ['MENAT_PH', 'PH', 'MENAT', None, 'MENAT'],
+    ['HASE_PH', 'PH', 'Canada', 'CAN', 'HASE']
+]
+
+# Iterate over the hardcoded keys and add them to the new DataFrame
+for mev_key, mev_var, country, iso_code, region_mapped in mev_keys_and_variables:
+    mev_data = mev_data.append(pd.Series([mev_key, mev_var, country, iso_code, region_mapped] + [None] * len(date_columns), index=mev_data_columns), ignore_index=True)
+
+# Iterate over each row in the original data
+for _, row in data.iterrows():
+    country = row['Country']
+    iso_code = row['ISOCODES']
+    mev_var = row['MEV_Variable']
+    region_mapped = row['Region_Mapped']
+    mev_key = f"{region_mapped}_{mev_var}"
+
+    # Populate the values in the new DataFrame
+    for date_col in date_columns:
+        if date_col in row:
+            date_value = row[date_col]
+            if pd.notna(date_value):
+                # Find the corresponding row in mev_data
+                row_index = mev_data[(mev_data['MEV Key'] == mev_key) & (mev_data['ISO Code'] == iso_code)].index
+                if not row_index.empty:
+                    mev_data.loc[row_index, date_col] = date_value
+                else:
+                    new_row = [mev_key, mev_var, country, iso_code, region_mapped] + [None] * len(date_columns)
+                    mev_data = mev_data.append(pd.Series(new_row, index=mev_data_columns), ignore_index=True)
+                    row_index = mev_data[(mev_data['MEV Key'] == mev_key) & (mev_data['ISO Code'] == iso_code)].index
+                    mev_data.loc[row_index, date_col] = date_value
+
+# Write the data to a new Excel file
+mev_data.to_excel('mev_data.xlsx', index=False)
+
+
+
+
+
