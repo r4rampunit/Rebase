@@ -3,47 +3,35 @@ import pandas as pd
 from django.shortcuts import render
 from django.conf import settings
 
-# Specify the location where your folders are stored
-FOLDER_PATH = '/path/to/your/folders'  # Change this to your folder path
+FOLDER_PATH = r'C:\Users\45363901\MI_Tool_Visualization\punitproject\Folder_Structure'
 
 def get_folders():
-    # List all folders in the specified location
     return [f.name for f in os.scandir(FOLDER_PATH) if f.is_dir()]
 
 def read_excel_files(folder_name):
     folder_path = os.path.join(FOLDER_PATH, folder_name)
     excel_files = [f for f in os.listdir(folder_path) if f.endswith('.xlsx')]
     dataframes = []
-
-    for i, excel_file in enumerate(excel_files):
+    for excel_file in excel_files:
         file_path = os.path.join(folder_path, excel_file)
         df = pd.read_excel(file_path)
         dataframes.append(df)
-
     return dataframes
 
 def folder_view(request):
     folders = get_folders()
     dataframes = []
-
+    selected_folder = None
     if request.method == 'POST':
         selected_folder = request.POST.get('folder')
         if selected_folder:
             dataframes = read_excel_files(selected_folder)
-
     context = {
         'folders': folders,
         'dataframes': dataframes,
+        'selected_folder': selected_folder,
     }
-
-    return render(request, 'myapp/folder_view.html', context)
-
-
-
-
-
-
-
+    return render(request, 'main_file.html', context)
 
 
 
@@ -68,12 +56,17 @@ def folder_view(request):
     <form method="post">
         {% csrf_token %}
         <select name="folder">
+            <option value="">Select a folder</option>
             {% for folder in folders %}
-                <option value="{{ folder }}">{{ folder }}</option>
+                <option value="{{ folder }}" {% if folder == selected_folder %}selected{% endif %}>{{ folder }}</option>
             {% endfor %}
         </select>
         <button type="submit">Submit</button>
     </form>
+
+    {% if selected_folder %}
+        <h2>Selected Folder: {{ selected_folder }}</h2>
+    {% endif %}
 
     {% if dataframes %}
         <h2>Data from Excel Files</h2>
@@ -88,7 +81,7 @@ def folder_view(request):
                     </tr>
                 </thead>
                 <tbody>
-                    {% for row in df.values %}
+                    {% for _, row in df.iterrows %}
                         <tr>
                             {% for cell in row %}
                                 <td>{{ cell }}</td>
@@ -101,40 +94,3 @@ def folder_view(request):
     {% endif %}
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-pip install django pandas openpyxl
-
