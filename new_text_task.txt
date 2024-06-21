@@ -497,7 +497,6 @@ def folder_view(request):
     <h2>Debug Information:</h2>
     <p>Number of folders: {{ folders|length }}</p>
     <p>Folders: {{ folders|join:", " }}</p>
-    <p>Folders type: {{ folders|type }}</p>
 
     <h2>Folder List:</h2>
     <ul>
