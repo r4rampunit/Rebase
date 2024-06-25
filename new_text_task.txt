@@ -2,17 +2,14 @@
     <div class="logo-container"></div>
     <h1>MI Tool Visualization</h1>
     <div class="dashboard-container">
-        <form id="dashboard-form">
-            <div class="dropdown-container">
-                <select name="folder" id="folder">
-                    <option value="">Select Variable</option>
-                    {% for folder in folders %}
-                        <option value="{{ folder }}" {% if folder == selected_folder %}selected{% endif %}>{{ folder }}</option>
-                    {% endfor %}
-                </select>
-                <button type="submit">Submit</button>
-            </div>
-        </form>
+        <div class="dropdown-container">
+            <select name="folder" id="folder">
+                <option value="">Select Variable</option>
+                {% for folder in folders %}
+                    <option value="{{ folder }}" {% if folder == selected_folder %}selected{% endif %}>{{ folder }}</option>
+                {% endfor %}
+            </select>
+        </div>
         {% if selected_folder %}
             <h2>Selected Folder: {{ selected_folder }}</h2>
         {% endif %}
@@ -47,7 +44,20 @@
             <p>No data to display</p>
         {% endif %}
     </div>
+
+    <script>
+        document.getElementById('folder').addEventListener('change', function() {
+            window.location.href = '?folder=' + this.value;
+        });
+    </script>
 </body>
+
+
+
+
+
+
+
 
 
 
@@ -64,12 +74,19 @@ def get_folders():
 
 def read_excel_files(folder_name):
     folder_path = os.path.join(FOLDER_PATH, folder_name)
+    print(f"Looking for Excel files in: {folder_path}")  # Debug print
     excel_files = [f for f in os.listdir(folder_path) if f.endswith('.xlsx')]
+    print(f"Excel files found: {excel_files}")  # Debug print
     dataframes = {}
     for excel_file in excel_files:
         file_path = os.path.join(folder_path, excel_file)
-        df = pd.read_excel(file_path)
-        dataframes[excel_file] = df
+        print(f"Attempting to read: {file_path}")  # Debug print
+        try:
+            df = pd.read_excel(file_path)
+            dataframes[excel_file] = df
+            print(f"Successfully read {excel_file}")  # Debug print
+        except Exception as e:
+            print(f"Error reading {excel_file}: {str(e)}")  # Debug print
     return dataframes
 
 def dashboard(request):
@@ -77,15 +94,13 @@ def dashboard(request):
     selected_folder = request.GET.get('folder')
     dataframes = {}
 
+    print(f"Selected folder: {selected_folder}")  # Debug print
+
     if selected_folder:
+        print(f"Attempting to read files from: {os.path.join(FOLDER_PATH, selected_folder)}")  # Debug print
         dataframes = read_excel_files(selected_folder)
 
-    # Debug response
-    print(f"Folders: {folders}")
-    print(f"Number of folders: {len(folders)}")
-    print(f"Folder type: {type(folders)}")
-    print(f"Selected folder: {selected_folder}")
-    print(f"Number of dataframes: {len(dataframes)}")
+    print(f"Dataframes: {dataframes.keys()}")  # Debug print
 
     context = {
         'folders': folders,
