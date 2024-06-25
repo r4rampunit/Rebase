@@ -109,3 +109,49 @@ def dashboard(request):
     }
 
     return render(request, 'dashboard.html', context)
+
+
+
+
+
+
+
+
+
+
+
+
+import openpyxl
+import pandas as pd
+
+def add_output_columns(sheet):
+    # Implement this function as needed
+    # It should return a pandas DataFrame
+    pass
+
+def filter_dataframe(df):
+    # List of columns to keep
+    columns_to_keep = [
+        'Country', 'ISOCODES', 'date', 'CPI', 'GDP', 'GDP_SA', 'PCOM', 'PH', 'PH_DUBAI',
+        'RLG', 'RBASE', 'RFED', 'RLEND', 'RLPR', 'UP', 'UPILO', 'WPO', 'WPO_WTI'
+    ]
+
+    # List of ISOCODES to keep
+    isocodes_to_keep = ['ARE', 'CAN', 'CHN', 'FRA', 'GBL', 'GBR', 'HKG', 'MEX', 'USA']
+
+    # Filter the dataframe
+    filtered_df = df[df['ISOCODES'].isin(isocodes_to_keep)][columns_to_keep]
+
+    return filtered_df
+
+input_file = r".\Input\Data Copy.xlsx"
+workbook = openpyxl.load_workbook(input_file)
+sheetNames = workbook.sheetnames
+All = []
+
+for sheet in sheetNames:
+    df = add_output_columns(sheet)
+    filtered_df = filter_dataframe(df)
+    All.append(filtered_df)
+
+# Now 'All' contains a list of filtered DataFrames
