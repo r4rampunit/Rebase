@@ -308,4 +308,33 @@ def dashboard(request):
     }
 </style>
 
+.dropdown-wrapper {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
 
+.dropdown-container {
+    width: 48%; /* Adjust as needed */
+}
+
+.dropdown-container select {
+    font-size: 18px;
+    padding: 10px 20px;
+    border-radius: 20px;
+    background-color: #ffccbb;
+    color: #333;
+    font-weight: bold;
+    border: none;
+    outline: none;
+    width: 100%;
+    box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+}
+
+.dropdown-container.left {
+    /* Additional styles for left dropdown if needed */
+}
+
+.dropdown-container.right {
+    /* Additional styles for right dropdown if needed */
+}
