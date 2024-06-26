@@ -155,3 +155,68 @@ for sheet in sheetNames:
     All.append(filtered_df)
 
 # Now 'All' contains a list of filtered DataFrames
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import os
+from django.shortcuts import render
+import pandas as pd
+
+FOLDER_PATH = r'C:\Users\45363901\MI_Tool_Visualization\punitproject\Folder_'
+
+def get_folders():
+    return [f.name for f in os.scandir(FOLDER_PATH) if f.is_dir()]
+
+def get_subfolders(folder_name):
+    folder_path = os.path.join(FOLDER_PATH, folder_name)
+    return [f.name for f in os.scandir(folder_path) if f.is_dir()]
+
+def read_excel_files(folder_name, subfolder_name):
+    folder_path = os.path.join(FOLDER_PATH, folder_name, subfolder_name)
+    excel_files = [f for f in os.listdir(folder_path) if f.endswith('.xlsx')]
+    dataframes = {}
+    for excel_file in excel_files:
+        file_path = os.path.join(folder_path, excel_file)
+        df = pd.read_excel(file_path)
+        dataframes[excel_file] = df
+    return dataframes
+
+def dashboard(request):
+    folders = get_folders()
+    selected_folder = request.GET.get("folder", None)
+    selected_subfolder = request.GET.get("subfolder", None)
+    subfolders = get_subfolders(selected_folder) if selected_folder else []
+    dataframes = {}
+
+    if selected_folder and selected_subfolder:
+        dataframes = read_excel_files(selected_folder, selected_subfolder)
+
+    context = {
+        'folders': folders,
+        'subfolders': subfolders,
+        'dataframes': dataframes,
+        'selected_folder': selected_folder,
+        'selected_subfolder': selected_subfolder,
+    }
+    return render(request, 'dashboard.html', context)
+
+
+
+
+
+
+
+
