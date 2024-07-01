@@ -324,3 +324,97 @@ def filter_data(request):
     </script>
 </body>
 </html>
+
+
+
+
+
+
+
+
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dataframe Dropdowns</title>
+    <!-- Include necessary CSS and JavaScript libraries -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css">
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.min.js"></script>
+    <style>
+        .dropdown-menu {
+            max-height: 200px; /* Adjust max-height as needed */
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Select Columns:</h2>
+        <div class="dropdown-scrollable">
+            {% for column in columns %}
+            <div class="dropdown" style="display: inline-block; margin-right: 10px;">
+                <button class="btn btn-secondary dropdown-toggle" type="button" data-toggle="dropdown">
+                    {{ column }}
+                </button>
+                <div class="dropdown-menu" aria-labelledby="dropdownMenuButton" style="min-width: 100px;">
+                    {% for value in data[column] %}
+                    <label class="dropdown-item">
+                        <input type="checkbox" value="{{ value }}"> {{ value }}
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        <hr>
+        <h2>Filtered Data:</h2>
+        <div id="filtered-table">
+            <!-- Placeholder for filtered data -->
+        </div>
+    </div>
+
+    <script>
+        $(document).ready(function() {
+            // Handle dropdown item selection
+            $('.dropdown-item input[type="checkbox"]').change(function() {
+                updateFilteredData();
+            });
+
+            // Function to update filtered data
+            function updateFilteredData() {
+                // Get selected values
+                var selectedValues = {};
+                $('.dropdown-menu').each(function() {
+                    var column = $(this).prev('.dropdown-toggle').text().trim();
+                    selectedValues[column] = [];
+                    $(this).find('input:checked').each(function() {
+                        selectedValues[column].push($(this).val());
+                    });
+                });
+
+                // AJAX call to update filtered data
+                $.ajax({
+                    type: 'POST',
+                    url: '/update_filtered_data/',  // Adjust URL based on your Django view
+                    data: {
+                        selected_values: JSON.stringify(selectedValues),
+                        csrfmiddlewaretoken: '{{ csrf_token }}'
+                    },
+                    success: function(response) {
+                        $('#filtered-table').html(response);
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('Error:', error);
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+</html>
