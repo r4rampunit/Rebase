@@ -324,21 +324,28 @@ def filter_data(request):
 
 
 
-
-
 from django.shortcuts import render
 import pandas as pd
+import random
 
-def home(request):
-    # Generate a DataFrame with 15 columns and 15 values in each column
-    data = {f'Column_{i}': [f'Value_{i}_{j}' for j in range(15)] for i in range(1, 16)}
+def dataframe_view(request):
+    # Generate example data (15 columns with 15 values each)
+    data = {}
+    num_columns = 15
+    num_values = 15
+    columns = [f'Column{i}' for i in range(1, num_columns + 1)]
+    for col in columns:
+        data[col] = [random.randint(1, 100) for _ in range(num_values)]
+
     df = pd.DataFrame(data)
 
-    # Extract column names
+    # Pass column names and data to template
     columns = df.columns.tolist()
-
-    return render(request, 'home.html', {'columns': columns})
-
+    context = {
+        'columns': columns,
+        'data': df.to_html(classes='table table-bordered', index=False, header=True),
+    }
+    return render(request, 'your_template.html', context)
 
 
 
@@ -348,37 +355,82 @@ def home(request):
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DataFrame Columns</title>
-    <!-- Include jQuery and Select2 CSS/JS -->
-    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <title>Dataframe Dropdowns</title>
+    <!-- Include necessary CSS and JavaScript libraries -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css">
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.min.js"></script>
     <style>
-        .dropdown-container {
-            display: flex;
-            overflow-x: auto;
-            white-space: nowrap;
-        }
-        .dropdown-container select {
-            margin: 10px;
-            width: 200px;
+        .dropdown-menu {
+            max-height: 200px; /* Adjust max-height as needed */
+            overflow-y: auto;
         }
     </style>
 </head>
 <body>
-    <h1>Select Columns</h1>
-    <div class="dropdown-container">
-        {% for column in columns %}
-            <select class="js-example-basic-multiple" name="states[]" multiple="multiple">
-                <option value="{{ column }}">{{ column }}</option>
-            </select>
-        {% endfor %}
+    <div class="container">
+        <h2>Select Columns:</h2>
+        <div class="dropdown-scrollable">
+            {% for column in columns %}
+            <div class="dropdown" style="display: inline-block; margin-right: 10px;">
+                <button class="btn btn-secondary dropdown-toggle" type="button" data-toggle="dropdown">
+                    {{ column }}
+                </button>
+                <div class="dropdown-menu" aria-labelledby="dropdownMenuButton" style="min-width: 100px;">
+                    {% for value in data[column] %}
+                    <label class="dropdown-item">
+                        <input type="checkbox" value="{{ value }}"> {{ value }}
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        <hr>
+        <h2>Filtered Data:</h2>
+        <div id="filtered-table">
+            {{ data|safe }}
+        </div>
     </div>
 
     <script>
         $(document).ready(function() {
-            $('.js-example-basic-multiple').select2();
+            // Handle dropdown item selection
+            $('.dropdown-item input[type="checkbox"]').change(function() {
+                updateFilteredData();
+            });
+
+            // Function to update filtered data
+            function updateFilteredData() {
+                // Get selected values
+                var selectedValues = {};
+                $('.dropdown-menu').each(function() {
+                    var column = $(this).prev('.dropdown-toggle').text().trim();
+                    selectedValues[column] = [];
+                    $(this).find('input:checked').each(function() {
+                        selectedValues[column].push($(this).val());
+                    });
+                });
+
+                // AJAX call to update filtered data
+                $.ajax({
+                    type: 'POST',
+                    url: '{% url "filter_data" %}',
+                    data: {
+                        selected_values: JSON.stringify(selectedValues),
+                        csrfmiddlewaretoken: '{{ csrf_token }}'
+                    },
+                    success: function(response) {
+                        $('#filtered-table').html(response);
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('Error:', error);
+                    }
+                });
+            }
         });
     </script>
 </body>
 </html>
+
