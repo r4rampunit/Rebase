@@ -1,99 +1,37 @@
-from django.shortcuts import render
-import pandas as pd
-import random
-
-def create_sample_dataframe():
-    # Create a sample dataframe with random data
-    data = {
-        'KT_Scenario': random.choices(['Scenario1', 'Scenario2', 'Scenario3', 'Scenario4', 'Scenario5'], k=1000),
-        'Organisational_unit_level_1': random.choices(['Unit1', 'Unit2', 'Unit3', 'Unit4', 'Unit5'], k=1000),
-        'Organisational_unit_level_2': random.choices(['SubUnit1', 'SubUnit2', 'SubUnit3', 'SubUnit4', 'SubUnit5'], k=1000),
-        'Organisational_unit_level_3': random.choices(['MicroUnit1', 'MicroUnit2', 'MicroUnit3', 'MicroUnit4', 'MicroUnit5'], k=1000),
-        'Country_of_exposure': random.choices(['USA', 'UK', 'Germany', 'France', 'Japan', 'China', 'India', 'Brazil'], k=1000),
-        'Asset_class': random.choices(['Equity', 'Fixed Income', 'Real Estate', 'Commodities', 'Cash'], k=1000),
-        'ProductType': random.choices(['Stocks', 'Bonds', 'Mutual Funds', 'ETFs', 'Options', 'Futures'], k=1000),
-        'Basel_approach': random.choices(['Standardized', 'IRB', 'Advanced IRB'], k=1000),
-        'ST_Scenario': random.choices(['Baseline', 'Adverse', 'Severely Adverse'], k=1000),
-        'Value': [random.uniform(1000, 10000) for _ in range(1000)]
-    }
-    return pd.DataFrame(data)
-
-def chart_view(request):
-    df = create_sample_dataframe()
-
-    # Get unique values for each dropdown
-    dropdowns = {
-        'KT_Scenario': df['KT_Scenario'].unique().tolist(),
-        'Organisational_unit_level_1': df['Organisational_unit_level_1'].unique().tolist(),
-        'Organisational_unit_level_2': df['Organisational_unit_level_2'].unique().tolist(),
-        'Organisational_unit_level_3': df['Organisational_unit_level_3'].unique().tolist(),
-        'Country_of_exposure': df['Country_of_exposure'].unique().tolist(),
-        'Asset_class': df['Asset_class'].unique().tolist(),
-        'ProductType': df['ProductType'].unique().tolist(),
-        'Basel_approach': df['Basel_approach'].unique().tolist(),
-        'ST_Scenario': df['ST_Scenario'].unique().tolist(),
-    }
-
-    # Get selected values from request
-    selected = {key: request.GET.getlist(key) for key in dropdowns.keys()}
-
-    # Filter the dataframe based on selections
-    for key, values in selected.items():
-        if values:
-            df = df[df[key].isin(values)]
-
-    # Convert filtered dataframe to list of dicts for template
-    filtered_data = df.to_dict('records')
-
-    context = {
-        'dropdowns': dropdowns,
-        'selected': selected,
-        'filtered_data': filtered_data,
-    }
-
-    return render(request, 'chart.html', context)
-
-
-
-
-
-
-{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chart View</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css">
+    <title>Data Filter</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <style>
-        .dropdown-wrapper {
-            display: flex;
-            overflow-x: auto;
-            padding: 10px 0;
-        }
         .dropdown-container {
-            margin-right: 20px;
-            min-width: 200px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-bottom: 20px;
         }
-        .dropdown-container select {
-            width: 100%;
-        }
-        .select2-container--default .select2-results__option {
-            display: inline-block;
-            width: 50%;
+        .dropdown-wrapper {
+            width: calc(20% - 10px);
         }
     </style>
 </head>
 <body>
-    <form method="get" action="{% url 'chart_view' %}">
-        <div class="dropdown-wrapper">
-            {% for key, options in dropdowns.items %}
-            <div class="dropdown-container">
-                <label for="{{ key }}">{{ key }}:</label>
-                <select name="{{ key }}" id="{{ key }}" multiple="multiple">
-                    {% for option in options %}
-                    <option value="{{ option }}" {% if option in selected|get_item:key %}selected{% endif %}>{{ option }}</option>
+    <h1>Data Filter</h1>
+    <form id="filter-form">
+        {% csrf_token %}
+        <div class="dropdown-container">
+            {% for column in columns %}
+            <div class="dropdown-wrapper">
+                <label for="{{ column }}">{{ column }}:</label>
+                <select name="{{ column }}" id="{{ column }}" multiple>
+                    {% for option in options|get_item:column %}
+                    <option value="{{ option }}">{{ option }}</option>
                     {% endfor %}
                 </select>
             </div>
@@ -101,36 +39,41 @@ def chart_view(request):
         </div>
         <button type="submit">Apply Filters</button>
     </form>
+    <div id="table-container"></div>
 
-    <h2>Filtered Data:</h2>
-    <table border="1">
-        <thead>
-            <tr>
-                {% for key in dropdowns.keys %}
-                <th>{{ key }}</th>
-                {% endfor %}
-                <th>Value</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for row in filtered_data %}
-            <tr>
-                {% for key in dropdowns.keys %}
-                <td>{{ row|get_item:key }}</td>
-                {% endfor %}
-                <td>{{ row.Value|floatformat:2 }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script>
         $(document).ready(function() {
-            $('select').select2({
-                width: '100%',
-                closeOnSelect: false,
+            $('select').select2();
+
+            function updateTable(data) {
+                let tableHtml = '<table border="1"><thead><tr>';
+                for (let col of data.columns) {
+                    tableHtml += `<th>${col}</th>`;
+                }
+                tableHtml += '</tr></thead><tbody>';
+                for (let row of data.data) {
+                    tableHtml += '<tr>';
+                    for (let col of data.columns) {
+                        tableHtml += `<td>${row[col]}</td>`;
+                    }
+                    tableHtml += '</tr>';
+                }
+                tableHtml += '</tbody></table>';
+                $('#table-container').html(tableHtml);
+            }
+
+            updateTable({{ data|safe }});
+
+            $('#filter-form').on('submit', function(e) {
+                e.preventDefault();
+                $.ajax({
+                    url: '',
+                    type: 'POST',
+                    data: $(this).serialize(),
+                    success: function(response) {
+                        updateTable(response);
+                    }
+                });
             });
         });
     </script>
@@ -143,10 +86,79 @@ def chart_view(request):
 
 
 
+
+
+
+
+import pandas as pd
+import numpy as np
+from django.shortcuts import render
+from django.http import JsonResponse
+
+def generate_dataframe():
+    np.random.seed(42)
+    columns = [f'Col{i}' for i in range(1, 11)]
+    data = np.random.randint(1, 100, size=(20, 10))
+    return pd.DataFrame(data, columns=columns)
+
+df = generate_dataframe()
+
+def filter_data(request):
+    if request.method == 'POST':
+        filters = {}
+        for col in df.columns:
+            selected_values = request.POST.getlist(col)
+            if selected_values:
+                filters[col] = selected_values
+
+        filtered_df = df
+        for col, values in filters.items():
+            filtered_df = filtered_df[filtered_df[col].astype(str).isin(values)]
+
+        return JsonResponse({
+            'data': filtered_df.to_dict('records'),
+            'columns': list(filtered_df.columns)
+        })
+
+    context = {
+        'columns': list(df.columns),
+        'options': {col: sorted(df[col].astype(str).unique().tolist()) for col in df.columns},
+        'data': df.to_dict('records'),
+    }
+    return render(request, 'filter_app/filter.html', context)
+
+
+
+
+
+
+
+
+
+
+Create filter_app/templatetags/custom_filters.py:
 from django import template
+from django.template.defaultfilters import stringfilter
 
 register = template.Library()
 
-@register.filter
+@register.filter(name='get_item')
 def get_item(dictionary, key):
     return dictionary.get(key)
+
+
+
+from django.urls import path
+from . import views
+
+urlpatterns = [
+    path('', views.filter_data, name='filter_data'),
+]
+
+
+from django.urls import path
+from . import views
+
+urlpatterns = [
+    path('', views.filter_data, name='filter_data'),
+]
