@@ -162,3 +162,160 @@ from . import views
 urlpatterns = [
     path('', views.filter_data, name='filter_data'),
 ]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import pandas as pd
+import numpy as np
+from django.shortcuts import render
+
+def generate_dataframe():
+    np.random.seed(42)
+    columns = [f'Col{i}' for i in range(1, 11)]
+    data = np.random.randint(1, 100, size=(20, 10))
+    return pd.DataFrame(data, columns=columns)
+
+df = generate_dataframe()
+
+def filter_data(request):
+    filtered_df = df.copy()
+
+    if request.method == 'POST':
+        filters = {}
+        for col in df.columns:
+            selected_values = request.POST.getlist(col)
+            if selected_values:
+                filters[col] = selected_values
+
+        for col, values in filters.items():
+            filtered_df = filtered_df[filtered_df[col].astype(str).isin(values)]
+
+    context = {
+        'columns': list(df.columns),
+        'options': {col: sorted(df[col].astype(str).unique().tolist()) for col in df.columns},
+        'data': filtered_df.to_dict('records'),
+        'selected': {col: request.POST.getlist(col) for col in df.columns} if request.method == 'POST' else {}
+    }
+    return render(request, 'filter_app/filter.html', context)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Filter</title>
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <style>
+        .dropdown-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+        }
+        .dropdown-wrapper {
+            width: calc(20% - 10px);
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+        th, td {
+            border: 1px solid black;
+            padding: 8px;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+    <h1>Data Filter</h1>
+    <form method="post">
+        {% csrf_token %}
+        <div class="dropdown-container">
+            {% for column in columns %}
+            <div class="dropdown-wrapper">
+                <label for="{{ column }}">{{ column }}:</label>
+                <select name="{{ column }}" id="{{ column }}" multiple>
+                    {% for option in options|get_item:column %}
+                    <option value="{{ option }}" {% if option|stringformat:"s" in selected|get_item:column %}selected{% endif %}>{{ option }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endfor %}
+        </div>
+        <button type="submit">Apply Filters</button>
+    </form>
+
+    <h2>Filtered Data</h2>
+    <table>
+        <thead>
+            <tr>
+                {% for column in columns %}
+                <th>{{ column }}</th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in data %}
+            <tr>
+                {% for column in columns %}
+                <td>{{ row|get_item:column }}</td>
+                {% endfor %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <script>
+        $(document).ready(function() {
+            $('select').select2();
+        });
+    </script>
+</body>
+</html>
