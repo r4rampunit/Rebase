@@ -418,3 +418,133 @@ def filter_data(request):
     </script>
 </body>
 </html>
+
+
+
+
+
+
+
+
+from django.shortcuts import render
+import pandas as pd
+import random
+
+def chart_view(request):
+    # Generate example data (15 columns with 15 values each)
+    data = {}
+    num_columns = 15
+    num_values = 15
+    columns = [f'Column{i}' for i in range(1, num_columns + 1)]
+    for col in columns:
+        data[col] = [random.randint(1, 100) for _ in range(num_values)]
+
+    df = pd.DataFrame(data)
+    # Pass column names and data to template
+    context = {
+        'columns': columns,
+        'data': df.to_dict(orient='list'),
+    }
+    return render(request, 'chart.html', context)
+
+
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dataframe Dropdowns</title>
+    <!-- Include necessary CSS and JavaScript libraries -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css">
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.min.js"></script>
+    <style>
+        .dropdown-menu {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Select Columns:</h2>
+        <div class="dropdown-scrollable">
+            {% for column in columns %}
+            <div class="dropdown" style="display: inline-block; margin-right: 10px;">
+                <button class="btn btn-secondary dropdown-toggle" type="button" data-toggle="dropdown">
+                    {{ column }}
+                </button>
+                <div class="dropdown-menu" aria-labelledby="dropdownMenuButton" style="min-width: 100px;">
+                    {% for value in data|dictsort:column %}
+                    <label class="dropdown-item">
+                        <input type="checkbox" value="{{ value }}"> {{ value }}
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        <hr>
+        <h2>Filtered Data:</h2>
+        <div id="filtered-table">
+            <table class="table table-bordered">
+                <thead>
+                    <tr>
+                        {% for column in columns %}
+                        <th>{{ column }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for i in data|dictsort:"Column1"|length|times %}
+                        <tr>
+                            {% for column in columns %}
+                            <td>{{ data|dictsort:column|slice:i:1 }}</td>
+                            {% endfor %}
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <script>
+        $(document).ready(function() {
+            // Handle dropdown item selection
+            $('.dropdown-item input[type="checkbox"]').change(function() {
+                updateFilteredData();
+            });
+            // Function to update filtered data
+            function updateFilteredData() {
+                // Get selected values
+                var selectedValues = {};
+                $('.dropdown-menu').each(function() {
+                    var column = $(this).prev('.dropdown-toggle').text().trim();
+                    selectedValues[column] = [];
+                    $(this).find('input:checked').each(function() {
+                        selectedValues[column].push($(this).val());
+                    });
+                });
+                // AJAX call to update filtered data
+                $.ajax({
+                    type: 'POST',
+                    url: '{% url "filter_data" %}',
+                    data: {
+                        selected_values: JSON.stringify(selectedValues),
+                        csrfmiddlewaretoken: '{{ csrf_token }}'
+                    },
+                    success: function(response) {
+                        $('#filtered-table').html(response);
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('Error:', error);
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+</html>
