@@ -548,3 +548,84 @@ def chart_view(request):
     </script>
 </body>
 </html>
+
+
+
+
+
+
+from django.shortcuts import render
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+import pandas as pd
+import random
+import json
+
+def chart_view(request):
+    # Your existing chart_view code here
+    ...
+
+@csrf_exempt
+def filter_data(request):
+    if request.method == 'POST':
+        selected_values = json.loads(request.POST.get('selected_values', '{}'))
+
+        # Recreate your dataframe here (or load it from a database)
+        data = {}
+        num_columns = 15
+        num_values = 15
+        columns = [f'Column{i}' for i in range(1, num_columns + 1)]
+        for col in columns:
+            data[col] = [random.randint(1, 100) for _ in range(num_values)]
+
+        df = pd.DataFrame(data)
+
+        # Apply filters
+        for column, values in selected_values.items():
+            if values:
+                df = df[df[column].isin(values)]
+
+        # Convert filtered dataframe to HTML
+        filtered_html = df.to_html(classes='table table-bordered', index=False, header=True)
+
+        return JsonResponse({'filtered_data': filtered_html})
+
+    return JsonResponse({'error': 'Invalid request method'})
+
+
+
+
+from django.urls import path
+from . import views
+
+urlpatterns = [
+    path('chart/', views.chart_view, name='chart'),
+    path('filter_data/', views.filter_data, name='filter_data'),
+]
+
+
+function updateFilteredData() {
+    // Get selected values
+    var selectedValues = {};
+    $('.dropdown-menu').each(function() {
+        var column = $(this).prev('.dropdown-toggle').text().trim();
+        selectedValues[column] = [];
+        $(this).find('input:checked').each(function() {
+            selectedValues[column].push($(this).val());
+        });
+    });
+    // AJAX call to update filtered data
+    $.ajax({
+        type: 'POST',
+        url: '{% url "filter_data" %}',
+        data: {
+            selected_values: JSON.stringify(selectedValues)
+        },
+        success: function(response) {
+            $('#filtered-table').html(response.filtered_data);
+        },
+        error: function(xhr, status, error) {
+            console.error('Error:', error);
+        }
+    });
+}
