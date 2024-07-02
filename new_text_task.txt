@@ -24,10 +24,14 @@ def chart_view(request):
     context = {
         'columns': df.columns.tolist(),
         'options': [{'column': col, 'values': df[col].unique().tolist()} for col in df.columns],
-        'filtered_data': filtered_df.to_dict('records'),
+        'filtered_data': filtered_df.values.tolist(),  # Convert to list of lists
     }
-    
+
     return render(request, 'chart.html', context)
+
+
+
+
 
 
 
@@ -68,8 +72,8 @@ def chart_view(request):
         <tbody>
             {% for row in filtered_data %}
             <tr>
-                {% for column in columns %}
-                <td>{{ row|get_item:column }}</td>
+                {% for value in row %}
+                <td>{{ value }}</td>
                 {% endfor %}
             </tr>
             {% endfor %}
