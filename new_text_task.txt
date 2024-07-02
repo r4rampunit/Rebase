@@ -1,34 +1,140 @@
-import pandas as pd
-import string
 from django.shortcuts import render
 
-# Create the DataFrame
-def create_dataframe():
-    columns = list(string.ascii_lowercase[:15])
-    data = {col: [f"{col}{i}" for i in range(1, 11)] for col in columns}
-    return pd.DataFrame(data)
+def dropdown_view(request):
 
-df = create_dataframe()
+    colors = [
 
-def chart_view(request):
-    global df
-    selected_options = request.GET.getlist('options')
-    
-    if selected_options:
-        filtered_df = df[df[selected_options[0]].isin(selected_options)]
-        for column in selected_options[1:]:
-            filtered_df = filtered_df[filtered_df[column].isin(selected_options)]
-    else:
-        filtered_df = df
-    
+        "Red", "Blue", "Green", "Yellow", "Purple", "Orange", "Pink", "Brown", "Black", "White",
+
+        "Gray", "Cyan", "Magenta", "Lime", "Teal", "Indigo", "Violet", "Maroon", "Navy", "Olive"
+
+    ]
+
+
+
+    fruits = [
+
+        "Apple", "Banana", "Orange", "Grape", "Mango", "Pineapple", "Strawberry", "Watermelon",
+
+        "Kiwi", "Peach", "Pear", "Plum", "Cherry", "Blueberry", "Raspberry", "Blackberry",
+
+        "Lemon", "Lime", "Coconut", "Papaya"
+
+    ]
+
+
+
     context = {
-        'columns': df.columns.tolist(),
-        'options': [{'column': col, 'values': df[col].unique().tolist()} for col in df.columns],
-        'filtered_data': filtered_df.values.tolist(),  # Convert to list of lists
+
+        'colors': colors,
+
+        'fruits': fruits,
+
     }
 
-    return render(request, 'chart.html', context)
 
+
+    return render(request, 'dropdown_template.html', context)
+
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+    <title>Multiple Multiselect Dropdowns</title>
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/js/select2.min.js"></script>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css" />
+
+    <style>
+
+        .select2-container--default .select2-selection--multiple .select2-selection__choice {
+
+            background-color: #e4e4e4;
+
+            border: 1px solid #aaa;
+
+            border-radius: 4px;
+
+            cursor: default;
+
+            float: left;
+
+            margin-right: 5px;
+
+            margin-top: 5px;
+
+            padding: 0 5px;
+
+        }
+
+    </style>
+
+    <script>
+
+        $(document).ready(function() {
+
+            $(".multiselect").select2({
+
+                placeholder: 'Select options...',
+
+                closeOnSelect: false,
+
+                allowClear: true,
+
+                tags: true
+
+            });
+
+        });
+
+    </script>
+
+</head>
+
+<body>
+
+    <center>
+
+        <h1>Multiple Multiselect Dropdowns</h1>
+
+        <hr/>
+
+
+
+        <h3>Colors</h3>
+
+        <select class="multiselect" multiple style="width: 300px;">
+
+            {% for color in colors %}
+
+                <option>{{ color }}</option>
+
+            {% endfor %}
+
+        </select>
+
+        <h3>Fruits</h3>
+
+        <select class="multiselect" multiple style="width: 300px;">
+
+            {% for fruit in fruits %}
+
+                <option>{{ fruit }}</option>
+
+            {% endfor %}
+
+        </select>
+
+    </center>
+
+</body>
+
+</html>
 
 
 
