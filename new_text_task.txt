@@ -629,3 +629,101 @@ function updateFilteredData() {
         }
     });
 }
+
+
+
+
+
+
+
+
+
+
+
+
+import pandas as pd
+import string
+from django.shortcuts import render
+
+# Create the DataFrame
+def create_dataframe():
+    columns = list(string.ascii_lowercase[:15])
+    data = {col: [f"{col}{i}" for i in range(1, 11)] for col in columns}
+    return pd.DataFrame(data)
+
+df = create_dataframe()
+
+def index(request):
+    global df
+
+    selected_options = request.GET.getlist('options')
+
+    if selected_options:
+        filtered_df = df[df[selected_options[0]].isin(selected_options)]
+        for column in selected_options[1:]:
+            filtered_df = filtered_df[filtered_df[column].isin(selected_options)]
+    else:
+        filtered_df = df
+
+    context = {
+        'columns': df.columns.tolist(),
+        'options': [{'column': col, 'values': df[col].unique().tolist()} for col in df.columns],
+        'filtered_data': filtered_df.to_dict('records'),
+    }
+
+    return render(request, 'dataframe_app/index.html', context)
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DataFrame Filter</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+</head>
+<body>
+    <h1>DataFrame Filter</h1>
+    <form id="filter-form" method="get">
+        {% for option in options %}
+        <label for="{{ option.column }}">{{ option.column }}:</label>
+        <select name="options" id="{{ option.column }}" multiple>
+            {% for value in option.values %}
+            <option value="{{ value }}">{{ value }}</option>
+            {% endfor %}
+        </select>
+        <br>
+        {% endfor %}
+        <input type="submit" value="Filter">
+    </form>
+
+    <h2>Filtered Data</h2>
+    <table border="1">
+        <thead>
+            <tr>
+                {% for column in columns %}
+                <th>{{ column }}</th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in filtered_data %}
+            <tr>
+                {% for column in columns %}
+                <td>{{ row|dict_item:column }}</td>
+                {% endfor %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <script>
+        $(document).ready(function() {
+            $('select').select2();
+        });
+    </script>
+</body>
+</html>
