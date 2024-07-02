@@ -1,27 +1,18 @@
-from datetime import datetime
+from datetime import datetime, timedelta, date
 
-def calculate_5year_avg(frame, Isocode, tzero_date, col):
-    try:
-        # Convert tzero_date to datetime
-        tzero_datetime = datetime.strptime(tzero_date + " 00:00:00", "%Y-%m-%d %H:%M:%S")
+def convert_date(date_val):
+    if isinstance(date_val, datetime):
+        return date_val.date()
+    elif isinstance(date_val, date):
+        return date_val
+    elif isinstance(date_val, (int, float)):
+        # Handle Excel date serial number
+        return (datetime(1899, 12, 30) + timedelta(days=int(date_val))).date()
+    elif isinstance(date_val, str):
+        for fmt in ('%d-%m-%Y', '%Y-%m-%d', '%m/%d/%Y'):
+            try:
+                return datetime.strptime(date_val, fmt).date()
+            except ValueError:
+                pass
 
-        # Find the matching row
-        matching_row = frame[(frame['ISOCODES'] == Isocode) & (frame['date'] == tzero_datetime)]
-
-        if matching_row.empty:
-            print(f"No matching row found for ISOCODE: {Isocode} and date: {tzero_date}")
-            return None
-
-        index = matching_row.index[0]
-
-        # Check if there are enough rows after the matching row
-        if index + 21 > len(frame):
-            print(f"Not enough data after the matching row for ISOCODE: {Isocode} and date: {tzero_date}")
-            return None
-
-        avg = frame[col].iloc[(index + 1):(index + 21)].mean()
-        return avg
-    except Exception as e:
-        print(f"Error in calculate_5year_avg for ISOCODE: {Isocode}, date: {tzero_date}, column: {col}")
-        print(f"Error message: {str(e)}")
-        return None
+    raise ValueError(f"Date format for {date_val} is not recognized")
