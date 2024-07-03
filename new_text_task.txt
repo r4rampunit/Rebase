@@ -993,3 +993,23 @@ def convert_date(date_val):
     </center>
 </body>
 </html>
+
+
+
+
+
+
+
+$(document).ready(function() {
+    $(".multiselect").each(function(index) {
+        var placeholders = ['First dropdown', 'Second dropdown', 'Third dropdown', 'Fourth dropdown'];
+        var placeholder = placeholders[index] || 'Dropdown select ' + (index + 1);
+
+        $(this).select2({
+            placeholder: placeholder,
+            closeOnSelect: false,
+            allowClear: true,
+            tags: true
+        });
+    });
+});
