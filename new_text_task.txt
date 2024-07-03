@@ -709,3 +709,143 @@ def convert_date(date_val):
     </center>
 </body>
 </html>
+
+
+
+
+
+
+
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Multiple Multiselect Dropdowns</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/js/select2.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css" />
+    <style>
+        body {
+            background-color: #ffebee;
+            font-family: Arial, sans-serif;
+        }
+        .logo {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 100px;
+        }
+        .dropdowns-container {
+            overflow-x: auto;
+            white-space: nowrap;
+            padding: 10px 0;
+            margin: 20px 0;
+        }
+        .dropdown-wrapper {
+            display: inline-block;
+            vertical-align: top;
+            margin-right: 20px;
+            width: 200px;
+        }
+        .select2-container {
+            width: 100% !important;
+        }
+        .select2-container--default .select2-selection--multiple {
+            border-radius: 25px;
+        }
+        .select2-container--default .select2-selection--multiple .select2-selection__choice {
+            background-color: #ff0000;
+            color: white;
+            border: 1px solid #ff0000;
+            border-radius: 20px;
+            cursor: default;
+            float: left;
+            margin-right: 5px;
+            margin-top: 5px;
+            padding: 0 5px;
+        }
+        .select2-container--default .select2-selection--multiple .select2-selection__rendered {
+            background-color: #ffcccb;
+            border-radius: 25px;
+            padding: 5px;
+        }
+        .select2-container--default.select2-container--focus .select2-selection--multiple {
+            border-color: #ff0000;
+        }
+        #selectedItems {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ff0000;
+            border-radius: 5px;
+            background-color: #fff;
+        }
+    </style>
+    <script>
+        $(document).ready(function() {
+            $(".multiselect").select2({
+                placeholder: 'Select options...',
+                closeOnSelect: false,
+                allowClear: true,
+                tags: true
+            });
+
+            function updateSelectedItems() {
+                var allSelected = true;
+                var selectedItems = {};
+
+                $('.multiselect').each(function() {
+                    var dropdownName = $(this).attr('name');
+                    var selected = $(this).select2('data');
+                    if (selected.length === 0) {
+                        allSelected = false;
+                    }
+                    selectedItems[dropdownName] = selected.map(item => item.text);
+                });
+
+                if (allSelected) {
+                    var html = '<h3>Selected Items:</h3>';
+                    for (var dropdown in selectedItems) {
+                        html += '<p><strong>' + dropdown + ':</strong> ' + selectedItems[dropdown].join(', ') + '</p>';
+                    }
+                    $('#selectedItems').html(html).show();
+                } else {
+                    $('#selectedItems').hide();
+                }
+            }
+
+            $('.multiselect').on('change', updateSelectedItems);
+        });
+    </script>
+</head>
+<body>
+    <img src="path_to_your_logo.png" alt="Logo" class="logo">
+    <center>
+        <h1>Multiple Multiselect Dropdowns</h1>
+        <hr/>
+
+        <div class="dropdowns-container">
+            <div class="dropdown-wrapper">
+                <select class="multiselect" name="Dropdown1" multiple>
+                    <option>Option 1</option>
+                    <option>Option 2</option>
+                    <option>Option 3</option>
+                    <option>Option 4</option>
+                    <option>Option 5</option>
+                </select>
+            </div>
+            <div class="dropdown-wrapper">
+                <select class="multiselect" name="Dropdown2" multiple>
+                    <option>Option 1</option>
+                    <option>Option 2</option>
+                    <option>Option 3</option>
+                    <option>Option 4</option>
+                    <option>Option 5</option>
+                </select>
+            </div>
+            <!-- Add more dropdowns here, up to 15 -->
+        </div>
+
+        <div id="selectedItems" style="display: none;"></div>
+    </center>
+</body>
+</html>
