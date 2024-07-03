@@ -78,3 +78,84 @@ def convert_date(date_val):
     </center>
 </body>
 </html>
+
+
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Multiple Multiselect Dropdowns</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/js/select2.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css" />
+    <style>
+        body {
+            background-color: #ffebee; /* Light red background */
+            font-family: Arial, sans-serif;
+        }
+        .logo {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 100px; /* Adjust as needed */
+        }
+        .select2-container--default .select2-selection--multiple {
+            border-radius: 25px; /* Oval shape */
+        }
+        .select2-container--default .select2-selection--multiple .select2-selection__choice {
+            background-color: #ff0000; /* Red color for selected items */
+            color: white;
+            border: 1px solid #ff0000;
+            border-radius: 20px;
+            cursor: default;
+            float: left;
+            margin-right: 5px;
+            margin-top: 5px;
+            padding: 0 5px;
+        }
+        .select2-container--default .select2-selection--multiple .select2-selection__rendered {
+            background-color: #ffcccb; /* Whitish red for unselected */
+            border-radius: 25px;
+            padding: 5px;
+        }
+        .select2-container--default.select2-container--focus .select2-selection--multiple {
+            border-color: #ff0000;
+        }
+    </style>
+    <script>
+        $(document).ready(function() {
+            $(".multiselect").select2({
+                placeholder: 'Select options...',
+                closeOnSelect: false,
+                allowClear: true,
+                tags: true
+            });
+        });
+    </script>
+</head>
+<body>
+    <img src="path_to_your_logo.png" alt="Logo" class="logo">
+    <center>
+        <h1>Multiple Multiselect Dropdowns</h1>
+        <hr/>
+
+        <h3>Colors</h3>
+        <select class="multiselect" multiple style="width: 300px;">
+            <option>Red</option>
+            <option>Blue</option>
+            <option>Green</option>
+            <option>Yellow</option>
+            <option>Purple</option>
+        </select>
+
+        <h3>Fruits</h3>
+        <select class="multiselect" multiple style="width: 300px;">
+            <option>Apple</option>
+            <option>Banana</option>
+            <option>Orange</option>
+            <option>Grape</option>
+            <option>Mango</option>
+        </select>
+    </center>
+</body>
+</html>
