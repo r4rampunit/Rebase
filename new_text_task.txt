@@ -1,3 +1,59 @@
+import pandas as pd
+from openpyxl.styles import Font
+from datetime import datetime
+
+def formatting_red_IFRS4Q(sheet):
+    workbook_path = r".\Input\Mapping_File Copy.xlsx"
+    data_edge = pd.read_excel(workbook_path, sheet_name="Data_Edge")
+    red_font_color = 'FFFF0000'
+
+    # Pre-process data_edge
+    data_edge['ISOCODES'] = data_edge['ISOCODES'].astype(str)
+    data_edge['Description'] = data_edge['Description'].astype(str)
+    data_edge['Prev_Data_Edge'] = pd.to_datetime(data_edge['Prev_Data_Edge'])
+
+    # Create a dictionary for faster lookup
+    data_edge_dict = {(row['ISOCODES'], row['Description']): row['Prev_Data_Edge'] for _, row in data_edge.iterrows()}
+
+    # Get all cell values at once
+    all_cells = list(sheet.iter_rows(values_only=True))
+
+    # Find the user_inputs[1] cells
+    target_cells = [(row_idx, col_idx) for row_idx, row in enumerate(all_cells, 1) 
+                    for col_idx, cell_value in enumerate(row, 1) if cell_value == user_inputs[1]]
+
+    # Process date column once
+    date_column = [cell[0] for cell in all_cells[3:24]]
+    datetime_index = pd.to_datetime([date for date in date_column if date and date != ''], 
+                                    format="%m/%d/%Y", errors='coerce')
+    formatted_dates = [date.strftime('%Y-%m-%d') if pd.notnull(date) else None for date in datetime_index]
+
+    for row, col in target_cells:
+        isocodes = sheet.cell(row=row, column=col+8).value
+        checks = sheet.cell(row=row-1, column=col+7).value
+
+        prev_data_edge = data_edge_dict.get((str(isocodes), str(checks)))
+        if prev_data_edge is None:
+            continue
+
+        prev_data_edge_str = prev_data_edge.strftime('%Y-%m-%d')
+        if prev_data_edge_str not in formatted_dates:
+            continue
+
+        row_matched_with_date = formatted_dates.index(prev_data_edge_str) + 4
+
+        range_to_change_font_color = sheet[
+            sheet.cell(row=row+3, column=col).coordinate:
+            sheet.cell(row=row_matched_with_date, column=col+5).coordinate
+        ]
+
+        new_font = Font(color=red_font_color, italic=True, name='Univers Next for HSBC Light')
+        for row in range_to_change_font_color:
+            for cell in row:
+                cell.font = new_font
+
+
+
 from datetime import datetime, timedelta, date
 
 def convert_date(date_val):
