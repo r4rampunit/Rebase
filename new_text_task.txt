@@ -1,3 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MI Tool Visualization</title>
+</head>
+<body>
+    <div class="logo-container"></div>
+    <h1>MI Tool Visualization</h1>
+    <div class="dashboard-container">
+        <div class="dropdown-container left">
+            <select name="folder" id="folder">
+                <option value="">Select Folder</option>
+                {% for folder in folders %}
+                    <option value="{{ folder }}" {% if folder == selected_folder %} selected{% endif %}>{{ folder }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="dropdown-container right">
+            <select name="subfolder" id="subfolder">
+                <option value="">Select Subfolder</option>
+                {% for subfolder in subfolders %}
+                    <option value="{{ subfolder }}" {% if subfolder == selected_subfolder %}selected{% endif %}>{{ subfolder }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+    {% if selected_folder and selected_subfolder %}
+        <h2>Selected Folder: {{ selected_folder }} / {{ selected_subfolder }}</h2>
+    {% endif %}
+    <script>
+        document.getElementById('folder').addEventListener('change', function() {
+            window.location.href = '?folder=' + this.value;
+        });
+        document.getElementById('subfolder').addEventListener('change', function() {
+            const folder = document.getElementById('folder').value;
+            const subfolder = this.value;
+            if (folder && subfolder) {
+                window.location.href = "{% url 'mi_chart' %}?folder=" + encodeURIComponent(folder) + "&subfolder=" + encodeURIComponent(subfolder);
+            }
+        });
+    </script>
+</body>
+</html>
+
+
+
 import pandas as pd
 from openpyxl.styles import Font
 from datetime import datetime
