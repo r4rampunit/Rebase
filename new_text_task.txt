@@ -343,3 +343,138 @@ document.getElementById('subfolder').addEventListener('change', function() {
 
 
 
+from django.shortcuts import render
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+import json
+
+@csrf_exempt
+def dashboard(request):
+    # Your existing code to prepare the lists and dataframe
+    Organisational_unit_level_1_list = [...]
+    Organisational_unit_level_2_list = [...]
+    Organisational_unit_level_3_list = [...]
+    Country_of_Exposure_list = [...]
+    Asset_class_list = [...]
+    Product_Type_list = [...]
+    Basel_Approach_list = [...]
+    ST_scenario_combo = [...]
+
+    # Get the dataframe (assuming you have a function or method to do this)
+    df = get_your_dataframe()
+
+    if request.method == 'POST':
+        # Handle the AJAX request
+        selections = json.loads(request.body)
+
+        # Print selections for the first three dropdowns
+        print("Dropdown1 selection:", selections.get('Dropdown1', []))
+        print("Dropdown2 selection:", selections.get('Dropdown2', []))
+        print("Dropdown3 selection:", selections.get('Dropdown3', []))
+
+        # Store the selections in the session
+        request.session['dropdown_selections'] = selections
+
+        # Filter the dataframe based on selections
+        for dropdown, values in selections.items():
+            if values:
+                df = df[df[dropdown].isin(values)]
+
+        # Return a success response
+        return JsonResponse({'status': 'success'})
+
+    # For GET requests, retrieve selections from session
+    selections = request.session.get('dropdown_selections', {})
+
+    # If there are selections, filter the dataframe
+    if selections:
+        for dropdown, values in selections.items():
+            if values:
+                df = df[df[dropdown].isin(values)]
+
+    # Prepare your context
+    context = {
+        'Organisational_unit_level_1_list': Organisational_unit_level_1_list,
+        'Organisational_unit_level_2_list': Organisational_unit_level_2_list,
+        'Organisational_unit_level_3_list': Organisational_unit_level_3_list,
+        'Country_of_Exposure_list': Country_of_Exposure_list,
+        'Asset_class_list': Asset_class_list,
+        'Product_Type_list': Product_Type_list,
+        'Basel_Approach_list': Basel_Approach_list,
+        'ST_scenario_combo': ST_scenario_combo,
+        'filtered_data': df.to_dict('records'),  # or however you pass your dataframe to the template
+        'current_selections': selections  # Pass the current selections to the template
+    }
+
+    return render(request, 'your_template.html', context)
+
+
+
+
+
+
+
+<script>
+$(document).ready(function() {
+    $(".multiselect").select2({
+        placeholder: "Select one or more options",
+        closeOnSelect: false,
+        allowClear: true,
+        tags: true
+    });
+
+    // Set initial selections
+    var currentSelections = {{ current_selections|safe }};
+    for (var dropdown in currentSelections) {
+        $(".multiselect[name='" + dropdown + "']").val(currentSelections[dropdown]).trigger('change');
+    }
+
+    function updateSelectedItems() {
+        var allSelected = true;
+        var selectedItems = {};
+        $('.multiselect').each(function() {
+            var dropdownName = $(this).attr('name');
+            var selected = $(this).select2('data');
+            if (selected.length === 0) {
+                allSelected = false;
+            }
+            selectedItems[dropdownName] = selected.map(item => item.text);
+        });
+
+        if (allSelected) {
+            var html = '<h3>Selected Items:</h3>';
+            for (var dropdown in selectedItems) {
+                html += '<p><strong>' + dropdown + ':</strong> ' + selectedItems[dropdown].join(', ') + '</p>';
+            }
+            $('#selectedItems').html(html).show();
+
+            // Send selected items to the server
+            $.ajax({
+                url: '{% url "dashboard" %}',  // Assuming 'dashboard' is the name of your URL pattern
+                type: 'POST',
+                data: JSON.stringify(selectedItems),
+                contentType: 'application/json',
+                success: function(response) {
+                    console.log('Selections updated successfully');
+                    location.reload();  // Reload the page to apply the filter
+                },
+                error: function(error) {
+                    console.error('Error updating selections:', error);
+                }
+            });
+        } else {
+            $('#selectedItems').hide();
+        }
+    }
+
+    $('.multiselect').on('change', updateSelectedItems);
+});
+</script>
+
+
+
+
+
+
+
+
