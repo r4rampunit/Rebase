@@ -564,3 +564,46 @@ urlpatterns = [
 
 
 
+
+from django.http import JsonResponse, HttpResponseBadRequest
+from django.views.decorators.csrf import csrf_exempt
+from django.shortcuts import render
+import json
+
+@csrf_exempt
+def mi_chart(request):
+    if request.method == 'POST':
+        try:
+            # Handle AJAX request
+            data = json.loads(request.body)
+            print("Received data:", data)  # This will print the data for testing
+            # You can process the data here as needed
+            return JsonResponse({'status': 'success'})
+        except json.JSONDecodeError:
+            return HttpResponseBadRequest('Invalid JSON data')
+
+    elif request.method == 'GET':
+        # Handle GET request (initial page load)
+        folders = get_folders()
+        selected_folder = request.GET.get("folder", None)
+        selected_subfolder = request.GET.get("subfolder", None)
+        subfolders = get_subfolders(selected_folder) if selected_folder else []
+
+        dataframes = []
+        if selected_folder and selected_subfolder:
+            dataframes = read_excel_files(selected_folder, selected_subfolder)
+
+        context = {
+            'folders': folders,
+            'subfolders': subfolders,
+            'dataframes': dataframes,
+        }
+        return render(request, 'mi_templates/mi_chart.html', context)
+
+    else:
+        # Handle other HTTP methods
+        return HttpResponseBadRequest('Invalid request method')
+
+
+
+
