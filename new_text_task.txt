@@ -607,3 +607,98 @@ def mi_chart(request):
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<script>
+$(document).ready(function() {
+    // ... (previous code remains the same)
+
+    function updateSelectedItems() {
+        var allSelected = true;
+        var selectedItems = {};
+        $('.multiselect').each(function() {
+            var dropdownName = $(this).attr('name');
+            var selected = $(this).select2('data');
+            if (selected.length == 0) {
+                allSelected = false;
+            }
+            selectedItems[dropdownName] = selected.map(item => item.text);
+        });
+
+        if (allSelected) {
+            var html = '<h3>Selected Items:</h3>';
+            for (var dropdown in selectedItems) {
+                html += '<p><strong>' + dropdown + ':</strong> ' + selectedItems[dropdown].join(', ') + '</p>';
+            }
+            $('#selectedItems').html(html).show();
+
+            // Send data to server
+            $.ajax({
+                url: '/mi_chart/',  // Use the same URL as the page
+                type: 'POST',
+                data: JSON.stringify(selectedItems),
+                contentType: 'application/json',
+                success: function(response) {
+                    console.log('Server response:', response);
+                },
+                error: function(xhr, status, error) {
+                    console.error("Error:", error);
+                }
+            });
+        } else {
+            $('#selectedItems').hide();
+        }
+    }
+
+    $('.multiselect').on('change', updateSelectedItems);
+});
+</script>
+
+
+
+
+from django.http import JsonResponse, HttpResponseBadRequest
+from django.views.decorators.csrf import csrf_exempt
+from django.shortcuts import render
+import json
+
+@csrf_exempt
+def mi_chart(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            print("Received data:", data)  # This will print the data for testing
+            # You can process the data here as needed
+            return JsonResponse({'status': 'success'})
+        except json.JSONDecodeError:
+            return HttpResponseBadRequest('Invalid JSON data')
+
+    elif request.method == 'GET':
+        # ... (GET request handling remains the same)
+
+    else:
+        return HttpResponseBadRequest('Invalid request method')
+
+
+
+
+
+
+
