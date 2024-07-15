@@ -112,3 +112,149 @@ def mi_chart(request):
     else:
         # Your existing code for GET requests
         ...
+
+
+
+
+
+
+<body>
+  <img src="/static/img/HSBC_hex.png" alt="Logo" class="logo">
+  <center>
+    <h1>Multiple Multiselect Dropdowns</h1>
+    <hr/>
+    <div class="dropdowns-container">
+      <div class="dropdowns-wrapper">
+        <div class="dropdown-wrapper">
+          <select class="multiselect" name="trees" multiple>
+            <option value="Oak">Oak</option>
+            <option value="Pine">Pine</option>
+            <option value="Maple">Maple</option>
+            <option value="Birch">Birch</option>
+            <option value="Elm">Elm</option>
+          </select>
+        </div>
+        <div class="dropdown-wrapper">
+          <select class="multiselect" name="animals" multiple>
+            <option value="Lion">Lion</option>
+            <option value="Elephant">Elephant</option>
+            <option value="Giraffe">Giraffe</option>
+            <option value="Tiger">Tiger</option>
+            <option value="Bear">Bear</option>
+          </select>
+        </div>
+        <div class="dropdown-wrapper">
+          <select class="multiselect" name="flowers" multiple>
+            <option value="Rose">Rose</option>
+            <option value="Tulip">Tulip</option>
+            <option value="Daisy">Daisy</option>
+            <option value="Sunflower">Sunflower</option>
+            <option value="Lily">Lily</option>
+          </select>
+        </div>
+        <div class="dropdown-wrapper">
+          <select class="multiselect" name="rivers" multiple>
+            <option value="Amazon">Amazon</option>
+            <option value="Nile">Nile</option>
+            <option value="Yangtze">Yangtze</option>
+            <option value="Mississippi">Mississippi</option>
+            <option value="Danube">Danube</option>
+          </select>
+        </div>
+        <div class="dropdown-wrapper">
+          <select class="multiselect" name="countries" multiple>
+            <option value="USA">USA</option>
+            <option value="China">China</option>
+            <option value="India">India</option>
+            <option value="Brazil">Brazil</option>
+            <option value="Russia">Russia</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div id="tableContainer"></div>
+    {% csrf_token %}
+  </center>
+</body>
+
+
+
+
+$(document).ready(function() {
+  $(".multiselect").select2({
+    placeholder: 'Select one or more options',
+    closeOnSelect: false,
+    allowClear: true,
+    tags: true
+  });
+
+  function updateSelectedItems() {
+    var selectedItems = {};
+    $('.multiselect').each(function() {
+      var dropdownName = $(this).attr('name');
+      var selected = $(this).select2('data');
+      selectedItems[dropdownName] = selected.map(item => item.text);
+    });
+
+    // Send selected items to the server via AJAX
+    $.ajax({
+      url: '/mi_chart/',  // Update this URL to match your Django URL configuration
+      method: 'POST',
+      data: {
+        selectedItems: JSON.stringify(selectedItems),
+        csrfmiddlewaretoken: getCookie('csrftoken')
+      },
+      success: function(response) {
+        $('#tableContainer').html(response);
+      },
+      error: function(xhr, status, error) {
+        console.error('Error sending selected items to server:', error);
+      }
+    });
+  }
+
+  $('.multiselect').on('change', updateSelectedItems);
+
+  // Initial call to populate the table
+  updateSelectedItems();
+});
+
+function getCookie(name) {
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== '') {
+    const cookies = document.cookie.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      if (cookie.substring(0, name.length + 1) === (name + '=')) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
+}
+
+
+
+
+from django.http import HttpResponse
+from django.views.decorators.csrf import csrf_exempt
+import json
+
+@csrf_exempt
+def mi_chart(request):
+    if request.method == 'POST':
+        selected_items = json.loads(request.POST.get('selectedItems', '{}'))
+
+        # Generate the table HTML
+        html = "<table border='1'>"
+        html += "<tr><th>Category</th><th>Selected Items</th></tr>"
+
+        for category, items in selected_items.items():
+            html += f"<tr><td>{category.capitalize()}</td><td>{', '.join(items)}</td></tr>"
+
+        html += "</table>"
+
+        return HttpResponse(html)
+    else:
+        return HttpResponse("This view only accepts POST requests.")
