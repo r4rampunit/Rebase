@@ -403,3 +403,184 @@ def generate_table_html(selected_items):
     <!-- Include your JavaScript code here -->
 </body>
 </html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import pandas as pd
+import matplotlib.pyplot as plt
+import io
+import base64
+from django.http import HttpResponse
+from django.shortcuts import render
+from django.views.decorators.csrf import csrf_exempt
+import json
+
+# Create the DataFrame
+data = {
+    'trees': ['Oak', 'Pine', 'Maple', 'Birch', 'Elm', 'Redwood', 'Cedar', 'Spruce', 'Fir', 'Willow'],
+    'animals': ['Lion', 'Elephant', 'Giraffe', 'Tiger', 'Bear', 'Wolf', 'Deer', 'Fox', 'Leopard', 'Rhino'],
+    'flowers': ['Rose', 'Tulip', 'Daisy', 'Sunflower', 'Lily', 'Orchid', 'Carnation', 'Daffodil', 'Iris', 'Peony'],
+    'rivers': ['Amazon', 'Nile', 'Yangtze', 'Mississippi', 'Danube', 'Congo', 'Mekong', 'Rhine', 'Volga', 'Thames'],
+    'countries': ['USA', 'China', 'India', 'Brazil', 'Russia', 'Japan', 'Germany', 'UK', 'France', 'Canada']
+}
+
+df = pd.DataFrame(data)
+
+@csrf_exempt
+def mi_chart(request):
+    if request.method == 'POST':
+        selected_items = json.loads(request.POST.get('selectedItems', '{}'))
+
+        # Filter the DataFrame
+        filtered_df = df.copy()
+        for category, items in selected_items.items():
+            if items:
+                filtered_df = filtered_df[filtered_df[category].isin(items)]
+
+        # Generate the table HTML
+        table_html = filtered_df.to_html(classes='table table-striped')
+
+        # Generate plots
+        plots_html = generate_plots(filtered_df)
+
+        response_html = f"{table_html}<br>{plots_html}"
+        return HttpResponse(response_html)
+    else:
+        # For GET requests, render the initial page with the full DataFrame
+        initial_table = df.to_html(classes='table table-striped')
+        initial_plots = generate_plots(df)
+        context = {
+            'initial_table': initial_table,
+            'initial_plots': initial_plots,
+            'categories': list(df.columns)
+        }
+        return render(request, 'your_template_name.html', context)
+
+def generate_plots(df):
+    plots_html = ""
+
+    # Plot 1: Bar chart of counts for each category
+    plt.figure(figsize=(10, 6))
+    df.count().plot(kind='bar')
+    plt.title('Count of Items in Each Category')
+    plt.ylabel('Count')
+    plots_html += get_plot_html()
+
+    # Plot 2: Pie chart of the first category
+    plt.figure(figsize=(8, 8))
+    df[df.columns[0]].value_counts().plot(kind='pie', autopct='%1.1f%%')
+    plt.title(f'Distribution of {df.columns[0]}')
+    plots_html += get_plot_html()
+
+    return plots_html
+
+def get_plot_html():
+    buffer = io.BytesIO()
+    plt.savefig(buffer, format='png')
+    buffer.seek(0)
+    image_png = buffer.getvalue()
+    buffer.close()
+    graphic = base64.b64encode(image_png)
+    graphic = graphic.decode('utf-8')
+    return f'<img src="data:image/png;base64,{graphic}"/>'
+
+
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multiple Multiselect Dropdowns</title>
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <style>
+        .dropdown-wrapper { margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+    <img src="/static/img/HSBC_hex.png" alt="Logo" class="logo">
+    <center>
+        <h1>Multiple Multiselect Dropdowns</h1>
+        <hr/>
+        <div class="dropdowns-container">
+            <div class="dropdowns-wrapper">
+                {% for category in categories %}
+                <div class="dropdown-wrapper">
+                    <select class="multiselect" name="{{ category }}" multiple>
+                        {% for option in df[category] %}
+                        <option value="{{ option }}">{{ option }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        <div id="tableContainer">
+            {{ initial_table|safe }}
+        </div>
+        <div id="plotsContainer">
+            {{ initial_plots|safe }}
+        </div>
+        {% csrf_token %}
+    </center>
+    <script>
+        $(document).ready(function() {
+            $(".multiselect").select2({
+                placeholder: 'Select one or more options',
+                closeOnSelect: false,
+                allowClear: true,
+                tags: true
+            });
+
+            function updateSelectedItems() {
+                var selectedItems = {};
+                $('.multiselect').each(function() {
+                    var dropdownName = $(this).attr('name');
+                    var selected = $(this).select2('data');
+                    selectedItems[dropdownName] = selected.map(item => item.text);
+                });
+
+                $.ajax({
+                    url: '/mi_chart/',  // Update this URL to match your Django URL configuration
+                    method: 'POST',
+                    data: {
+                        selectedItems: JSON.stringify(selectedItems),
+                        csrfmiddlewaretoken: $('input[name=csrfmiddlewaretoken]').val()
+                    },
+                    success: function(response) {
+                        $('#tableContainer').html($(response).filter('#tableContainer').html());
+                        $('#plotsContainer').html($(response).filter('#plotsContainer').html());
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('Error sending selected items to server:', error);
+                    }
+                });
+            }
+
+            $('.multiselect').on('change', updateSelectedItems);
+        });
+    </script>
+</body>
+</html>
