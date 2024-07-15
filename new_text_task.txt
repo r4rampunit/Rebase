@@ -25,3 +25,90 @@ def mi_chart(request):
     }
 
     return render(request, 'mi_templates/mi_chart.html', context)
+
+
+
+
+
+
+
+function updateSelectedItems() {
+  var allSelected = true;
+  var selectedItems = {};
+
+  $('.multiselect').each(function() {
+    var dropdownName = $(this).attr('name');
+    var selected = $(this).select2('data');
+    if (selected.length == 0) {
+      allSelected = false;
+    }
+    selectedItems[dropdownName] = selected.map(item => item.text);
+  });
+
+  if (allSelected) {
+    var html = '<h3>Selected Items:</h3>';
+    for (var dropdown in selectedItems) {
+      html += '<p><strong>' + dropdown + ':</strong> ' + selectedItems[dropdown].join(', ') + '</p>';
+    }
+    $('#selectedItems').html(html).show();
+
+    // Send selected items to the server via AJAX
+    $.ajax({
+      url: window.location.href,
+      method: 'POST',
+      data: {
+        selectedItems: JSON.stringify(selectedItems),
+        csrfmiddlewaretoken: getCookie('csrftoken')  // Add this line
+      },
+      success: function(response) {
+        console.log('Selected items sent to server successfully.');
+        // Update the table with the new data
+        $('#tableContainer').html(response);
+      },
+      error: function(xhr, status, error) {
+        console.error('Error sending selected items to server:', error);
+      }
+    });
+  } else {
+    $('#selectedItems').hide();
+  }
+}
+
+
+function getCookie(name) {
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== '') {
+    const cookies = document.cookie.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      if (cookie.substring(0, name.length + 1) === (name + '=')) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
+}
+
+
+
+
+from django.http import HttpResponse
+from django.views.decorators.csrf import csrf_exempt
+import json
+
+@csrf_exempt
+def mi_chart(request):
+    if request.method == 'POST':
+        selected_items = json.loads(request.POST.get('selectedItems', '{}'))
+
+        # Process the selected items
+        # For example, you can filter your data based on the selections
+
+        # Generate the new table HTML
+        table_html = generate_table_html(selected_items)  # You need to implement this function
+
+        return HttpResponse(table_html)
+    else:
+        # Your existing code for GET requests
+        ...
