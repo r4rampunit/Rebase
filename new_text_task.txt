@@ -806,3 +806,85 @@ def get_plot_html():
     </script>
 </body>
 </html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+@csrf_exempt
+def mi_chart(request):
+    response_html = ""  # Initialize response_html at the beginning
+
+    if request.method == 'POST':
+        selected_items = json.loads(request.POST.get('selectedItems', '{}'))
+        print(selected_items)
+        list_of_selected = []
+        for category, items in selected_items.items():
+            if items:
+                print(category)
+                list_of_selected.append(items)
+
+        # Assign selected items to variables
+        Organisational_unit_level_1_selected = list_of_selected[0]
+        Organisational_unit_level_2_selected = list_of_selected[1]
+        Organisational_unit_level_3_selected = list_of_selected[2]
+        Country_of_Exposure_selected = list_of_selected[3]
+        Asset_class_selected = list_of_selected[4]
+        Product_Type_selected = list_of_selected[5]
+        Basel_Approach_selected = list_of_selected[6]
+        ST_scenario_selected = list_of_selected[7]
+
+    folders = get_folders()
+    selected_folder = request.GET.get("folder", None)
+    selected_subfolder = request.GET.get("subfolder", None)
+    subfolders = get_subfolders(selected_folder) if selected_folder else []
+
+    if selected_folder and selected_subfolder:
+        folder_path = os.path.join(FOLDER_PATH, selected_folder, selected_subfolder)
+        excel_files = [f for f in os.listdir(folder_path) if f.endswith(".xlsx")]
+
+        # Process excel files and perform data operations here
+        # ...
+
+        # Create and populate table_df
+        table_df = pd.DataFrame()  # Initialize table_df
+
+        # Populate table_df
+        # ...
+
+        table_html = table_df.to_html(classes='table table-striped table-bordered', index=False)
+        response_html = f"<div id='tableContainer'>{table_html}</div>"
+
+    if response_html:
+        return HttpResponse(response_html)
+    else:
+        context1 = {
+            'folders': folders,
+            'subfolders': subfolders,
+            'selected_folder': selected_folder,
+            'selected_subfolder': selected_subfolder,
+            'Organisational_unit_level_1_list': Organisational_unit_level_1_list,
+            'Organisational_unit_level_2_list': Organisational_unit_level_2_list,
+            'Organisational_unit_level_3_list': Organisational_unit_level_3_list,
+            'Country_of_Exposure_list': Country_of_Exposure_list,
+            'Asset_class_list': Asset_class_list,
+            'Product_Type_list': Product_Type_list,
+            'Basel_Approach_list': Basel_Approach_list,
+            'ST_scenario_combo': ST_scenario_combo
+        }
+        return render(request, 'mi_templates/mi_chart.html', context1)
