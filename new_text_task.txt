@@ -1732,3 +1732,43 @@ def update_table(request):
         return JsonResponse({'table_html': table_html})
 
     return JsonResponse({'error': 'Invalid request method'})
+
+
+
+
+from django.shortcuts import render
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+import pandas as pd
+import json
+
+# Sample DataFrame
+df = pd.DataFrame({
+    'Name': ['Alice', 'Bob', 'Charlie', 'David'],
+    'Age': [25, 30, 35, 40],
+    'City': ['New York', 'London', 'Paris', 'Tokyo']
+})
+
+@csrf_exempt
+def data_view(request):
+    if request.method == 'POST':
+        # Handle AJAX request
+        selected_options = json.loads(request.POST.get('selected_options', '[]'))
+
+        if selected_options:
+            filtered_df = df[df['City'].isin(selected_options)]
+        else:
+            filtered_df = df
+
+        table_html = filtered_df.to_html(classes='table table-striped', index=False)
+        return JsonResponse({'table_html': table_html})
+
+    else:
+        # Handle initial page load
+        options = df['City'].unique().tolist()
+        table_html = df.to_html(classes='table table-striped', index=False)
+        context = {
+            'options': options,
+            'table_html': table_html
+        }
+        return render(request, 'data_template.html', context)
