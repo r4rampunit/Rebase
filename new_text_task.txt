@@ -1,8 +1,1734 @@
-Organisational_unit_level_1_selected = list_of_selected[0] if len(list_of_selected) > 0 else []
-            Organisational_unit_level_2_selected = list_of_selected[1] if len(list_of_selected) > 1 else []
-            Organisational_unit_level_3_selected = list_of_selected[2] if len(list_of_selected) > 2 else []
-            Country_of_Exposure_selected = list_of_selected[3] if len(list_of_selected) > 3 else []
-            Asset_class_selected = list_of_selected[4] if len(list_of_selected) > 4 else []
-            Product_Type_selected = list_of_selected[5] if len(list_of_selected) > 5 else []
-            Basel_Approach_selected = list_of_selected[6] if len(list_of_selected) > 6 else []
-            ST_scenario_selected = list_of_selected[7] if len(list_of_selected) > 7 else []
+from django.http import JsonResponse
+from django.shortcuts import render
+
+def mi_chart(request):
+    folders = get_folders()
+    selected_folder = request.GET.get("folder", None)
+    selected_subfolder = request.GET.get("subfolder", None)
+    subfolders = get_subfolders(selected_folder) if selected_folder else []
+
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        selected_items = request.GET.get('selectedItems', {})
+        # Print the selected items for testing purposes
+        print(selected_items)
+        return JsonResponse({'status': 'success', 'selectedItems': selected_items})
+
+    if selected_folder and selected_subfolder:
+        dataframes = read_excel_files(selected_folder, selected_subfolder)
+    else:
+        dataframes = []
+
+    context = {
+        'folders': folders,
+        'subfolders': subfolders,
+        'dataframes': dataframes,
+    }
+
+    return render(request, 'mi_templates/mi_chart.html', context)
+
+
+
+
+
+
+
+function updateSelectedItems() {
+  var allSelected = true;
+  var selectedItems = {};
+
+  $('.multiselect').each(function() {
+    var dropdownName = $(this).attr('name');
+    var selected = $(this).select2('data');
+    if (selected.length == 0) {
+      allSelected = false;
+    }
+    selectedItems[dropdownName] = selected.map(item => item.text);
+  });
+
+  if (allSelected) {
+    var html = '<h3>Selected Items:</h3>';
+    for (var dropdown in selectedItems) {
+      html += '<p><strong>' + dropdown + ':</strong> ' + selectedItems[dropdown].join(', ') + '</p>';
+    }
+    $('#selectedItems').html(html).show();
+
+    // Send selected items to the server via AJAX
+    $.ajax({
+      url: window.location.href,
+      method: 'POST',
+      data: {
+        selectedItems: JSON.stringify(selectedItems),
+        csrfmiddlewaretoken: getCookie('csrftoken')  // Add this line
+      },
+      success: function(response) {
+        console.log('Selected items sent to server successfully.');
+        // Update the table with the new data
+        $('#tableContainer').html(response);
+      },
+      error: function(xhr, status, error) {
+        console.error('Error sending selected items to server:', error);
+      }
+    });
+  } else {
+    $('#selectedItems').hide();
+  }
+}
+
+
+function getCookie(name) {
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== '') {
+    const cookies = document.cookie.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      if (cookie.substring(0, name.length + 1) === (name + '=')) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
+}
+
+
+
+
+from django.http import HttpResponse
+from django.views.decorators.csrf import csrf_exempt
+import json
+
+@csrf_exempt
+def mi_chart(request):
+    if request.method == 'POST':
+        selected_items = json.loads(request.POST.get('selectedItems', '{}'))
+
+        # Process the selected items
+        # For example, you can filter your data based on the selections
+
+        # Generate the new table HTML
+        table_html = generate_table_html(selected_items)  # You need to implement this function
+
+        return HttpResponse(table_html)
+    else:
+        # Your existing code for GET requests
+        ...
+
+
+
+
+
+
+<body>
+  <img src="/static/img/HSBC_hex.png" alt="Logo" class="logo">
+  <center>
+    <h1>Multiple Multiselect Dropdowns</h1>
+    <hr/>
+    <div class="dropdowns-container">
+      <div class="dropdowns-wrapper">
+        <div class="dropdown-wrapper">
+          <select class="multiselect" name="trees" multiple>
+            <option value="Oak">Oak</option>
+            <option value="Pine">Pine</option>
+            <option value="Maple">Maple</option>
+            <option value="Birch">Birch</option>
+            <option value="Elm">Elm</option>
+          </select>
+        </div>
+        <div class="dropdown-wrapper">
+          <select class="multiselect" name="animals" multiple>
+            <option value="Lion">Lion</option>
+            <option value="Elephant">Elephant</option>
+            <option value="Giraffe">Giraffe</option>
+            <option value="Tiger">Tiger</option>
+            <option value="Bear">Bear</option>
+          </select>
+        </div>
+        <div class="dropdown-wrapper">
+          <select class="multiselect" name="flowers" multiple>
+            <option value="Rose">Rose</option>
+            <option value="Tulip">Tulip</option>
+            <option value="Daisy">Daisy</option>
+            <option value="Sunflower">Sunflower</option>
+            <option value="Lily">Lily</option>
+          </select>
+        </div>
+        <div class="dropdown-wrapper">
+          <select class="multiselect" name="rivers" multiple>
+            <option value="Amazon">Amazon</option>
+            <option value="Nile">Nile</option>
+            <option value="Yangtze">Yangtze</option>
+            <option value="Mississippi">Mississippi</option>
+            <option value="Danube">Danube</option>
+          </select>
+        </div>
+        <div class="dropdown-wrapper">
+          <select class="multiselect" name="countries" multiple>
+            <option value="USA">USA</option>
+            <option value="China">China</option>
+            <option value="India">India</option>
+            <option value="Brazil">Brazil</option>
+            <option value="Russia">Russia</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div id="tableContainer"></div>
+    {% csrf_token %}
+  </center>
+</body>
+
+
+
+
+$(document).ready(function() {
+  $(".multiselect").select2({
+    placeholder: 'Select one or more options',
+    closeOnSelect: false,
+    allowClear: true,
+    tags: true
+  });
+
+  function updateSelectedItems() {
+    var selectedItems = {};
+    $('.multiselect').each(function() {
+      var dropdownName = $(this).attr('name');
+      var selected = $(this).select2('data');
+      selectedItems[dropdownName] = selected.map(item => item.text);
+    });
+
+    // Send selected items to the server via AJAX
+    $.ajax({
+      url: '/mi_chart/',  // Update this URL to match your Django URL configuration
+      method: 'POST',
+      data: {
+        selectedItems: JSON.stringify(selectedItems),
+        csrfmiddlewaretoken: getCookie('csrftoken')
+      },
+      success: function(response) {
+        $('#tableContainer').html(response);
+      },
+      error: function(xhr, status, error) {
+        console.error('Error sending selected items to server:', error);
+      }
+    });
+  }
+
+  $('.multiselect').on('change', updateSelectedItems);
+
+  // Initial call to populate the table
+  updateSelectedItems();
+});
+
+function getCookie(name) {
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== '') {
+    const cookies = document.cookie.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      if (cookie.substring(0, name.length + 1) === (name + '=')) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
+}
+
+
+
+
+from django.http import HttpResponse
+from django.views.decorators.csrf import csrf_exempt
+import json
+
+@csrf_exempt
+def mi_chart(request):
+    if request.method == 'POST':
+        selected_items = json.loads(request.POST.get('selectedItems', '{}'))
+
+        # Generate the table HTML
+        html = "<table border='1'>"
+        html += "<tr><th>Category</th><th>Selected Items</th></tr>"
+
+        for category, items in selected_items.items():
+            html += f"<tr><td>{category.capitalize()}</td><td>{', '.join(items)}</td></tr>"
+
+        html += "</table>"
+
+        return HttpResponse(html)
+    else:
+        return HttpResponse("This view only accepts POST requests.")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+from django.http import HttpResponse
+from django.shortcuts import render
+from django.views.decorators.csrf import csrf_exempt
+import json
+
+@csrf_exempt
+def mi_chart(request):
+    if request.method == 'POST':
+        selected_items = json.loads(request.POST.get('selectedItems', '{}'))
+
+        # Generate the table HTML
+        html = generate_table_html(selected_items)
+
+        return HttpResponse(html)
+    else:
+        # For GET requests, render the initial page with an empty table
+        initial_data = {
+            'trees': [],
+            'animals': [],
+            'flowers': [],
+            'rivers': [],
+            'countries': []
+        }
+        initial_table = generate_table_html(initial_data)
+        context = {
+            'initial_table': initial_table
+        }
+        return render(request, 'your_template_name.html', context)
+
+def generate_table_html(selected_items):
+    html = "<table border='1'>"
+    html += "<tr><th>Category</th><th>Selected Items</th></tr>"
+
+    for category, items in selected_items.items():
+        html += f"<tr><td>{category.capitalize()}</td><td>{', '.join(items)}</td></tr>"
+
+    html += "</table>"
+    return html
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multiple Multiselect Dropdowns</title>
+    <!-- Include necessary CSS and JS files here -->
+</head>
+<body>
+    <img src="/static/img/HSBC_hex.png" alt="Logo" class="logo">
+    <center>
+        <h1>Multiple Multiselect Dropdowns</h1>
+        <hr/>
+        <div class="dropdowns-container">
+            <div class="dropdowns-wrapper">
+                <div class="dropdown-wrapper">
+                    <select class="multiselect" name="trees" multiple>
+                        <option value="Oak">Oak</option>
+                        <option value="Pine">Pine</option>
+                        <option value="Maple">Maple</option>
+                        <option value="Birch">Birch</option>
+                        <option value="Elm">Elm</option>
+                    </select>
+                </div>
+                <div class="dropdown-wrapper">
+                    <select class="multiselect" name="animals" multiple>
+                        <option value="Lion">Lion</option>
+                        <option value="Elephant">Elephant</option>
+                        <option value="Giraffe">Giraffe</option>
+                        <option value="Tiger">Tiger</option>
+                        <option value="Bear">Bear</option>
+                    </select>
+                </div>
+                <div class="dropdown-wrapper">
+                    <select class="multiselect" name="flowers" multiple>
+                        <option value="Rose">Rose</option>
+                        <option value="Tulip">Tulip</option>
+                        <option value="Daisy">Daisy</option>
+                        <option value="Sunflower">Sunflower</option>
+                        <option value="Lily">Lily</option>
+                    </select>
+                </div>
+                <div class="dropdown-wrapper">
+                    <select class="multiselect" name="rivers" multiple>
+                        <option value="Amazon">Amazon</option>
+                        <option value="Nile">Nile</option>
+                        <option value="Yangtze">Yangtze</option>
+                        <option value="Mississippi">Mississippi</option>
+                        <option value="Danube">Danube</option>
+                    </select>
+                </div>
+                <div class="dropdown-wrapper">
+                    <select class="multiselect" name="countries" multiple>
+                        <option value="USA">USA</option>
+                        <option value="China">China</option>
+                        <option value="India">India</option>
+                        <option value="Brazil">Brazil</option>
+                        <option value="Russia">Russia</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        <div id="tableContainer">
+            {{ initial_table|safe }}
+        </div>
+        {% csrf_token %}
+    </center>
+    <!-- Include your JavaScript code here -->
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import pandas as pd
+import matplotlib.pyplot as plt
+import io
+import base64
+from django.http import HttpResponse
+from django.shortcuts import render
+from django.views.decorators.csrf import csrf_exempt
+import json
+
+# Create the DataFrame
+data = {
+    'trees': ['Oak', 'Pine', 'Maple', 'Birch', 'Elm', 'Redwood', 'Cedar', 'Spruce', 'Fir', 'Willow'],
+    'animals': ['Lion', 'Elephant', 'Giraffe', 'Tiger', 'Bear', 'Wolf', 'Deer', 'Fox', 'Leopard', 'Rhino'],
+    'flowers': ['Rose', 'Tulip', 'Daisy', 'Sunflower', 'Lily', 'Orchid', 'Carnation', 'Daffodil', 'Iris', 'Peony'],
+    'rivers': ['Amazon', 'Nile', 'Yangtze', 'Mississippi', 'Danube', 'Congo', 'Mekong', 'Rhine', 'Volga', 'Thames'],
+    'countries': ['USA', 'China', 'India', 'Brazil', 'Russia', 'Japan', 'Germany', 'UK', 'France', 'Canada']
+}
+
+df = pd.DataFrame(data)
+
+@csrf_exempt
+def mi_chart(request):
+    if request.method == 'POST':
+        selected_items = json.loads(request.POST.get('selectedItems', '{}'))
+
+        # Filter the DataFrame
+        filtered_df = df.copy()
+        for category, items in selected_items.items():
+            if items:
+                filtered_df = filtered_df[filtered_df[category].isin(items)]
+
+        # Generate the table HTML
+        table_html = filtered_df.to_html(classes='table table-striped')
+
+        # Generate plots
+        plots_html = generate_plots(filtered_df)
+
+        response_html = f"{table_html}<br>{plots_html}"
+        return HttpResponse(response_html)
+    else:
+        # For GET requests, render the initial page with the full DataFrame
+        initial_table = df.to_html(classes='table table-striped')
+        initial_plots = generate_plots(df)
+        context = {
+            'initial_table': initial_table,
+            'initial_plots': initial_plots,
+            'categories': list(df.columns)
+        }
+        return render(request, 'your_template_name.html', context)
+
+def generate_plots(df):
+    plots_html = ""
+
+    # Plot 1: Bar chart of counts for each category
+    plt.figure(figsize=(10, 6))
+    df.count().plot(kind='bar')
+    plt.title('Count of Items in Each Category')
+    plt.ylabel('Count')
+    plots_html += get_plot_html()
+
+    # Plot 2: Pie chart of the first category
+    plt.figure(figsize=(8, 8))
+    df[df.columns[0]].value_counts().plot(kind='pie', autopct='%1.1f%%')
+    plt.title(f'Distribution of {df.columns[0]}')
+    plots_html += get_plot_html()
+
+    return plots_html
+
+def get_plot_html():
+    buffer = io.BytesIO()
+    plt.savefig(buffer, format='png')
+    buffer.seek(0)
+    image_png = buffer.getvalue()
+    buffer.close()
+    graphic = base64.b64encode(image_png)
+    graphic = graphic.decode('utf-8')
+    return f'<img src="data:image/png;base64,{graphic}"/>'
+
+
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multiple Multiselect Dropdowns</title>
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <style>
+        .dropdown-wrapper { margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+    <img src="/static/img/HSBC_hex.png" alt="Logo" class="logo">
+    <center>
+        <h1>Multiple Multiselect Dropdowns</h1>
+        <hr/>
+        <div class="dropdowns-container">
+            <div class="dropdowns-wrapper">
+                {% for category in categories %}
+                <div class="dropdown-wrapper">
+                    <select class="multiselect" name="{{ category }}" multiple>
+                        {% for option in df[category] %}
+                        <option value="{{ option }}">{{ option }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        <div id="tableContainer">
+            {{ initial_table|safe }}
+        </div>
+        <div id="plotsContainer">
+            {{ initial_plots|safe }}
+        </div>
+        {% csrf_token %}
+    </center>
+    <script>
+        $(document).ready(function() {
+            $(".multiselect").select2({
+                placeholder: 'Select one or more options',
+                closeOnSelect: false,
+                allowClear: true,
+                tags: true
+            });
+
+            function updateSelectedItems() {
+                var selectedItems = {};
+                $('.multiselect').each(function() {
+                    var dropdownName = $(this).attr('name');
+                    var selected = $(this).select2('data');
+                    selectedItems[dropdownName] = selected.map(item => item.text);
+                });
+
+                $.ajax({
+                    url: '/mi_chart/',  // Update this URL to match your Django URL configuration
+                    method: 'POST',
+                    data: {
+                        selectedItems: JSON.stringify(selectedItems),
+                        csrfmiddlewaretoken: $('input[name=csrfmiddlewaretoken]').val()
+                    },
+                    success: function(response) {
+                        $('#tableContainer').html($(response).filter('#tableContainer').html());
+                        $('#plotsContainer').html($(response).filter('#plotsContainer').html());
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('Error sending selected items to server:', error);
+                    }
+                });
+            }
+
+            $('.multiselect').on('change', updateSelectedItems);
+        });
+    </script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import pandas as pd
+import matplotlib.pyplot as plt
+import io
+import base64
+from django.http import HttpResponse
+from django.shortcuts import render
+from django.views.decorators.csrf import csrf_exempt
+import json
+
+# Create the DataFrame with hard-coded options
+data = {
+    'trees': ['Oak', 'Pine', 'Maple', 'Birch', 'Elm'],
+    'animals': ['Lion', 'Elephant', 'Giraffe', 'Tiger', 'Bear'],
+    'flowers': ['Rose', 'Tulip', 'Daisy', 'Sunflower', 'Lily'],
+    'rivers': ['Amazon', 'Nile', 'Yangtze', 'Mississippi', 'Danube'],
+    'countries': ['USA', 'China', 'India', 'Brazil', 'Russia']
+}
+
+df = pd.DataFrame(data)
+
+@csrf_exempt
+def mi_chart(request):
+    if request.method == 'POST':
+        selected_items = json.loads(request.POST.get('selectedItems', '{}'))
+
+        # Filter the DataFrame
+        filtered_df = df.copy()
+        for category, items in selected_items.items():
+            if items:
+                filtered_df = filtered_df[filtered_df[category].isin(items)]
+
+        # Generate the table HTML
+        table_html = filtered_df.to_html(classes='table table-striped')
+
+        # Generate plots
+        plots_html = generate_plots(filtered_df)
+
+        response_html = f"<div id='tableContainer'>{table_html}</div><div id='plotsContainer'>{plots_html}</div>"
+        return HttpResponse(response_html)
+    else:
+        # For GET requests, render the initial page with the full DataFrame
+        initial_table = df.to_html(classes='table table-striped')
+        initial_plots = generate_plots(df)
+        context = {
+            'initial_table': initial_table,
+            'initial_plots': initial_plots
+        }
+        return render(request, 'your_template_name.html', context)
+
+def generate_plots(df):
+    plots_html = ""
+
+    # Plot 1: Bar chart of counts for each category
+    plt.figure(figsize=(10, 6))
+    df.count().plot(kind='bar')
+    plt.title('Count of Items in Each Category')
+    plt.ylabel('Count')
+    plots_html += get_plot_html()
+
+    # Plot 2: Pie chart of the first category
+    plt.figure(figsize=(8, 8))
+    df[df.columns[0]].value_counts().plot(kind='pie', autopct='%1.1f%%')
+    plt.title(f'Distribution of {df.columns[0]}')
+    plots_html += get_plot_html()
+
+    return plots_html
+
+def get_plot_html():
+    buffer = io.BytesIO()
+    plt.savefig(buffer, format='png')
+    buffer.seek(0)
+    image_png = buffer.getvalue()
+    buffer.close()
+    graphic = base64.b64encode(image_png)
+    graphic = graphic.decode('utf-8')
+    return f'<img src="data:image/png;base64,{graphic}"/>'
+
+
+
+
+
+
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multiple Multiselect Dropdowns</title>
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <style>
+        .dropdown-wrapper { margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+    <img src="/static/img/HSBC_hex.png" alt="Logo" class="logo">
+    <center>
+        <h1>Multiple Multiselect Dropdowns</h1>
+        <hr/>
+        <div class="dropdowns-container">
+            <div class="dropdowns-wrapper">
+                <div class="dropdown-wrapper">
+                    <select class="multiselect" name="trees" multiple>
+                        <option value="Oak">Oak</option>
+                        <option value="Pine">Pine</option>
+                        <option value="Maple">Maple</option>
+                        <option value="Birch">Birch</option>
+                        <option value="Elm">Elm</option>
+                    </select>
+                </div>
+                <div class="dropdown-wrapper">
+                    <select class="multiselect" name="animals" multiple>
+                        <option value="Lion">Lion</option>
+                        <option value="Elephant">Elephant</option>
+                        <option value="Giraffe">Giraffe</option>
+                        <option value="Tiger">Tiger</option>
+                        <option value="Bear">Bear</option>
+                    </select>
+                </div>
+                <div class="dropdown-wrapper">
+                    <select class="multiselect" name="flowers" multiple>
+                        <option value="Rose">Rose</option>
+                        <option value="Tulip">Tulip</option>
+                        <option value="Daisy">Daisy</option>
+                        <option value="Sunflower">Sunflower</option>
+                        <option value="Lily">Lily</option>
+                    </select>
+                </div>
+                <div class="dropdown-wrapper">
+                    <select class="multiselect" name="rivers" multiple>
+                        <option value="Amazon">Amazon</option>
+                        <option value="Nile">Nile</option>
+                        <option value="Yangtze">Yangtze</option>
+                        <option value="Mississippi">Mississippi</option>
+                        <option value="Danube">Danube</option>
+                    </select>
+                </div>
+                <div class="dropdown-wrapper">
+                    <select class="multiselect" name="countries" multiple>
+                        <option value="USA">USA</option>
+                        <option value="China">China</option>
+                        <option value="India">India</option>
+                        <option value="Brazil">Brazil</option>
+                        <option value="Russia">Russia</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        <div id="tableContainer">
+            {{ initial_table|safe }}
+        </div>
+        <div id="plotsContainer">
+            {{ initial_plots|safe }}
+        </div>
+        {% csrf_token %}
+    </center>
+    <script>
+        $(document).ready(function() {
+            $(".multiselect").select2({
+                placeholder: 'Select one or more options',
+                closeOnSelect: false,
+                allowClear: true
+            });
+
+            function updateSelectedItems() {
+                var selectedItems = {};
+                $('.multiselect').each(function() {
+                    var dropdownName = $(this).attr('name');
+                    var selected = $(this).select2('data');
+                    selectedItems[dropdownName] = selected.map(item => item.text);
+                });
+
+                $.ajax({
+                    url: '/mi_chart/',  // Update this URL to match your Django URL configuration
+                    method: 'POST',
+                    data: {
+                        selectedItems: JSON.stringify(selectedItems),
+                        csrfmiddlewaretoken: $('input[name=csrfmiddlewaretoken]').val()
+                    },
+                    success: function(response) {
+                        $('#tableContainer').html($(response).filter('#tableContainer').html());
+                        $('#plotsContainer').html($(response).filter('#plotsContainer').html());
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('Error sending selected items to server:', error);
+                    }
+                });
+            }
+
+            $('.multiselect').on('change', updateSelectedItems);
+        });
+    </script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+@csrf_exempt
+def mi_chart(request):
+    response_html = ""  # Initialize response_html at the beginning
+
+    if request.method == 'POST':
+        selected_items = json.loads(request.POST.get('selectedItems', '{}'))
+        print(selected_items)
+        list_of_selected = []
+        for category, items in selected_items.items():
+            if items:
+                print(category)
+                list_of_selected.append(items)
+
+        # Assign selected items to variables
+        Organisational_unit_level_1_selected = list_of_selected[0]
+        Organisational_unit_level_2_selected = list_of_selected[1]
+        Organisational_unit_level_3_selected = list_of_selected[2]
+        Country_of_Exposure_selected = list_of_selected[3]
+        Asset_class_selected = list_of_selected[4]
+        Product_Type_selected = list_of_selected[5]
+        Basel_Approach_selected = list_of_selected[6]
+        ST_scenario_selected = list_of_selected[7]
+
+    folders = get_folders()
+    selected_folder = request.GET.get("folder", None)
+    selected_subfolder = request.GET.get("subfolder", None)
+    subfolders = get_subfolders(selected_folder) if selected_folder else []
+
+    if selected_folder and selected_subfolder:
+        folder_path = os.path.join(FOLDER_PATH, selected_folder, selected_subfolder)
+        excel_files = [f for f in os.listdir(folder_path) if f.endswith(".xlsx")]
+
+        # Process excel files and perform data operations here
+        # ...
+
+        # Create and populate table_df
+        table_df = pd.DataFrame()  # Initialize table_df
+
+        # Populate table_df
+        # ...
+
+        table_html = table_df.to_html(classes='table table-striped table-bordered', index=False)
+        response_html = f"<div id='tableContainer'>{table_html}</div>"
+
+    if response_html:
+        return HttpResponse(response_html)
+    else:
+        context1 = {
+            'folders': folders,
+            'subfolders': subfolders,
+            'selected_folder': selected_folder,
+            'selected_subfolder': selected_subfolder,
+            'Organisational_unit_level_1_list': Organisational_unit_level_1_list,
+            'Organisational_unit_level_2_list': Organisational_unit_level_2_list,
+            'Organisational_unit_level_3_list': Organisational_unit_level_3_list,
+            'Country_of_Exposure_list': Country_of_Exposure_list,
+            'Asset_class_list': Asset_class_list,
+            'Product_Type_list': Product_Type_list,
+            'Basel_Approach_list': Basel_Approach_list,
+            'ST_scenario_combo': ST_scenario_combo
+        }
+        return render(request, 'mi_templates/mi_chart.html', context1)
+
+
+
+
+
+
+The Comprehensive Capital Analysis and Review (CCAR) is an annual exercise conducted by the Federal Reserve to assess whether large banks have sufficient capital to continue operations throughout times of economic and financial stress. Developing a CCAR model using Python involves several components. Here's an overview of the process along with some sample Python code to get you started:
+
+Data Preparation
+Scenario Generation
+Balance Sheet Projection
+Income Statement Projection
+Risk-Weighted Assets (RWA) Calculation
+Capital Ratio Calculation
+Stress Testing
+Reporting
+
+Let's go through each step with some Python code examples:
+
+Data Preparation:
+
+pythonCopyimport pandas as pd
+import numpy as np
+
+# Load historical data
+historical_data = pd.read_csv('historical_data.csv')
+
+# Clean and preprocess data
+def preprocess_data(data):
+    # Handle missing values
+    data = data.fillna(method='ffill')
+
+    # Convert date column to datetime
+    data['date'] = pd.to_datetime(data['date'])
+
+    return data
+
+cleaned_data = preprocess_data(historical_data)
+
+Scenario Generation:
+
+pythonCopydef generate_scenarios(base_data, num_scenarios=3):
+    scenarios = []
+    for i in range(num_scenarios):
+        scenario = base_data.copy()
+        # Apply random shocks to key economic variables
+        scenario['gdp_growth'] *= np.random.uniform(0.8, 1.2)
+        scenario['unemployment_rate'] += np.random.uniform(-1, 1)
+        scenario['interest_rate'] += np.random.uniform(-0.5, 0.5)
+        scenarios.append(scenario)
+    return scenarios
+
+base_scenario = cleaned_data[['date', 'gdp_growth', 'unemployment_rate', 'interest_rate']]
+stress_scenarios = generate_scenarios(base_scenario)
+
+Balance Sheet Projection:
+
+pythonCopydef project_balance_sheet(initial_balance_sheet, scenario, projection_period):
+    projected_balance_sheet = initial_balance_sheet.copy()
+
+    for t in range(projection_period):
+        # Project assets based on economic factors
+        projected_balance_sheet['total_assets'] *= (1 + scenario['gdp_growth'].iloc[t])
+
+        # Project liabilities
+        projected_balance_sheet['total_liabilities'] *= (1 + scenario['interest_rate'].iloc[t] * 0.1)
+
+        # Calculate equity
+        projected_balance_sheet['total_equity'] = projected_balance_sheet['total_assets'] - projected_balance_sheet['total_liabilities']
+
+    return projected_balance_sheet
+
+initial_balance_sheet = pd.DataFrame({'total_assets': [1000000], 'total_liabilities': [900000], 'total_equity': [100000]})
+projected_balance_sheet = project_balance_sheet(initial_balance_sheet, stress_scenarios[0], projection_period=9)
+
+Income Statement Projection:
+
+pythonCopydef project_income_statement(balance_sheet, scenario, projection_period):
+    income_statement = pd.DataFrame(index=range(projection_period))
+
+    for t in range(projection_period):
+        # Project net interest income
+        income_statement.loc[t, 'net_interest_income'] = balance_sheet['total_assets'].iloc[t] * scenario['interest_rate'].iloc[t] * 0.02
+
+        # Project non-interest income
+        income_statement.loc[t, 'non_interest_income'] = balance_sheet['total_assets'].iloc[t] * 0.01
+
+        # Project expenses
+        income_statement.loc[t, 'expenses'] = balance_sheet['total_assets'].iloc[t] * 0.015
+
+        # Calculate net income
+        income_statement.loc[t, 'net_income'] = income_statement.loc[t, 'net_interest_income'] + income_statement.loc[t, 'non_interest_income'] - income_statement.loc[t, 'expenses']
+
+    return income_statement
+
+projected_income_statement = project_income_statement(projected_balance_sheet, stress_scenarios[0], projection_period=9)
+
+Risk-Weighted Assets (RWA) Calculation:
+
+pythonCopydef calculate_rwa(balance_sheet, scenario):
+    # Simplified RWA calculation
+    rwa = balance_sheet['total_assets'] * 0.75  # Assuming 75% risk weight on average
+    return rwa
+
+rwa = calculate_rwa(projected_balance_sheet, stress_scenarios[0])
+
+Capital Ratio Calculation:
+
+pythonCopydef calculate_capital_ratios(balance_sheet, rwa):
+    cet1_ratio = balance_sheet['total_equity'] / rwa
+    total_capital_ratio = (balance_sheet['total_equity'] + balance_sheet['total_liabilities'] * 0.02) / rwa  # Assuming 2% of liabilities are eligible as Tier 2 capital
+    return pd.DataFrame({'CET1 Ratio': cet1_ratio, 'Total Capital Ratio': total_capital_ratio})
+
+capital_ratios = calculate_capital_ratios(projected_balance_sheet, rwa)
+
+Stress Testing:
+
+pythonCopydef perform_stress_test(initial_balance_sheet, scenarios, projection_period):
+    results = []
+    for scenario in scenarios:
+        balance_sheet = project_balance_sheet(initial_balance_sheet, scenario, projection_period)
+        income_statement = project_income_statement(balance_sheet, scenario, projection_period)
+        rwa = calculate_rwa(balance_sheet, scenario)
+        capital_ratios = calculate_capital_ratios(balance_sheet, rwa)
+        results.append({
+            'scenario': scenario,
+            'balance_sheet': balance_sheet,
+            'income_statement': income_statement,
+            'rwa': rwa,
+            'capital_ratios': capital_ratios
+        })
+    return results
+
+stress_test_results = perform_stress_test(initial_balance_sheet, stress_scenarios, projection_period=9)
+
+Reporting:
+
+pythonCopyimport matplotlib.pyplot as plt
+
+def generate_report(stress_test_results):
+    for i, result in enumerate(stress_test_results):
+        plt.figure(figsize=(12, 6))
+        plt.plot(result['capital_ratios']['CET1 Ratio'], label='CET1 Ratio')
+        plt.plot(result['capital_ratios']['Total Capital Ratio'], label='Total Capital Ratio')
+        plt.title(f'Capital Ratios under Scenario {i+1}')
+        plt.xlabel('Projection Period')
+        plt.ylabel('Ratio')
+        plt.legend()
+        plt.savefig(f'scenario_{i+1}_capital_ratios.png')
+        plt.close()
+
+        # Generate other charts and tables as needed
+
+generate_report(stress_test_results)
+This code provides a basic framework for CCAR modeling and stress testing. In practice, you would need to:
+
+Use more sophisticated models for projections and risk calculations.
+Incorporate more detailed data and risk factors.
+Implement regulatory requirements and guidelines specific to CCAR.
+Develop more comprehensive reporting capabilities.
+Implement model validation and sensitivity analysis.
+Ensure compliance with regulatory standards and documentation requirements.
+
+Remember that CCAR models are complex and require deep understanding of banking regulations, risk management, and financial modeling. This code is a simplified example and should be significantly expanded and refined for actual use in a regulatory context. CopyRetryClaude does not have the ability to run the code it generates yet.Claude can make mistakes. Please double-check responses.
+  #monica-writing-entry-btn-root {
+    ._monica-theme-d2f2b383 {
+      --theme-text-primary: #262626;
+      --theme-text-secondary: #404040;
+      --theme-text-tertiary: #595959;
+      --theme-text-quaternary: #8C8C8C;
+      --theme-text-disable: #BDBDBD;
+      --theme-text-white-primary: #FFFFFF;
+      --theme-text-white-secondary: #FFFFFF;
+      --theme-text-link: #1E6FFF;
+      --theme-text-link-active: #1E6FFF;
+      --theme-text-brand: #6841EA;
+
+      --theme-icon-primary: #222226;
+      --theme-icon-secondary: #3D3D43;
+      --theme-icon-tertiary: #55555D;
+      --theme-icon-quaternary: #868692;
+      --theme-icon-disable: #D9D9DD;
+      --theme-icon-white-primary: #FFFFFF;
+      --theme-icon-white-secondary: #FFFFFF;
+      --theme-icon-brand: #6841EA;
+
+      --theme-btn-fill-primary: #6841EA;
+      --theme-btn-fill-primary-hover: #9373FF;
+      --theme-btn-fill-primary-active: #522BD6;
+      --theme-btn-fill-secondary: #ECECEE;
+      --theme-btn-fill-secondary-hover: #F5F5F5;
+      --theme-btn-fill-secondary-active: #D9D9DD;
+      --theme-btn-fill-tertiary: #F0EBFF;
+      --theme-btn-fill-tertiary-hover: #DFD5FE;
+      --theme-btn-fill-tertiary-active: #B8A3FB;
+      --theme-btn-border-primary: #4F59661F;
+      --theme-btn-border-secondary: #4F596614;
+
+      --theme-fill-tsp-components-primary: #4F59661F;
+      --theme-fill-tsp-components-secondary: #4F596614;
+      --theme-fill-tsp-components-tertiary: #4F59660A;
+      --theme-fill-btn-primary: #ECECEE;
+      --theme-fill-btn-secondary: #F5F5F5;
+      --theme-fill-white: #FFFFFF;
+      --theme-fill-tsp-blue: #185CEB14;
+      --theme-fill-tsp-brand: #6841EA14;
+      --theme-fill-tsp-brand-primary: #6841EABF;
+      --theme-fill-tsp-brand-secondary: #6841EA73;
+      --theme-fill-tsp-brand-tertiary: #6841EA3D;
+      --theme-fill-tsp-gray: #4F596652;
+      --theme-fill-black-none: #252528;
+
+
+      --theme-label-tsp-brand-primary: #6841EA1F;
+      --theme-label-tsp-brand-secondary: #6841EA14;
+
+
+      --theme-border-light: #4F596614;
+      --theme-border-primary: #4F59661F;
+      --theme-border-quaternary: #4F596633;
+      --theme-border-active: #6841EA;
+      --theme-border-white: #FFFFFF0A;
+
+      --theme-tab-fill: #4F596614;
+      --theme-tab-fill-active: #222226;
+
+      --theme-tooltips-fill: #000000D9;
+
+      --theme-bg-white: #FFFFFF;
+      --theme-bg-gray-primary: #F5F5F5;
+      --theme-bg-gray-secondary: #FAFAFA;
+      --theme-bg-mask: #00000073;
+      --theme-bg-menu-white: #FFFFFF;
+      --theme-bg-menu-gray: #F5F5F5;
+      --theme-bg-tsp-gray-primary: #F5F5F5E6;
+      --theme-bg-tsp-white-primary: #FFFFFF;
+      --theme-bg-gray-nav: #ececee;
+      --theme-bg-tsp-white-secondary: #FFFFFF73;
+
+      --theme-function-info: #3BBFFF;
+      --theme-function-success: #00AA5B;
+      --theme-function-warning: #FFAB00;
+      --theme-function-error: #EA3639;
+      --theme-function-error-border: #FFA4A3;
+      --theme-function-warning-light: #FDFAE9;
+      --theme-function-warning-border: #FFE266;
+
+      --theme-shadow-s1: rgba(0, 0, 0, 0.04);
+      --theme-shadow-s2: rgba(0, 0, 0, 0.08);
+      --theme-shadow-s3: rgba(0, 0, 0, 0.24);
+
+      --theme-box-shadow-s1: 0px 1px 20px 0px var(--theme-shadow-s1);
+      --theme-box-shadow-s2: 0px 8px 24px 0px var(--theme-shadow-s2), 0px 0px 1px 0px var(--theme-shadow-s2);
+      --theme-box-shadow-s3: 0px 12px 40px -4px var(--theme-shadow-s3), 0px 0px 2px 0px var(--theme-shadow-s2);
+
+    }
+    ._monica-theme-d2f2b383._monica-dark {
+      --theme-text-primary:  #F3F3F3;
+      --theme-text-secondary:  #DBDBDB;
+      --theme-text-tertiary:  #AAAAAA;
+      --theme-text-quaternary:  #7A7A7A;
+      --theme-text-disable:  #4C4C4C;
+      --theme-text-white-primary:  #E9EAED;
+      --theme-text-white-secondary:  #E9EAED;
+      --theme-text-link:  #5E8CFF;
+      --theme-text-link-active:  #3767EB;
+      --theme-text-brand:  #7F58FD;
+
+      --theme-icon-primary:  #F3F3F4;
+      --theme-icon-secondary:  #BFBFC4;
+      --theme-icon-tertiary:  #A7A7AE;
+      --theme-icon-quaternary:  #77777E;
+      --theme-icon-disable:  #4A4A4F;
+      --theme-icon-white-primary:  #F3F3F4;
+      --theme-icon-white-secondary:  #F3F3F4;
+      --theme-icon-brand:  #7F58FD;
+
+      --theme-btn-fill-primary:  #7F58FD;
+      --theme-btn-fill-primary-hover:  #8363E9;
+      --theme-btn-fill-primary-active:  #5E40BF;
+      --theme-btn-fill-secondary:  #56565F3D;
+      --theme-btn-fill-secondary-hover:  #56565F52;
+      --theme-btn-fill-secondary-active:  #56565F52;
+      --theme-btn-fill-tertiary:  #3C2B73;
+      --theme-btn-fill-tertiary-hover:  #332560;
+      --theme-btn-fill-tertiary-active: #271F42;
+      --theme-btn-border-primary:  #A2B1D733;
+      --theme-btn-border-secondary:  #A2B1D71F;
+
+      --theme-fill-tsp-components-primary:  #56565F52;
+      --theme-fill-tsp-components-secondary:  #56565F33;
+      --theme-fill-tsp-components-tertiary:  #56565F1F;
+      --theme-fill-btn-primary:  #2d2d2f;
+      --theme-fill-btn-secondary:  #252528;
+      --theme-fill-white:  #0000003D;
+      --theme-fill-tsp-blue:  #5E8CFF1F;
+      --theme-fill-tsp-brand:  #765AD01F;
+      --theme-fill-tsp-brand-primary:  #765AD0D9;
+      --theme-fill-tsp-brand-secondary: #765AD0A6;
+      --theme-fill-tsp-brand-tertiary: #765AD073;
+      --theme-fill-tsp-gray: #56565FA6;
+      --theme-fill-black-none: #2D2D2F;
+
+
+      --theme-label-tsp-brand-primary:  #765AD03D;
+      --theme-label-tsp-brand-secondary:  #765AD01F;
+
+
+      --theme-border-light:  #56565F33;
+      --theme-border-primary:  #56565F52;
+      --theme-border-quaternary:  #56565F73;
+      --theme-border-active:  #7F58FD;
+      --theme-border-white:  #FFFFFF0A;
+
+      --theme-tab-fill: #56565F1F;
+      --theme-tab-fill-active:  #77777E;
+
+      --theme-tooltips-fill:  #000000F2;
+
+      --theme-bg-white:  #202020;
+      --theme-bg-gray-primary:  #252528;
+      --theme-bg-gray-secondary:  #1B1B1D;
+      --theme-bg-mask:  #00000073;
+      --theme-bg-menu-white:  #282828;
+      --theme-bg-menu-gray:  #2D2D2F;
+      --theme-bg-tsp-gray-primary: #252528E6;
+      --theme-bg-tsp-white-primary:  #25272D;
+      --theme-bg-gray-nav: #2D2D2F;
+      --theme-bg-tsp-white-secondary: #0000003D;
+
+      --theme-function-info:  #0F76BC;
+      --theme-function-success:  #278056;
+      --theme-function-warning: #B07807;
+      --theme-function-error:  #8E2827;
+      --theme-function-error-border: #742525;
+      --theme-function-warning-light: #443518;
+      --theme-function-warning-border: #634B1B;
+
+      --theme-shadow-s1: rgba(0, 0, 0, 0.24);
+      --theme-shadow-s2: rgba(0, 0, 0, 0.32);
+      --theme-shadow-s3: rgba(0, 0, 0, 0.45);
+    }
+}
+
+
+.monica-writing-entry-btn-wrapper {
+  position: absolute;
+  right: 9px;
+  bottom: 2px;
+  pointer-events: all;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.monica-writing-entry-btn {
+  position: relative;
+  height: 28px;
+  transition: all 0.2s ease-in-out;
+  border-radius: 28px;
+  background: var(--theme-bg-white);
+  box-shadow: 0px 1px 4px 0px var(--theme-shadow-s2), 0px 0px 1px 0px var(--theme-shadow-s3);
+  overflow: hidden;
+}
+
+.monica-writing-clickable-box {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.monica-writing-clickable-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.monica-writing-clickable-item {
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-drag: none;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  box-sizing: border-box;
+  height: 24px;
+  padding: 3px;
+  border-radius: 12px;
+  color: var(--theme-icon-disable);
+  transition: all 0.2s ease-in-out;
+}
+
+.monica-writing-clickable-item-bg:hover {
+  background: var(--theme-border-primary);
+}
+
+.monica-writing-clickable-item.monica-writing-off:hover {
+  color: var(--theme-text-brand);
+}
+
+.monica-writing-clickable-item.monica-writing-writing {
+  color: var(--theme-text-brand);
+}
+
+.monica-writing-clickable-item.monica-writing-open {
+  color: var(--theme-text-brand);
+  opacity: 0.5;
+}
+
+.monica-writing-divider {
+  background-color: var(--theme-border-light);
+  min-width: 1px;
+  height: 12px;
+}
+
+
+.monica-writing-grammar-checking-content {
+  min-width: 18px;
+  height: 18px;
+  display: flex;
+  box-sizing: border-box;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  border-radius: 16px 16px 6px 16px;
+  color: var(--theme-text-white-primary);
+  white-space: nowrap;
+}
+.monica-writing-grammar-checking-loading {
+  background: var(--theme-icon-brand);
+}
+
+.monica-writing-tooltip_wrapper {
+  z-index: 9999;
+}
+
+
+
+.monica-writing-grammar-checking-content.monica-writing-grammar-checking-has-result {
+  background: var(--theme-function-error);
+  padding: 2px;
+}
+
+.monica-writing-grammar-checking-content.monica-writing-grammar-checking-result-than-100 {
+    border-radius: 16px 8px 3px 16px;
+    padding: 2px;
+}
+
+.monica-writing-grammar-checking-result {
+  color: var(--theme-text-white-primary);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: 16px;
+}
+
+.monica-writing-grammar-checking-icon {
+  animation: monica-writing-grammar-checking-icon-rotate 1s linear infinite;
+}
+
+@keyframes monica-writing-grammar-checking-icon-rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+
+}
+
+
+.monica-writing-caret {
+  width: 1.5px;
+  background-color: var(--theme-border-active);
+  pointer-events: none;
+  position: absolute;
+  border-radius: 1px;
+}
+.monica-writing-caret-head {
+  background-color: var(--theme-border-active);
+  width: 6px;
+  height: 6px;
+  border-radius: 6px;
+  position: absolute;
+  left: -2.25px;
+}
+@media print {
+  .monica-writing-entry-btn {
+    display: none;
+  }
+}
+
+.monica-writing-primary-btn {
+  box-sizing: border-box;
+  padding: 4px 8px;
+  font-size: 14px;
+  line-height: 24px;
+  color: var(--theme-text-white-primary);
+  background: var(--theme-btn-fill-primary);
+  border-radius: 8px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+}
+
+.monica-writing-primary-btn:hover {
+  background: var(--theme-btn-fill-primary-hover);
+}
+
+.monica-writing-primary-btn:active {
+  background: var(--theme-btn-fill-primary-active);
+}
+
+.monica-writing-text-btn {
+  font-size: 14px;
+  line-height: 24px;
+  color: var(--theme-text-tertiary);
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  padding: 4px 8px;
+  border-radius: 8px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
+.monica-writing-text-btn:hover,
+.monica-writing-text-btn:active {
+  color: var(--theme-fill-tsp-components-secondary);
+}
+
+.monica-writing-gc-guide {
+  position: absolute;
+  right: 0;
+  bottom: 30px;
+  width: 300px;
+  min-height: 100px;
+  border-radius: 20px;
+  background: var(--theme-bg-white);
+  box-shadow: var(--theme-box-shadow-s1);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  user-select: unset;
+}
+
+.monica-writing-gc-guide-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.monica-writing-gc-guide-title {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 16px;
+}
+
+.monica-writing-gc-guide-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  color: var(--theme-text-quaternary);
+}
+
+.monica-writing-gc-guide-close:hover {
+  background: var(--theme-fill-tsp-components-secondary);
+}
+
+.monica-writing-gc-guide-content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.monica-writing-gc-guide-msg {
+  font-size: 14px;
+  line-height: 22px;
+  color: var(--theme-text-primary);
+}
+
+.monica-writing-gc-guide-img {
+  padding: 0 20px;
+}
+
+.monica-writing-gc-guide-img img {
+  width: 100%;
+  height: auto;
+}
+
+.monica-writing-gc-guide-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.monica-writing-gc-guide-footer .monica-writing-primary-btn,
+.monica-writing-gc-guide-footer .monica-writing-subscribe-btn {
+  width: 100%;
+}
+
+.monica-writing-gc-setting-guide {
+  width: auto;
+}
+
+.monica-writing-gc-setting-guide .monica-writing-gc-guide-footer {
+  align-items: flex-end;
+}
+
+.monica-writing-gc-setting-guide .monica-writing-primary-btn {
+  width: auto;
+  min-width: 60px;
+}
+
+.monica-writing-gc-guide-setting {
+  color: var(--theme-text-brand);
+  cursor: pointer;
+}
+
+.monica-writing-gc-guide-setting:hover {
+  opacity: 0.8;
+}
+
+1. Overview of CCAR Modeling:
+
+Purpose: CCAR is a regulatory framework introduced by the Federal Reserve to assess, regulate, and supervise large banks to ensure they have robust capital planning processes and adequate capital to withstand economic and financial stress.
+Components:
+Scenario Analysis: Evaluate the impact of hypothetical adverse economic conditions.
+Capital Planning: Determine the necessary capital buffer to remain solvent during stress periods.
+Risk Assessment: Identify and quantify various risks, including credit risk, market risk, and operational risk.
+2. Python Code for CCAR Modeling:
+
+a. Data Preparation:
+
+Data Collection: Gather historical financial data, macroeconomic indicators, and other relevant data points.
+Data Cleaning: Handle missing values, outliers, and inconsistencies.
+python
+Copy code
+import pandas as pd
+import numpy as np
+
+# Load data
+financial_data = pd.read_csv('financial_data.csv')
+macroeconomic_data = pd.read_csv('macroeconomic_data.csv')
+
+# Data cleaning
+financial_data.fillna(method='ffill', inplace=True)
+macroeconomic_data.fillna(method='bfill', inplace=True)
+b. Scenario Analysis:
+
+Define Scenarios: Create baseline, adverse, and severely adverse scenarios based on macroeconomic variables.
+Forecasting: Use statistical models to forecast financial metrics under each scenario.
+python
+Copy code
+from statsmodels.tsa.arima_model import ARIMA
+
+# Define scenarios
+scenarios = {
+    'baseline': [1.5, 2.0, 2.5],  # Example GDP growth rates
+    'adverse': [0.5, 1.0, 1.5],
+    'severely_adverse': [-1.0, 0.0, 0.5]
+}
+
+# Forecast financial metrics
+def forecast_metrics(data, scenario):
+    model = ARIMA(data, order=(5,1,0))
+    model_fit = model.fit(disp=0)
+    forecast = model_fit.forecast(steps=len(scenario))
+    return forecast[0]
+
+financial_forecasts = {key: forecast_metrics(financial_data['metric'], val) for key, val in scenarios.items()}
+c. Capital Planning:
+
+Capital Adequacy: Calculate the capital requirement for each scenario using stress testing results.
+Buffer Calculation: Determine additional capital buffers needed to maintain solvency.
+python
+Copy code
+def calculate_capital_requirement(forecasts, risk_weight):
+    capital_requirement = forecasts * risk_weight
+    return capital_requirement
+
+risk_weight = 0.08  # Example risk weight
+capital_requirements = {key: calculate_capital_requirement(val, risk_weight) for key, val in financial_forecasts.items()}
+d. Risk Assessment:
+
+Credit Risk: Evaluate the potential for loan defaults.
+Market Risk: Assess the impact of market fluctuations on asset values.
+Operational Risk: Consider the risk of loss due to failed internal processes or systems.
+python
+Copy code
+def evaluate_credit_risk(financial_data):
+    default_prob = financial_data['default_rate'].mean()
+    expected_loss = financial_data['loan_amount'] * default_prob
+    return expected_loss
+
+def evaluate_market_risk(financial_data, market_scenarios):
+    market_loss = []
+    for scenario in market_scenarios:
+        loss = financial_data['market_value'] * (1 - scenario)
+        market_loss.append(loss)
+    return np.mean(market_loss)
+
+credit_risk = evaluate_credit_risk(financial_data)
+market_risk = evaluate_market_risk(financial_data, scenarios['severely_adverse'])
+3. Detailed Discussion Points:
+
+a. Importance of CCAR:
+
+Ensures that banks have sufficient capital to absorb losses during economic downturns.
+Promotes robust risk management practices.
+Enhances transparency and confidence in the banking system.
+b. Data Challenges:
+
+Ensuring data quality and consistency across different sources.
+Handling missing or incomplete data.
+Aligning historical data with forecasted scenarios.
+c. Model Selection:
+
+Choosing appropriate statistical models (e.g., ARIMA, VAR) for forecasting.
+Balancing model complexity with interpretability and performance.
+Validating and back-testing models to ensure accuracy.
+d. Scenario Definition:
+
+Defining realistic and comprehensive stress scenarios.
+Incorporating regulatory guidelines and economic forecasts.
+Continuously updating scenarios based on emerging risks and trends.
+e. Risk Management:
+
+Integrating CCAR results into the bank’s overall risk management framework.
+Using CCAR outcomes to inform strategic decisions, such as capital allocation and risk mitigation.
+Communicating results to stakeholders, including regulators, investors, and senior management.
+f. Regulatory Compliance:
+
+Ensuring adherence to regulatory requirements and guidelines.
+Preparing detailed documentation and reports for regulatory submissions.
+Engaging with regulators to address any concerns or questions.
+By following these steps and considerations, large banks can effectively implement
+CCAR modeling using Python to ensure they are well-prepared for potential economic
+stresses and maintain adequate capital levels.
+
+
+
+
+<!-- template.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Table with Select2</title>
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+</head>
+<body>
+    <h1>Data Table with Select2</h1>
+
+    <select id="multiselect" multiple="multiple" style="width: 300px;">
+        {% for option in options %}
+            <option value="{{ option }}">{{ option }}</option>
+        {% endfor %}
+    </select>
+
+    <div id="table-container">
+        {{ table_html|safe }}
+    </div>
+
+    <script>
+        $(document).ready(function() {
+            $('#multiselect').select2();
+
+            $('#multiselect').on('change', function() {
+                var selectedOptions = $(this).val();
+                $.ajax({
+                    url: '{% url "update_table" %}',
+                    method: 'POST',
+                    data: {
+                        'selected_options': JSON.stringify(selectedOptions),
+                        'csrfmiddlewaretoken': '{{ csrf_token }}'
+                    },
+                    success: function(response) {
+                        $('#table-container').html(response.table_html);
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
+
+
+
+# views.py
+from django.shortcuts import render
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+import pandas as pd
+import json
+
+# Sample DataFrame
+df = pd.DataFrame({
+    'Name': ['Alice', 'Bob', 'Charlie', 'David'],
+    'Age': [25, 30, 35, 40],
+    'City': ['New York', 'London', 'Paris', 'Tokyo']
+})
+
+def index(request):
+    options = df['City'].unique().tolist()
+    table_html = df.to_html(classes='table table-striped', index=False)
+    return render(request, 'template.html', {'options': options, 'table_html': table_html})
+
+@csrf_exempt
+def update_table(request):
+    if request.method == 'POST':
+        selected_options = json.loads(request.POST.get('selected_options', '[]'))
+
+        if selected_options:
+            filtered_df = df[df['City'].isin(selected_options)]
+        else:
+            filtered_df = df
+
+        table_html = filtered_df.to_html(classes='table table-striped', index=False)
+        return JsonResponse({'table_html': table_html})
+
+    return JsonResponse({'error': 'Invalid request method'})
