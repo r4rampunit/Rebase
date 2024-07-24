@@ -2726,3 +2726,126 @@ def filter_dataframe(df, *selected_values):
     for f in filters:
         df = df[f]
     return df
+
+
+
+
+
+import os
+import json
+import pandas as pd
+from django.http import JsonResponse
+from django.shortcuts import render
+from django.views.decorators.csrf import csrf_exempt
+
+@csrf_exempt
+def mi_chart(request):
+    if request.method == 'POST':
+        # Load selected items from the POST request
+        selected_items = json.loads(request.POST.get('selectedItems', '{}'))
+        list_of_selected = [items for category, items in selected_items.items() if items]
+
+        # Extract selected values
+        selected_values = list_of_selected[:8]  # Assuming 8 selection categories
+
+        # Define folder paths
+        FOLDER_PATH = "path/to/your/folder"  # Replace with your actual folder path
+        selected_folder = request.GET.get("folder", "")
+        selected_subfolder = request.GET.get("subfolder", "")
+        folder_path = os.path.join(FOLDER_PATH, selected_folder, selected_subfolder)
+
+        if selected_folder and selected_subfolder:
+            excel_files = [f for f in os.listdir(folder_path) if f.endswith('.xlsx')]
+
+            # Initialize DataFrames
+            lic_dfs = []
+            rwa_dfs = []
+
+            columns_to_keep = [
+                "ST", "Credit_Risk_Type", "Organisational_unit_level_1", "Organisational_unit_level_2",
+                "Organisational_unit_level_3", "Country_of_Exposure", "Asset_class", "Product_Type", "Security",
+                "Basel_Approach", "scenario", "Projection_Period", "Type", "IFRS9_Stage", "Balance", "IFRS9_12M_PD",
+                "IFRS9_LGD", "IFRS9_Lifetime_PD", "Cumm_Gross_WO", "Provisions_orig", "Provisions", "Loss_at_WO_orig",
+                "Loss_at_WO", "Delta_Provisions", "LIC_Orig", "LIC", "Mapping1"
+            ]
+
+            for excel_file in excel_files:
+                file_path = os.path.join(folder_path, excel_file)
+
+                if "LIC" in excel_file:
+                    df = pd.read_excel(file_path, sheet_name="LPACT_OL_YTD_QTR_Final")
+                    df = df.loc[:, columns_to_keep].rename(columns={
+                        'Countryofexposure': 'Country_of_Exposure',
+                        'projection_period': 'Projection_Period',
+                        'LIC_Orig': 'LIC_orig'
+                    })
+                    df = df[df["Type"] != "YTD"]
+                    df["scenario"] = df["scenario"].replace('Annual cyclical scenario', 'Stress')
+                    lic_dfs.append(df)
+                elif "MI" in excel_file:
+                    df = pd.read_excel(file_path, sheet_name="Temp_RRM_Final_OL")
+                    df = df.loc[:, columns_to_keep].rename(columns={
+                        'Countryofexposure': 'Country_of_Exposure',
+                        'projection_period': 'Projection_Period',
+                        'LIC_Orig': 'LIC_orig'
+                    })
+                    df["scenario"] = df["scenario"].replace('Annual cyclical scenario', 'Stress')
+                    rwa_dfs.append(df)
+
+            # Combine all LIC and RWA DataFrames
+            lic_df = pd.concat(lic_dfs, ignore_index=True)
+            rwa_df = pd.concat(rwa_dfs, ignore_index=True)
+
+            # Filter DataFrame based on selected values
+            for i, column in enumerate([
+                "Organisational_unit_level_1", "Organisational_unit_level_2", "Organisational_unit_level_3",
+                "Country_of_Exposure", "Asset_class", "Product_Type", "Basel_Approach", "scenario"
+            ]):
+                if selected_values[i]:
+                    lic_df = lic_df[lic_df[column].isin(selected_values[i])]
+                    rwa_df = rwa_df[rwa_df[column].isin(selected_values[i])]
+
+            # Convert DataFrame to HTML
+            table_html = lic_df.to_html(classes='table table-striped table-bordered', index=False, escape=False)
+
+            return JsonResponse({"table_html": table_html})
+
+        return JsonResponse({"message": "No data available for the selected folder/subfolder"}, status=404)
+
+    else:
+        row_names = [
+            'Gross Balance ($ MM)', 'Net Balance ($ MM)', 'Net Balance Proportion S1',
+            'Net Balance Proportion S2', 'Net Balance Proportion S3', 'ECL ($ MM)',
+            'ECL Original ($ MM)', 'ECL Rate', 'Loss at WO ($ MM)',
+            'Loss at WO Original ($ MM)', 'LIC ($ MM)', 'LIC Original ($ MM)',
+            'LIC overlay ($ MM)', 'LIC Rate', 'Coverage ratio', 'PD', 'LGD',
+            'EAD ($ MM)', 'RWA ($ MM)', 'RWA Original ($ MM)', 'RWA Overlay ($ MM)',
+            'RWA Density', 'EL($ MM)', 'EL Overlay ($MM)', 'EL Density'
+        ]
+        column_names = ['T0', 'T1', 'T2', 'T3', 'T4', 'T5']
+        table_df = pd.DataFrame(index=row_names, columns=column_names)
+        table_html = table_df.to_html(classes='table table-striped table-bordered', index=True)
+
+        # You need to define these lists based on your data
+        Organisational_unit_level_1_list = []  # Add your data here
+        Organisational_unit_level_2_list = []  # Add your data here
+        Organisational_unit_level_3_list = []  # Add your data here
+        Country_of_Exposure_list = []  # Add your data here
+        Asset_class_list = []  # Add your data here
+        Product_Type_list = []  # Add your data here
+        Basel_Approach_list = []  # Add your data here
+        ST_scenario_combo = []  # Add your data here
+
+        context1 = {
+            'Organisational_unit_level_1_list': Organisational_unit_level_1_list,
+            'Organisational_unit_level_2_list': Organisational_unit_level_2_list,
+            'Organisational_unit_level_3_list': Organisational_unit_level_3_list,
+            'Country_of_Exposure_list': Country_of_Exposure_list,
+            'Asset_class_list': Asset_class_list,
+            'Product_Type_list': Product_Type_list,
+            'Basel_Approach_list': Basel_Approach_list,
+            'ST_scenario_combo': ST_scenario_combo,
+            'table_html': table_html
+        }
+
+        return render(request, 'mi_templates/mi_chart.html', context1)
