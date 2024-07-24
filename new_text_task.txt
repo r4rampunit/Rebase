@@ -15,6 +15,160 @@ def mi_chart(request):
             return JsonResponse({'error': 'Folder and subfolder must be selected'}, status=400)
 
         # Extract selected filters
+        Organisational_unit_level_1_selected = selected_items.get('Organisational_unit_level_1', [])
+        Organisational_unit_level_2_selected = selected_items.get('Organisational_unit_level_2', [])
+        Organisational_unit_level_3_selected = selected_items.get('Organisational_unit_level_3', [])
+        Country_of_Exposure_selected = selected_items.get('Country_of_Exposure', [])
+        Asset_class_selected = selected_items.get('Asset_class', [])
+        Product_Type_selected = selected_items.get('Product_Type', [])
+        Basel_Approach_selected = selected_items.get('Basel_Approach', [])
+        ST_scenario_selected = selected_items.get('ST_scenario', [])
+
+        # Define projection periods for each column
+        projection_periods = {
+            'T1': [1, 2, 3, 4],
+            'T2': [5, 6, 7, 8],
+            'T3': [9, 10, 11, 12],
+            'T4': [13, 14, 15, 16],
+            'T5': [17, 18, 19, 20]
+        }
+
+        # Initialize result DataFrame
+        row_names = ['Gross Balance ($ MM)', 'Net Balance ($ MM)', 'Net Balance Proportion S1', 
+                     'Net Balance Proportion S2', 'Net Balance Proportion S3', 'ECL ($ MM)', 
+                     'ECL Original ($ MM)', 'ECL Rate', 'Loss at WO ($ MM)', 'Loss at WO Original ($ MM)', 
+                     'LIC ($ MM)', 'LIC Original ($ MM)', 'LIC overlay ($ MM)', 'LIC Rate', 
+                     'Coverage ratio', 'PD', 'LGD', 'EAD ($ MM)', 'RWA ($ MM)', 'RWA Original ($ MM)', 
+                     'RWA Overlay ($ MM)', 'RWA Density', 'EL($ MM)', 'EL Overlay ($ MM)', 'EL Density']
+        column_names = ['T1', 'T2', 'T3', 'T4', 'T5']
+        table_df = pd.DataFrame(index=row_names, columns=column_names)
+
+        # Read Excel files
+        folder_path = os.path.join(settings.FOLDER_PATH, selected_folder, selected_subfolder)
+        excel_files = [f for f in os.listdir(folder_path) if f.endswith('.xlsx')]
+
+        lic_hbap_data = pd.DataFrame()
+        lic_non_hbap_data = pd.DataFrame()
+        rwa_hbap_data = pd.DataFrame()
+        rwa_non_hbap_data = pd.DataFrame()
+
+        for excel_file in excel_files:
+            file_path = os.path.join(folder_path, excel_file)
+            if "LIC" in excel_file and "HBAP" in excel_file:
+                lic_hbap_data = pd.concat([lic_hbap_data, pd.read_excel(file_path, sheet_name="LPACT_OL_YTD_QTR_Final")])
+            elif "LIC" in excel_file and "NonHBAP" in excel_file:
+                lic_non_hbap_data = pd.concat([lic_non_hbap_data, pd.read_excel(file_path, sheet_name="LPACT_OL_YTD_QTR_Final")])
+            elif "MI" in excel_file and "HBAP" in excel_file:
+                rwa_hbap_data = pd.concat([rwa_hbap_data, pd.read_excel(file_path, sheet_name="Temp_RRM_Final_OL")])
+            elif "MI" in excel_file and "NonHBAP" in excel_file:
+                rwa_non_hbap_data = pd.concat([rwa_non_hbap_data, pd.read_excel(file_path, sheet_name="Temp_RRM_Final_OL")])
+
+        # Combine HBAP and NonHBAP data
+        lic_df = pd.concat([lic_hbap_data, lic_non_hbap_data])
+        rwa_df = pd.concat([rwa_hbap_data, rwa_non_hbap_data])
+
+        # Apply filters
+        filters = {
+            'Organisational_unit_level_1': Organisational_unit_level_1_selected,
+            'Organisational_unit_level_2': Organisational_unit_level_2_selected,
+            'Organisational_unit_level_3': Organisational_unit_level_3_selected,
+            'Country_of_Exposure': Country_of_Exposure_selected,
+            'Asset_class': Asset_class_selected,
+            'Product_Type': Product_Type_selected,
+            'Basel_Approach': Basel_Approach_selected,
+        }
+
+        for key, value in filters.items():
+            if value:
+                lic_df = lic_df[lic_df[key].isin(value)]
+                rwa_df = rwa_df[rwa_df[key].isin(value)]
+
+        # Process ST_scenario_selected
+        st_scenario_list = [item.split('-') for item in ST_scenario_selected]
+        st_list = [item[0] for item in st_scenario_list]
+        scenario_list = [item[1] for item in st_scenario_list]
+
+        lic_df = lic_df[lic_df['ST'].isin(st_list) & lic_df['scenario'].isin(scenario_list)]
+        rwa_df = rwa_df[rwa_df['ST'].isin(st_list) & rwa_df['scenario'].isin(scenario_list)]
+
+        for col, periods in projection_periods.items():
+            # Filter LIC data for the current period
+            period_lic_data = lic_df[lic_df['Projection_Period'].isin(periods)]
+
+            # Aggregate LIC data
+            net_balance = period_lic_data['Balance'].sum() / 1000000
+            provisions = period_lic_data['Provisions'].sum() / 1000000
+            provisions_orig = period_lic_data['Provisions_orig'].sum() / 1000000
+            loss_at_wo = period_lic_data['Loss_at_WO'].sum() / 1000000
+            loss_at_wo_orig = period_lic_data['Loss_at_WO_orig'].sum() / 1000000
+            lic = period_lic_data['LIC'].sum() / 1000000
+            lic_orig = period_lic_data['LIC_orig'].sum() / 1000000
+
+            # Calculate proportions
+            stage_proportions = period_lic_data.groupby('IFRS9_Stage')['Balance'].sum() / period_lic_data['Balance'].sum()
+
+            # Populate result DataFrame
+            table_df.loc['Net Balance ($ MM)', col] = round(net_balance, 2)
+            for stage, proportion in stage_proportions.items():
+                table_df.loc[f"Net Balance Proportion S{stage}", col] = f"{round(proportion * 100, 2)}%"
+
+            table_df.loc['ECL ($ MM)', col] = round(provisions, 2)
+            table_df.loc['ECL Original ($ MM)', col] = round(provisions_orig, 2)
+            table_df.loc['ECL Rate', col] = f"{round((provisions / net_balance) * 100, 2)}%"
+            table_df.loc['Loss at WO ($ MM)', col] = round(loss_at_wo, 2)
+            table_df.loc['Loss at WO Original ($ MM)', col] = round(loss_at_wo_orig, 2)
+            table_df.loc['LIC ($ MM)', col] = round(lic, 2)
+            table_df.loc['LIC Original ($ MM)', col] = round(lic_orig, 2)
+            table_df.loc['LIC overlay ($ MM)', col] = round(lic - lic_orig, 2)
+            table_df.loc['LIC Rate', col] = f"{round((lic / net_balance) * 100, 2)}%"
+
+            # Filter RWA data for the current period (assuming Projection_Period 0 for RWA data)
+            period_rwa_data = rwa_df[rwa_df['Projection_Period'] == 0]
+
+            # Aggregate RWA data
+            ead = period_rwa_data['Exposure_for_RWA'].sum() / 1000000
+            rwa = period_rwa_data['RWA'].sum() / 1000000
+            rwa_orig = period_rwa_data['RWA_Orig'].sum() / 1000000
+            el = period_rwa_data['Expected_Loss_Regulatory'].sum() / 1000000
+            el_orig = period_rwa_data['Expected_Loss_Regulatory_Orig'].sum() / 1000000
+
+            # Populate result DataFrame with RWA data
+            table_df.loc['EAD ($ MM)', col] = round(ead, 2)
+            table_df.loc['RWA ($ MM)', col] = round(rwa, 2)
+            table_df.loc['RWA Original ($ MM)', col] = round(rwa_orig, 2)
+            table_df.loc['RWA Overlay ($ MM)', col] = round(rwa - rwa_orig, 2)
+            table_df.loc['RWA Density', col] = f"{round((rwa / ead) * 100, 2)}%" if ead else "0%"
+            table_df.loc['EL($ MM)', col] = round(el, 2)
+            table_df.loc['EL Overlay ($ MM)', col] = round(el - el_orig, 2)
+            table_df.loc['EL Density', col] = f"{round((el / ead) * 100, 2)}%" if ead else "0%"
+
+        # Convert DataFrame to HTML
+        table_html = table_df.to_html(classes="table table-striped table-bordered", index=True)
+        
+        return JsonResponse({'table_html': table_html})
+
+    # Handle GET request or other cases
+    return JsonResponse({'error': 'Invalid request method'}, status=400)
+
+
+
+
+import json
+import pandas as pd
+import os
+from django.http import JsonResponse
+from django.conf import settings
+
+def mi_chart(request):
+    if request.method == 'POST':
+        selected_items = json.loads(request.POST.get('selectedItems', '{}'))
+        selected_folder = request.GET.get("folder")
+        selected_subfolder = request.GET.get("subfolder")
+
+        if not selected_folder or not selected_subfolder:
+            return JsonResponse({'error': 'Folder and subfolder must be selected'}, status=400)
+
+        # Extract selected filters
         filters = {
             'Organisational_unit_level_1': selected_items.get('Organisational_unit_level_1', []),
             'Organisational_unit_level_2': selected_items.get('Organisational_unit_level_2', []),
