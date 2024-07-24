@@ -1,3 +1,138 @@
+import json
+import pandas as pd
+from django.http import JsonResponse
+from django.db.models import Sum, F, Case, When, Value, FloatField
+from .models import LICData, RWAData  # Assuming you have these models
+
+def mi_chart(request):
+    if request.method == 'POST':
+        selected_items = json.loads(request.POST.get('selectedItems', '{}'))
+        
+        # Extract selected filters
+        filters = {
+            'Organisational_unit_level_1': selected_items.get('Organisational_unit_level_1', []),
+            'Organisational_unit_level_2': selected_items.get('Organisational_unit_level_2', []),
+            'Organisational_unit_level_3': selected_items.get('Organisational_unit_level_3', []),
+            'Country_of_Exposure': selected_items.get('Country_of_Exposure', []),
+            'Asset_class': selected_items.get('Asset_class', []),
+            'Product_Type': selected_items.get('Product_Type', []),
+            'Basel_Approach': selected_items.get('Basel_Approach', []),
+            'ST_scenario': selected_items.get('ST_scenario', [])
+        }
+
+        # Extract ST and scenario from ST_scenario
+        st_scenario_list = [item.split('-') for item in filters['ST_scenario']]
+        st_list = [item[0] for item in st_scenario_list]
+        scenario_list = [item[1] for item in st_scenario_list]
+
+        # Define projection periods for each column
+        projection_periods = {
+            'T1': [1, 2, 3, 4],
+            'T2': [5, 6, 7, 8],
+            'T3': [9, 10, 11, 12],
+            'T4': [13, 14, 15, 16],
+            'T5': [17, 18, 19, 20]
+        }
+
+        # Initialize result DataFrame
+        result_df = pd.DataFrame(index=[
+            'Net Balance ($ MM)', 'Net Balance Proportion S1', 'Net Balance Proportion S2',
+            'Net Balance Proportion S3', 'ECL ($ MM)', 'ECL Original ($ MM)', 'ECL Rate',
+            'Loss at WO ($ MM)', 'Loss at WO Original ($ MM)', 'LIC ($ MM)',
+            'LIC Original ($ MM)', 'LIC overlay ($ MM)', 'LIC Rate', 'Coverage ratio',
+            'PD', 'LGD', 'EAD ($ MM)', 'RWA ($ MM)', 'RWA Original ($ MM)',
+            'RWA Overlay ($ MM)', 'RWA Density', 'EL($ MM)', 'EL Overlay ($ MM)', 'EL Density'
+        ], columns=['T1', 'T2', 'T3', 'T4', 'T5'])
+
+        for col, periods in projection_periods.items():
+            # Filter LIC data
+            lic_data = LICData.objects.filter(
+                Organisational_unit_level_1__in=filters['Organisational_unit_level_1'],
+                Organisational_unit_level_2__in=filters['Organisational_unit_level_2'],
+                Organisational_unit_level_3__in=filters['Organisational_unit_level_3'],
+                Country_of_Exposure__in=filters['Country_of_Exposure'],
+                Asset_class__in=filters['Asset_class'],
+                Product_Type__in=filters['Product_Type'],
+                Basel_Approach__in=filters['Basel_Approach'],
+                ST__in=st_list,
+                scenario__in=scenario_list,
+                Projection_Period__in=periods
+            )
+
+            # Aggregate LIC data
+            lic_aggregates = lic_data.aggregate(
+                net_balance=Sum('Balance') / 1000000,
+                provisions=Sum('Provisions') / 1000000,
+                provisions_orig=Sum('Provisions_orig') / 1000000,
+                loss_at_wo=Sum('Loss_at_WO') / 1000000,
+                loss_at_wo_orig=Sum('Loss_at_WO_orig') / 1000000,
+                lic=Sum('LIC') / 1000000,
+                lic_orig=Sum('LIC_orig') / 1000000
+            )
+
+            # Calculate proportions
+            stage_proportions = lic_data.values('IFRS9_Stage').annotate(
+                proportion=Sum('Balance') / lic_aggregates['net_balance']
+            ).order_by('IFRS9_Stage')
+
+            # Populate result DataFrame
+            result_df.loc['Net Balance ($ MM)', col] = round(lic_aggregates['net_balance'], 2)
+            for stage in stage_proportions:
+                result_df.loc[f"Net Balance Proportion S{stage['IFRS9_Stage']}", col] = f"{round(stage['proportion'] * 100, 2)}%"
+
+            result_df.loc['ECL ($ MM)', col] = round(lic_aggregates['provisions'], 2)
+            result_df.loc['ECL Original ($ MM)', col] = round(lic_aggregates['provisions_orig'], 2)
+            result_df.loc['ECL Rate', col] = f"{round((lic_aggregates['provisions'] / lic_aggregates['net_balance']) * 100, 2)}%"
+            result_df.loc['Loss at WO ($ MM)', col] = round(lic_aggregates['loss_at_wo'], 2)
+            result_df.loc['Loss at WO Original ($ MM)', col] = round(lic_aggregates['loss_at_wo_orig'], 2)
+            result_df.loc['LIC ($ MM)', col] = round(lic_aggregates['lic'], 2)
+            result_df.loc['LIC Original ($ MM)', col] = round(lic_aggregates['lic_orig'], 2)
+            result_df.loc['LIC overlay ($ MM)', col] = round(lic_aggregates['lic'] - lic_aggregates['lic_orig'], 2)
+            result_df.loc['LIC Rate', col] = f"{round((lic_aggregates['lic'] / lic_aggregates['net_balance']) * 100, 2)}%"
+
+            # Filter RWA data
+            rwa_data = RWAData.objects.filter(
+                Organisational_unit_level_1__in=filters['Organisational_unit_level_1'],
+                Organisational_unit_level_2__in=filters['Organisational_unit_level_2'],
+                Organisational_unit_level_3__in=filters['Organisational_unit_level_3'],
+                Country_of_Exposure__in=filters['Country_of_Exposure'],
+                Asset_class__in=filters['Asset_class'],
+                Product_Type__in=filters['Product_Type'],
+                Basel_Approach__in=filters['Basel_Approach'],
+                ST__in=st_list,
+                scenario__in=scenario_list,
+                Projection_Period=0
+            )
+
+            # Aggregate RWA data
+            rwa_aggregates = rwa_data.aggregate(
+                ead=Sum('Exposure_for_RWA') / 1000000,
+                rwa=Sum('RWA') / 1000000,
+                rwa_orig=Sum('RWA_Orig') / 1000000,
+                el=Sum('Expected_Loss_Regulatory') / 1000000,
+                el_orig=Sum('Expected_Loss_Regulatory_Orig') / 1000000
+            )
+
+            # Populate result DataFrame with RWA data
+            result_df.loc['EAD ($ MM)', col] = round(rwa_aggregates['ead'], 2)
+            result_df.loc['RWA ($ MM)', col] = round(rwa_aggregates['rwa'], 2)
+            result_df.loc['RWA Original ($ MM)', col] = round(rwa_aggregates['rwa_orig'], 2)
+            result_df.loc['RWA Overlay ($ MM)', col] = round(rwa_aggregates['rwa'] - rwa_aggregates['rwa_orig'], 2)
+            result_df.loc['RWA Density', col] = f"{round((rwa_aggregates['rwa'] / rwa_aggregates['ead']) * 100, 2)}%" if rwa_aggregates['ead'] else "0%"
+            result_df.loc['EL($ MM)', col] = round(rwa_aggregates['el'], 2)
+            result_df.loc['EL Overlay ($ MM)', col] = round(rwa_aggregates['el'] - rwa_aggregates['el_orig'], 2)
+            result_df.loc['EL Density', col] = f"{round((rwa_aggregates['el'] / rwa_aggregates['ead']) * 100, 2)}%" if rwa_aggregates['ead'] else "0%"
+
+        # Convert DataFrame to HTML
+        table_html = result_df.to_html(classes="table table-striped table-bordered", index=True)
+        
+        return JsonResponse({'table_html': table_html})
+
+    # Handle GET request or other cases
+    return JsonResponse({'error': 'Invalid request method'}, status=400)
+
+
+
 from django.http import JsonResponse
 from django.shortcuts import render
 
