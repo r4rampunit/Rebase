@@ -3039,3 +3039,382 @@ def mi_chart(request):
             "subfolders": subfolders
         }
         return render(request, 'mi_chart.html', context)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import json
+import os
+import pandas as pd
+from django.http import JsonResponse
+
+def mi_chart(request):
+    if request.method == 'POST':
+        selected_items = json.loads(request.POST.get('selectedItems', '{}'))
+        print(selected_items)
+        list_of_selected = [items for category, items in selected_items.items() if items]
+
+        Organisational_unit_level_1_selected = list_of_selected[0]
+        Organisational_unit_level_2_selected = list_of_selected[1]
+        Organisational_unit_level_3_selected = list_of_selected[2]
+        Country_of_Exposure_selected = list_of_selected[3]
+        Asset_class_selected = list_of_selected[4]
+        Product_Type_selected = list_of_selected[5]
+        Basel_Approach_selected = list_of_selected[6]
+        ST_scenario_selected = list_of_selected[7]
+
+        folders = get_folders()
+        selected_folder = request.GET.get("folder")
+        selected_subfolder = request.GET.get("subfolder")
+        subfolders = get_subfolders(selected_folder) if selected_folder else []
+
+        row_names = [
+            'Gross Balance ($ MM)', 'Net Balance ($ MM)', 'Net Balance Proportion S1',
+            'Net Balance Proportion S2', 'Net Balance Proportion S3', 'ECL ($ MM)',
+            'ECL Original ($ MM)', 'ECL Rate', 'Loss at WO ($ MM)', 'Loss at WO Original ($ MM)',
+            'LIC ($ MM)', 'LIC Original ($ MM)', 'LIC overlay ($ MM)', 'LIC Rate',
+            'Coverage ratio', 'PD', 'LGD', 'EAD ($ MM)', 'RWA ($ MM)', 'RWA Original ($ MM)',
+            'RWA Overlay ($ MM)', 'RWA Density', 'EL($ MM)', 'EL Overlay ($MM)', 'EL Density'
+        ]
+        column_names = ['T0', 'T1', 'T2', 'T3', 'T4', 'T5']
+        table_df1 = pd.DataFrame(index=row_names, columns=column_names)
+        table_df = pd.DataFrame(index=row_names)
+
+        if selected_folder and selected_subfolder:
+            folder_path = os.path.join(FOLDER_PATH, selected_folder, selected_subfolder)
+            excel_files = [f for f in os.listdir(folder_path) if f.endswith('.xlsx')]
+
+            dataframes = {}
+            for excel_file in excel_files:
+                file_path = os.path.join(folder_path, excel_file)
+                if "LIC" in excel_file and "HBAP" in excel_file:
+                    if "FirstRun" in excel_file:
+                        dataframes['lic_hbap_first_run'] = pd.read_excel(file_path, sheet_name="LPACT_OL_YTD_QTR_Final")
+                    elif "LastRun" in excel_file:
+                        dataframes['lic_hbap_last_run'] = pd.read_excel(file_path, sheet_name="LPACT_OL_YTD_QTR_Final")
+                elif "LPACT" in excel_file and "HBAP" in excel_file:
+                    dataframes['lpact_hbap_data'] = pd.read_excel(file_path, sheet_name="PD series")
+                elif "LIC" in excel_file and "NonHBAP" in excel_file:
+                    if "FirstRun" in excel_file:
+                        dataframes['lic_non_hbap_first_run'] = pd.read_excel(file_path, sheet_name="LPACT_OL_YTD_QTR_Final")
+                    elif "LastRun" in excel_file:
+                        dataframes['lic_non_hbap_last_run'] = pd.read_excel(file_path, sheet_name="LPACT_OL_YTD_QTR_Final")
+                elif "LPACT" in excel_file and "Non" in excel_file and "HBAP" in excel_file:
+                    dataframes['lpact_non_hbap_data'] = pd.read_excel(file_path, sheet_name="PD series")
+                elif "MI" in excel_file and "HBAP" in excel_file:
+                    if "FirstRun" in excel_file:
+                        dataframes['rwa_hbap_first_run'] = pd.read_excel(file_path, sheet_name="Temp_RRM_Final_OL")
+                    elif "LastRun" in excel_file:
+                        dataframes['rwa_hbap_last_run'] = pd.read_excel(file_path, sheet_name="Temp_RRM_Final_OL")
+                elif "MI" in excel_file and "Non" in excel_file and "HBAP" in excel_file:
+                    if "FirstRun" in excel_file:
+                        dataframes['rwa_non_hbap_first_run'] = pd.read_excel(file_path, sheet_name="Temp_RRM_Final_OL")
+                    elif "LastRun" in excel_file:
+                        dataframes['rwa_non_hbap_last_run'] = pd.read_excel(file_path, sheet_name="Temp_RRM_Final_OL")
+                elif "LIC" in excel_file and "Previous" in excel_file:
+                    dataframes['lic_views_previous'] = pd.read_excel(file_path, sheet_name="LIC_raw1")
+                elif "RWA" in excel_file and "Previous" in excel_file:
+                    dataframes['rwa_views_previous'] = pd.read_excel(file_path, sheet_name="RWA_raw1")
+
+            columns_to_keep = [
+                "ST", "Credit_Risk_Type", "Organisational_unit_level_1", "Organisational_unit_level_2",
+                "Organisational_unit_level_3", "Country_of_Exposure", "Asset_class", "Product_Type",
+                "Security", "Basel_Approach", "scenario", "Projection_Period", "Type", "IFRS9_Stage",
+                "Balance", "IFRS9_12M_PD", "IFRS9_LGD", "IFRS9_Lifetime_PD", "Cumm_Gross_WO",
+                "Provisions_orig", "Provisions", "Loss_at_WO_orig", "Loss_at_WO", "Delta_Provisions",
+                "LIC_Orig", "LIC", "Mapping1"
+            ]
+
+            for df_name in ['lic_hbap_first_run', 'lic_hbap_last_run', 'lic_non_hbap_first_run', 'lic_non_hbap_last_run']:
+                if df_name in dataframes:
+                    dataframes[df_name] = dataframes[df_name].loc[:, columns_to_keep]
+
+            new_column_names = {
+                'Countryofexposure': 'Country_of_Exposure',
+                'projection_period': 'Projection_Period',
+                'LIC_Orig': 'LIC_orig'
+            }
+
+            for df_name in ['lic_hbap_last_run', 'lic_hbap_first_run', 'lic_non_hbap_last_run', 'lic_non_hbap_first_run']:
+                if df_name in dataframes:
+                    dataframes[df_name] = dataframes[df_name].rename(columns=new_column_names)
+                    dataframes[df_name] = dataframes[df_name][dataframes[df_name]["Type"] != "YTD"]
+                    dataframes[df_name]["scenario"] = dataframes[df_name]["scenario"].replace('Annual cyclical scenario', 'Stress')
+
+            for df_name in ['lpact_hbap_data', 'lpact_non_hbap_data']:
+                if df_name in dataframes:
+                    dataframes[df_name]["date"] = dataframes[df_name]["date"].str.replace('T', '')
+                    dataframes[df_name]["date"] = pd.to_numeric(dataframes[df_name]["date"])
+
+            lic_key_columns = [
+                "Credit_Risk_Type", "Organisational_unit_level_1", "Organisational_unit_level_2",
+                "Organisational_unit_level_3", "Country_of_Exposure", "Asset_class", "Product_Type",
+                "Security", "Basel_Approach", "scenario", "Projection_Period", "Type", "IFRS9_Stage"
+            ]
+            lic_first_run_columns = ['Provisions_orig', 'Loss_at_WO_orig', 'LIC_orig']
+            columns_to_merge = lic_key_columns + lic_first_run_columns
+
+            for hbap_type in ['hbap', 'non_hbap']:
+                if f'lic_{hbap_type}_last_run' in dataframes and f'lic_{hbap_type}_first_run' in dataframes:
+                    merged_df = pd.merge(
+                        dataframes[f'lic_{hbap_type}_last_run'],
+                        dataframes[f'lic_{hbap_type}_first_run'][columns_to_merge],
+                        on=lic_key_columns,
+                        how='left',
+                        suffixes=('', '_run_columns')
+                    )
+                    for col in lic_first_run_columns:
+                        merged_df[col] = merged_df[f'{col}_run_columns']
+                        merged_df.drop(columns=[f'{col}_run_columns'], inplace=True)
+                    dataframes[f'lic_{hbap_type}_merged_df'] = merged_df
+
+            if 'lic_non_hbap_last_run' in dataframes and 'lpact_non_hbap_data' in dataframes:
+                updated_ifrs12M_df = dataframes['lic_non_hbap_last_run'].merge(
+                    dataframes['lpact_non_hbap_data'],
+                    how='left',
+                    left_on=['Projection_Period', 'Mapping1', 'scenario'],
+                    right_on=['date', 'portfolio', 'scenario']
+                )
+
+                def update_ifrs12M(row, updated_ifrs12M_df):
+                    if row['IFRS9_Stage'] in [1, 2]:
+                        match = updated_ifrs12M_df[
+                            (updated_ifrs12M_df['date'] == row['Projection_Period']) &
+                            (updated_ifrs12M_df['portfolio'] == row['Mapping1']) &
+                            (updated_ifrs12M_df['scenario'] == row['scenario'])
+                        ]
+                        return match['pd'].values[0] if not match.empty else row['IFRS9_12M_PD']
+                    elif row['IFRS9_Stage'] == 3:
+                        return 1
+                    return row['IFRS9_12M_PD']
+
+                dataframes['lic_non_hbap_last_run']['IFRS9_12M_PD'] = dataframes['lic_non_hbap_last_run'].apply(
+                    lambda row: update_ifrs12M(row, updated_ifrs12M_df), axis=1
+                )
+
+            lic_df = pd.concat([
+                dataframes.get('lic_hbap_merged_df', pd.DataFrame()),
+                dataframes.get('lic_non_hbap_merged_df', pd.DataFrame())
+            ], ignore_index=True, sort=False)
+
+            columns_to_keep = [
+                "ST", "Credit_Risk_Type", "Organisational_unit_level_1", "Organisational_unit_level_2",
+                "Organisational_unit_level_3", "Country_of_Exposure", "Asset_Class", "Product_Type",
+                "security", "Basel_Approach", "Scenario", "Projection_Period", "Default_Status",
+                "RWA_Orig", "Balance", "Exposure_for_RWA_Orig", "PD_Regulatory", "LGD_Regulatory",
+                "Expected_Loss_Regulatory_Orig", "RWA", "Exposure_for_RWA", "Expected_Loss_Regulatory"
+            ]
+
+            for df_name in ['rwa_hbap_first_run', 'rwa_hbap_last_run', 'rwa_non_hbap_first_run', 'rwa_non_hbap_last_run']:
+                if df_name in dataframes:
+                    dataframes[df_name] = dataframes[df_name].loc[:, columns_to_keep]
+
+            new_column_names = {'Scenario': 'scenario', 'Asset_Class': 'Asset_class'}
+
+            for df_name in ['rwa_hbap_first_run', 'rwa_hbap_last_run', 'rwa_non_hbap_first_run', 'rwa_non_hbap_last_run']:
+                if df_name in dataframes:
+                    dataframes[df_name] = dataframes[df_name].rename(columns=new_column_names)
+                    dataframes[df_name] = dataframes[df_name][~dataframes[df_name]['Projection_Period'].str.startswith('Y')]
+                    dataframes[df_name]['Projection_Period'] = dataframes[df_name]['Projection_Period'].str.replace('^Q', '', regex=True)
+                    dataframes[df_name]['Projection_Period'] = pd.to_numeric(dataframes[df_name]['Projection_Period'])
+
+            rwa_key_columns = [
+                "Credit_Risk_Type", "Organisational_unit_level_1", "Organisational_unit_level_2",
+                "Organisational_unit_level_3", "Country_of_Exposure", "Asset_class", "Product_Type",
+                "security", "Basel_Approach", "scenario", "Projection_Period", "Default_Status"
+            ]
+            rwa_first_run_columns = ['RWA_Orig', 'Exposure_for_RWA_Orig', 'Expected_Loss_Regulatory_Orig']
+            columns_to_merge = rwa_key_columns + rwa_first_run_columns
+
+            for hbap_type in ['hbap', 'non_hbap']:
+                if f'rwa_{hbap_type}_last_run' in dataframes and f'rwa_{hbap_type}_first_run' in dataframes:
+                    merged_df = pd.merge(
+                        dataframes[f'rwa_{hbap_type}_last_run'],
+                        dataframes[f'rwa_{hbap_type}_first_run'][columns_to_merge],
+                        on=rwa_key_columns,
+                        how='left',
+                        suffixes=('', '_run_columns')
+                    )
+                    for col in rwa_first_run_columns:
+                        merged_df[col] = merged_df[f'{col}_run_columns']
+                        merged_df.drop(columns=[f'{col}_run_columns'], inplace=True)
+                    dataframes[f'rwa_{hbap_type}_merged_df'] = merged_df
+
+            rwa_df = pd.concat([
+                dataframes.get('rwa_hbap_merged_df', pd.DataFrame()),
+                dataframes.get('rwa_non_hbap_merged_df', pd.DataFrame())
+            ], ignore_index=True, sort=False)
+
+            lic_df = pd.concat([lic_df, dataframes.get('lic_views_previous', pd.DataFrame())])
+            rwa_df = pd.concat([rwa_df, dataframes.get('rwa_views_previous', pd.DataFrame())])
+
+            lic_df["scenario"] = lic_df["scenario"].replace('Annual cyclical scenario', 'Stress')
+            rwa_df["scenario"] = rwa_df["scenario"].replace('Annual cyclical scenario', 'Stress')
+
+            Organisational_unit_level_1_list = lic_df["Organisational_unit_level_1"].unique()
+            Organisational_unit_level_2_list = lic_df["Organisational_unit_level_2"].unique()
+            Organisational_unit_level_3_list = lic_df["Organisational_unit_level_3"].unique()
+            Country_of_Exposure_list = lic_df["Country_of_Exposure"].unique()
+            Asset_class_list = lic_df["Asset_class"].unique()
+            Product_Type_list = lic_df["Product_Type"].unique()
+            Basel_Approach_list = lic_df["Basel_Approach"].unique()
+            ST_type = lic_df['ST'].unique()
+            scenario_type = lic_df['scenario'].unique()
+
+            ST_scenario_combo = [f"{st}-{scenario}" for st in ST_type for scenario in scenario_type]
+
+            list1 = [st.split('-') for st in ST_scenario_selected]
+            print(list1)
+
+            for x in list1:
+                scenario = x[1]
+                ST = x[0]
+                print(ST)
+
+                for col in column_names:
+                    if col == "T1":
+                        Projection_Period = [4]
+                        projection_period_range = [1, 2, 3, 4]
+                    elif col == "T2":
+                        Projection_Period = [8]
+                        projection_period_range = [5, 6, 7, 8]
+                    elif col == "T3":
+                        Projection_Period = [12]
+                        projection_period_range = [9, 10, 11, 12]
+                    elif col == "T4":
+                        Projection_Period = [16]
+                        projection_period_range = [13, 14, 15, 16]
+                    elif col == "T5":
+                        Projection_Period = [20]
+                        projection_period_range = [17, 18, 19, 20]
+                    else:
+                        Projection_Period = [0]
+                        projection_period_range = [0]
+
+                    filter_conditions = (
+                        (lic_df["Organisational_unit_level_1"].isin(Organisational_unit_level_1_selected)) &
+                        (lic_df["ST"] == ST) &
+                        (lic_df["Organisational_unit_level_2"].isin(Organisational_unit_level_2_selected)) &
+                        (lic_df["Organisational_unit_level_3"].isin(Organisational_unit_level_3_selected)) &
+                        (lic_df["Country_of_Exposure"].isin(Country_of_Exposure_selected)) &
+                        (lic_df["Asset_class"].isin(Asset_class_selected)) &
+                        (lic_df["Product_Type"].isin(Product_Type_selected)) &
+                        (lic_df["Basel_Approach"].isin(Basel_Approach_selected)) &
+                        (lic_df["scenario"] == scenario) &
+                        (lic_df["Projection_Period"].isin(Projection_Period))
+                    )
+
+                    net_balance = lic_df[filter_conditions]["Balance"].sum()
+                    table_df1.loc["Net Balance ($ MM)", col] = round(net_balance / 1000000, 2)
+
+                    gross_balance = net_balance + lic_df[filter_conditions]["Cumm_Gross_WO"].sum()
+                    table_df1.loc["Gross Balance ($ MM)", col] = round(gross_balance / 1000000, 2)
+
+                    for stage in [1, 2, 3]:
+                        stage_balance = lic_df[filter_conditions & (lic_df["IFRS9_Stage"] == stage)]["Balance"].sum()
+                        proportion = (stage_balance / net_balance) * 100 if net_balance != 0 else 0
+                        table_df1.loc[f"Net Balance Proportion S{stage}", col] = f"{proportion:.2f}%"
+
+                    provisions = lic_df[filter_conditions]["Provisions"].sum()
+                    table_df1.loc["ECL ($ MM)", col] = round(provisions / 1000000, 2)
+
+                    provisions_orig = lic_df[filter_conditions]["Provisions_orig"].sum()
+                    table_df1.loc["ECL Original ($ MM)", col] = round(provisions_orig / 1000000, 2)
+
+                    ecl_rate = (provisions / net_balance) * 100 if net_balance != 0 else 0
+                    table_df1.loc["ECL Rate", col] = f"{ecl_rate:.2f}%"
+
+                    loss_at_wo = lic_df[filter_conditions & (lic_df["Projection_Period"].isin(projection_period_range))]["Loss_at_WO"].sum()
+                    table_df1.loc["Loss at WO ($ MM)", col] = round(loss_at_wo / 1000000, 2)
+
+                    loss_at_wo_orig = lic_df[filter_conditions & (lic_df["Projection_Period"].isin(projection_period_range))]["Loss_at_WO_orig"].sum()
+                    table_df1.loc["Loss at WO Original ($ MM)", col] = round(loss_at_wo_orig / 1000000, 2)
+
+                    lic = lic_df[filter_conditions & (lic_df["Projection_Period"].isin(projection_period_range))]["LIC"].sum()
+                    table_df1.loc["LIC ($ MM)", col] = round(lic / 1000000, 2)
+
+                    lic_orig = lic_df[filter_conditions & (lic_df["Projection_Period"].isin(projection_period_range))]["LIC_orig"].sum()
+                    table_df1.loc["LIC Original ($ MM)", col] = round(lic_orig / 1000000, 2)
+
+                    table_df1.loc["LIC overlay ($ MM)", col] = table_df1.loc["LIC ($ MM)", col] - table_df1.loc["LIC Original ($ MM)", col]
+
+                    lic_rate = (lic / net_balance) * 100 if net_balance != 0 else 0
+                    table_df1.loc["LIC Rate", col] = f"{lic_rate:.2f}%"
+
+                    # Coverage ratio calculation (if needed)
+                    # table_df1.loc["Coverage ratio", col] = ...
+
+                    # PD and LGD calculations (if needed)
+                    # table_df1.loc["PD", col] = ...
+                    # table_df1.loc["LGD", col] = ...
+
+                    rwa_filter_conditions = (
+                        (rwa_df["Organisational_unit_level_1"].isin(Organisational_unit_level_1_selected)) &
+                        (rwa_df["ST"] == ST) &
+                        (rwa_df["Organisational_unit_level_2"].isin(Organisational_unit_level_2_selected)) &
+                        (rwa_df["Organisational_unit_level_3"].isin(Organisational_unit_level_3_selected)) &
+                        (rwa_df["Country_of_Exposure"].isin(Country_of_Exposure_selected)) &
+                        (rwa_df["Asset_class"].isin(Asset_class_selected)) &
+                        (rwa_df["Product_Type"].isin(Product_Type_selected)) &
+                        (rwa_df["Basel_Approach"].isin(Basel_Approach_selected)) &
+                        (rwa_df["scenario"] == scenario) &
+                        (rwa_df["Projection_Period"] == 0)
+                    )
+
+                    ead = rwa_df[rwa_filter_conditions]["Exposure_for_RWA"].sum()
+                    table_df1.loc["EAD ($ MM)", col] = round(ead / 1000000, 2)
+
+                    rwa = rwa_df[rwa_filter_conditions]["RWA"].sum()
+                    table_df1.loc["RWA ($ MM)", col] = round(rwa / 1000000, 2)
+
+                    rwa_orig = rwa_df[rwa_filter_conditions]["RWA_Orig"].sum()
+                    table_df1.loc["RWA Original ($ MM)", col] = round(rwa_orig / 1000000, 2)
+
+                    table_df1.loc["RWA Overlay ($ MM)", col] = round(table_df1.loc["RWA ($ MM)", col] - table_df1.loc["RWA Original ($ MM)", col], 2)
+
+                    rwa_density = (rwa / ead) * 100 if ead != 0 else 0
+                    table_df1.loc["RWA Density", col] = f"{rwa_density:.2f}%"
+
+                    el = rwa_df[rwa_filter_conditions]["Expected_Loss_Regulatory"].sum()
+                    table_df1.loc["EL($ MM)", col] = round(el / 1000000, 2)
+
+                    el_orig = rwa_df[rwa_filter_conditions]["Expected_Loss_Regulatory_Orig"].sum()
+                    table_df1.loc["EL Overlay ($MM)", col] = round((el - el_orig) / 1000000, 2)
+
+                    el_density = (el / ead) * 100 if ead != 0 else 0
+                    table_df1.loc["EL Density", col] = f"{el_density:.2f}%"
+
+            table_df = pd.concat([table_df, table_df1], axis=1)
+            table_html = table_df.to_html(classes="table table-striped table-bordered", index=True)
+            return JsonResponse({'table_html': table_html})
+
+    return JsonResponse({'error': 'Invalid request method'})
