@@ -1968,3 +1968,98 @@ def mi_chart(request):
             'table_html': table_html
         }
         return render(request, 'data_template.html', context)
+
+
+
+
+
+
+
+
+
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MI Chart</title>
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+</head>
+<body>
+    <div id="filter-form">
+        <select class="select2" multiple name="Product">
+            {% for option in list1 %}
+                <option value="{{ option }}">{{ option }}</option>
+            {% endfor %}
+        </select>
+
+        <select class="select2" multiple name="Category">
+            {% for option in list2 %}
+                <option value="{{ option }}">{{ option }}</option>
+            {% endfor %}
+        </select>
+
+        <select class="select2" multiple name="Price_Range">
+            {% for option in list3 %}
+                <option value="{{ option }}">{{ option }}</option>
+            {% endfor %}
+        </select>
+
+        <select class="select2" multiple name="Stock_Level">
+            {% for option in list4 %}
+                <option value="{{ option }}">{{ option }}</option>
+            {% endfor %}
+        </select>
+
+        <select class="select2" multiple name="Rating">
+            {% for option in list5 %}
+                <option value="{{ option }}">{{ option }}</option>
+            {% endfor %}
+        </select>
+
+        <select class="select2" multiple name="Supplier">
+            {% for option in list6 %}
+                <option value="{{ option }}">{{ option }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div id="table-container">
+        {{ table_html|safe }}
+    </div>
+
+    <script>
+        $(document).ready(function() {
+            $('.select2').select2();
+
+            function updateTable() {
+                var selectedOptions = {};
+                $('#filter-form select').each(function() {
+                    selectedOptions[$(this).attr('name')] = $(this).val();
+                });
+
+                $.ajax({
+                    url: '{% url "mi_chart" %}',
+                    method: 'POST',
+                    data: {
+                        selected_options: JSON.stringify(selectedOptions)
+                    },
+                    success: function(response) {
+                        $('#table-container').html(response.table_html);
+                    }
+                });
+            }
+
+            // Trigger update when any select changes
+            $('.select2').on('change', function() {
+                updateTable();
+            });
+        });
+    </script>
+</body>
+</html>
