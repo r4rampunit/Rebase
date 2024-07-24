@@ -1,3 +1,46 @@
+# ... (previous code remains the same)
+
+# Combine HBAP and NonHBAP data
+lic_df = pd.concat([lic_hbap_data, lic_non_hbap_data])
+rwa_df = pd.concat([rwa_hbap_data, rwa_non_hbap_data])
+
+# Function to safely filter DataFrame
+def safe_filter(df, column, values):
+    if column in df.columns and values:
+        return df[df[column].isin(values)]
+    return df
+
+# Apply filters
+filters = {
+    'Organisational_unit_level_1': Organisational_unit_level_1_selected,
+    'Organisational_unit_level_2': Organisational_unit_level_2_selected,
+    'Organisational_unit_level_3': Organisational_unit_level_3_selected,
+    'Country_of_Exposure': Country_of_Exposure_selected,
+    'Asset_class': Asset_class_selected,
+    'Product_Type': Product_Type_selected,
+    'Basel_Approach': Basel_Approach_selected,
+}
+
+for key, value in filters.items():
+    lic_df = safe_filter(lic_df, key, value)
+    rwa_df = safe_filter(rwa_df, key, value)
+
+# Process ST_scenario_selected
+if ST_scenario_selected:
+    st_scenario_list = [item.split('-') for item in ST_scenario_selected]
+    st_list = [item[0] for item in st_scenario_list]
+    scenario_list = [item[1] for item in st_scenario_list]
+
+    lic_df = safe_filter(lic_df, 'ST', st_list)
+    lic_df = safe_filter(lic_df, 'scenario', scenario_list)
+    rwa_df = safe_filter(rwa_df, 'ST', st_list)
+    rwa_df = safe_filter(rwa_df, 'scenario', scenario_list)
+
+# ... (rest of the code remains the same)
+
+
+
+
 
 import json
 import pandas as pd
