@@ -3418,3 +3418,90 @@ def mi_chart(request):
             return JsonResponse({'table_html': table_html})
 
     return JsonResponse({'error': 'Invalid request method'})
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import pandas as pd
+from datetime import datetime
+from openpyxl import load_workbook
+
+def write_description(sheet):
+    # Load the mapping file
+    workbook_path = r".\Input\Mapping_File - Copy.xlsx"
+    mapping_df = pd.read_excel(workbook_path, sheet_name="Data_Edge")
+
+    # Define the constants
+    country_list = ['USA']
+    curr_year = 2024
+    quarters = [
+        (curr_year - 1, 3, 31),
+        (curr_year - 1, 6, 30),
+        (curr_year - 1, 9, 30),
+        (curr_year - 1, 12, 31)
+    ]
+
+    # Get the col_list once
+    col_list = Table_List.loc[Table_List['Country'].isin(country_list), 'MEV'].tolist()
+
+    # Process all frames
+    all_results = [process_frame(frame, country_list, col_list, quarters) for frame in All]
+
+    # Combine results
+    combined_results = list(zip(*all_results))
+
+    # Iterate through all cells in the sheet
+    for row in range(1, sheet.max_row + 1):
+        for col in range(1, sheet.max_column + 1):
+            if sheet.cell(row=row, column=col).value == 'user_inputs[0]':
+                check_and_write(sheet, row, col, combined_results, col_list, country_list, mapping_df)
+
+def process_frame(frame, country_list, col_list, quarters):
+    results = []
+    for year, month, day in quarters:
+        date = datetime(year, month, day)
+        filtered = frame[(frame['ISOCODES'].isin(country_list)) & (frame['date'] == date)]
+        if not filtered.empty:
+            values = filtered[col_list].round(1).values[0]
+            results.append(values.tolist())
+    return results
+
+def check_and_write(sheet, row, col, combined_results, col_list, country_list, mapping_df):
+    for i in range(3, 7):
+        cell_value = sheet.cell(row=row+i, column=col).value
+        if cell_value not in combined_results[i-3]:
+            return
+
+    for trans_variable, isocode in zip(col_list, country_list):
+        match = mapping_df[(mapping_df['Trans_variable'] == trans_variable) &
+                           (mapping_df['ISOCODES'] == isocode)]
+        if not match.empty:
+            description = match['Description'].values[0]
+            sheet.cell(row=row-1, column=col, value=description)
+            return
+
+# Usage example
+workbook = load_workbook('your_workbook.xlsx')
+sheet = workbook['Your Sheet Name']
+write_description(sheet)
+workbook.save('your_workbook_updated.xlsx')
+
+
