@@ -3597,3 +3597,81 @@ updated_sheet.to_excel(workbook_path, sheet_name=sheet_name, index=False)
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import pandas as pd
+from datetime import datetime
+
+def write_description(sheet):
+    # Load the mapping file
+    workbook_path = r".\Input\Mapping_File - Copy.xlsx"
+    df = pd.read_excel(workbook_path, sheet_name="Data_Edge")
+
+    # Define constants
+    country_list = ['USA']
+    curr_year = 2024
+    quarters = [
+        (curr_year - 1, 3, 31),
+        (curr_year - 1, 6, 30),
+        (curr_year - 1, 9, 30),
+        (curr_year - 1, 12, 31)
+    ]
+
+    # Get the col_list
+    col_list = Table_List.loc[Table_List['Country'].isin(country_list), 'MEV'].tolist()
+
+    # Process all frames
+    lists = [[], [], [], []]
+    for frame in All:
+        for quarter, target_list in zip(quarters, lists):
+            date = datetime(*quarter)
+            filtered = frame[(frame['ISOCODES'].isin(country_list)) & (frame['date'] == date)]
+            if not filtered.empty:
+                for col in col_list:
+                    target_list.append(round(filtered[col].values[0], 1))
+
+    # Iterate through all cells in the sheet
+    for row in range(1, sheet.max_row + 1):
+        for col in range(1, sheet.max_column + 1):
+            if sheet.cell(row=row, column=col).value == 'user_inputs[0]':
+                for i in range(len(col_list)):
+                    # Check conditions
+                    conditions_met = True
+                    for j, target_list in enumerate(lists):
+                        if sheet.cell(row=row+j+3, column=col).value != target_list[i]:
+                            conditions_met = False
+                            break
+
+                    if conditions_met:
+                        # Find matching description
+                        trans_variable = col_list[i]
+                        isocode = country_list[0]  # Assuming only one country in the list
+                        match = df[(df['Trans_variable'] == trans_variable) &
+                                   (df['ISOCODES'] == isocode)]
+                        if not match.empty:
+                            description = match['Description'].values[0]
+                            sheet.cell(row=row-1, column=col, value=description)
+                            break
+
+    return sheet
+
+# Usage example:
+# workbook = load_workbook('your_workbook.xlsx')
+# sheet = workbook['Your Sheet Name']
+# updated_sheet = write_description(sheet)
+# workbook.save('your_workbook_updated.xlsx')
+
+
