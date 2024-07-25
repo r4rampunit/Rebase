@@ -3505,3 +3505,95 @@ write_description(sheet)
 workbook.save('your_workbook_updated.xlsx')
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import pandas as pd
+from datetime import datetime
+
+def write_description(sheet, user_inputs, country_list):
+    curr_year = 2024
+    list2, list3, list4, list5 = [], [], [], []
+
+    for frame in All:
+        for row in frame.itertuples():
+            for Isocode in country_list:
+                if row.ISOCODES == Isocode:
+                    if row.date == datetime.strptime(f"{curr_year-1}-03-31 00:00:00", "%Y-%m-%d %H:%M:%S"):
+                        col_list = Table_List["MEV"].loc[Table_List.Country == Isocode].tolist()
+                        for col in col_list:
+                            list2.append(round(getattr(row, col), 1))
+                    if row.date == datetime.strptime(f"{curr_year-1}-06-30 00:00:00", "%Y-%m-%d %H:%M:%S"):
+                        col_list = Table_List["MEV"].loc[Table_List.Country == Isocode].tolist()
+                        for col in col_list:
+                            list3.append(round(getattr(row, col), 1))
+                    if row.date == datetime.strptime(f"{curr_year-1}-09-30 00:00:00", "%Y-%m-%d %H:%M:%S"):
+                        col_list = Table_List["MEV"].loc[Table_List.Country == Isocode].tolist()
+                        for col in col_list:
+                            list4.append(round(getattr(row, col), 1))
+                    if row.date == datetime.strptime(f"{curr_year-1}-12-31 00:00:00", "%Y-%m-%d %H:%M:%S"):
+                        col_list = Table_List["MEV"].loc[Table_List.Country == Isocode].tolist()
+                        for col in col_list:
+                            list5.append(round(getattr(row, col), 1))
+
+    # Ensure all lists are the same length by trimming to the length of col_list
+    col_length = len(col_list)
+    list2 = list2[:col_length]
+    list3 = list3[:col_length]
+    list4 = list4[:col_length]
+    list5 = list5[:col_length]
+
+    # Iterate over each set of elements
+    for i in range(col_length):
+        combined_list = [list2[i], list3[i], list4[i], list5[i]]
+
+        # Find the location of user_inputs[0] in the sheet
+        location = sheet[sheet.apply(lambda row: row.astype(str).str.contains(user_inputs[0]).any(), axis=1)].index[0]
+
+        # Check if combined_list matches the cells 3, 4, 5, and 6 rows below
+        match = True
+        for j in range(4):
+            if sheet.iloc[location + 3 + j, sheet.columns.get_loc(user_inputs[0])] != combined_list[j]:
+                match = False
+                break
+
+        # If all matched, update the Description column
+        if match:
+            trans_var = sheet['Trans_variable'][location]
+            isocode = sheet['ISOCODES'][location]
+
+            if trans_var in col_list and isocode in country_list:
+                sheet.at[location - 1, 'Description'] = sheet.at[location, trans_var]
+                break  # Update for the first matching set only
+
+    return sheet
+
+# Example usage:
+workbook_path = r".\Input\Mapping_File - Copy.xlsx"
+sheet_name = "Data_Edge"
+sheet = pd.read_excel(workbook_path, sheet_name=sheet_name)
+user_inputs = ["SomeValue"]
+country_list = ['USA']
+
+# Assuming All and Table_List are already defined
+# All = [...]
+# Table_List = pd.DataFrame(...)
+
+updated_sheet = write_description(sheet, user_inputs, country_list)
+
+# Save the updated sheet back to Excel
+updated_sheet.to_excel(workbook_path, sheet_name=sheet_name, index=False)
+
+
+
