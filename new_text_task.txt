@@ -3779,3 +3779,70 @@ if isinstance(target_cell.value, (int, float)):
         target_cell.number_format = '0'
     else:
         target_cell.number_format = '0.00'
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+from openpyxl.styles import Font
+
+def convert_to_number(sheet):
+    for row in sheet.iter_rows():
+        for cell in row:
+            if cell.value == 'user_inputs[0]':
+                target_column = cell.column - 1
+                target_rows = [cell.row + offset for offset in [7, 12, 17, 18, 19]]
+
+                for target_row in target_rows:
+                    target_cell = sheet.cell(row=target_row, column=target_column)
+
+                    # Store existing cell style
+                    existing_style = target_cell._style
+
+                    # Convert to number if it's a string that represents a number
+                    if isinstance(target_cell.value, str):
+                        try:
+                            # Convert to float first
+                            numeric_value = float(target_cell.value)
+                            # If it's a whole number, convert to int
+                            if numeric_value.is_integer():
+                                numeric_value = int(numeric_value)
+                            target_cell.value = numeric_value
+                        except ValueError:
+                            # If conversion fails, leave the value as is
+                            pass
+
+                    # Apply bold font with size 9, preserving other font properties
+                    new_font = Font(bold=True, size=9,
+                                    name=target_cell.font.name,
+                                    color=target_cell.font.color)
+                    target_cell.font = new_font
+
+                    # Format the cell to display without decimal places if it's a whole number
+                    if target_cell.value is not None and isinstance(target_cell.value, (int, float)):
+                        if isinstance(target_cell.value, int) or (isinstance(target_cell.value, float) and target_cell.value.is_integer()):
+                            target_cell.number_format = '0'
+                        else:
+                            target_cell.number_format = '0.00'
+
+                    # Restore other existing styles
+                    target_cell._style = existing_style
+                    target_cell.font = new_font
+
+    return sheet
+
+# Usage example:
+# workbook = load_workbook('your_workbook.xlsx')
+# sheet = workbook['Your Sheet Name']
+# updated_sheet = convert_to_number(sheet)
+# workbook.save('your_workbook_updated.xlsx')
