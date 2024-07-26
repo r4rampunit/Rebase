@@ -3846,3 +3846,58 @@ def convert_to_number(sheet):
 # sheet = workbook['Your Sheet Name']
 # updated_sheet = convert_to_number(sheet)
 # workbook.save('your_workbook_updated.xlsx')
+
+
+
+
+
+
+
+
+
+from openpyxl.styles import PatternFill, Alignment
+from openpyxl.utils import get_column_letter
+
+def grey_separation(sheet):
+    # Find the cell containing '4% DN'
+    target_cell = None
+    for row in sheet.iter_rows():
+        for cell in row:
+            if cell.value == '4% DN':
+                target_cell = cell
+                break
+        if target_cell:
+            break
+
+    if not target_cell:
+        print("Cell containing '4% DN' not found.")
+        return sheet
+
+    # Calculate the column two columns to the right of '4% DN'
+    target_column = target_cell.column + 2
+    target_column_letter = get_column_letter(target_column)
+
+    # Define the range to merge and fill
+    start_cell = f"{target_column_letter}1"
+    end_cell = f"{target_column_letter}31"
+
+    # Merge the cells
+    sheet.merge_cells(f"{start_cell}:{end_cell}")
+
+    # Get the merged cell
+    merged_cell = sheet[start_cell]
+
+    # Apply center alignment
+    merged_cell.alignment = Alignment(horizontal='center', vertical='center')
+
+    # Apply light grey fill
+    light_grey_fill = PatternFill(start_color='D3D3D3', end_color='D3D3D3', fill_type='solid')
+    merged_cell.fill = light_grey_fill
+
+    return sheet
+
+# Usage example:
+# workbook = load_workbook('your_workbook.xlsx')
+# sheet = workbook['Your Sheet Name']
+# updated_sheet = grey_separation(sheet)
+# workbook.save('your_workbook_updated.xlsx')
