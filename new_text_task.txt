@@ -3675,3 +3675,47 @@ def write_description(sheet):
 # workbook.save('your_workbook_updated.xlsx')
 
 
+
+
+
+
+
+
+
+
+from openpyxl.styles import Border, Side
+
+def black_marking(sheet):
+    thin_border = Side(style='thin', color='080808')
+
+    for row in sheet.iter_rows():
+        for cell in row:
+            if cell.value == user_inputs[0]:
+                start_row = cell.row + 26
+                start_col = cell.column - 1
+                end_row = cell.row + 28
+                end_col = cell.column
+
+                # Top border
+                for col in range(start_col, end_col + 1):
+                    sheet.cell(row=start_row, column=col).border = Border(top=thin_border)
+
+                # Bottom border
+                for col in range(start_col, end_col + 1):
+                    sheet.cell(row=end_row, column=col).border = Border(bottom=thin_border)
+
+                # Left border
+                for row in range(start_row, end_row + 1):
+                    sheet.cell(row=row, column=start_col).border = Border(left=thin_border)
+
+                # Right border
+                for row in range(start_row, end_row + 1):
+                    sheet.cell(row=row, column=end_col).border = Border(right=thin_border)
+
+                # Corners
+                sheet.cell(row=start_row, column=start_col).border = Border(top=thin_border, left=thin_border)
+                sheet.cell(row=start_row, column=end_col).border = Border(top=thin_border, right=thin_border)
+                sheet.cell(row=end_row, column=start_col).border = Border(bottom=thin_border, left=thin_border)
+                sheet.cell(row=end_row, column=end_col).border = Border(bottom=thin_border, right=thin_border)
+
+    return sheet
