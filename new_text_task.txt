@@ -3901,3 +3901,69 @@ def grey_separation(sheet):
 # sheet = workbook['Your Sheet Name']
 # updated_sheet = grey_separation(sheet)
 # workbook.save('your_workbook_updated.xlsx')
+
+
+
+
+
+
+
+
+
+import pandas as pd
+from openpyxl.styles import Border, Side
+from datetime import datetime
+
+def red_marking(sheet):
+    # Define the thick red border style
+    thick_red_border = Side(style='thick', color='FF0000')
+
+    # Extract dates from the first column
+    date_column = [cell.value for cell in sheet['A'] if cell.value]
+
+    # Convert dates to datetime objects
+    datetime_index = pd.to_datetime(date_column, format="%m/%d/%Y", errors='coerce')
+
+    # Get the boundary dates from user inputs
+    above_date = pd.to_datetime(user_inputs[17], format='%Y-%m-%d', errors='coerce')
+    below_date = pd.to_datetime(user_inputs[18], format='%Y-%m-%d', errors='coerce')
+
+    # Find the rows for the boundary dates
+    above_row = None
+    below_row = None
+    for i, date in enumerate(datetime_index):
+        if pd.notnull(date):
+            if date >= above_date and above_row is None:
+                above_row = i + 1  # +1 because sheet rows are 1-indexed
+            if date >= below_date:
+                below_row = i + 1
+                # Check for empty cells below
+                while below_row + 1 <= len(date_column) and sheet.cell(row=below_row + 1, column=1).value is None:
+                    below_row += 1
+                break
+
+    if above_row and below_row:
+        # Find all cells containing user_inputs[0]
+        for row in sheet.iter_rows():
+            for cell in row:
+                if cell.value == user_inputs[0]:
+                    start_cell = sheet.cell(row=above_row, column=cell.column + 1)
+                    end_cell = sheet.cell(row=below_row, column=cell.column + 1)
+
+                    for box_row in sheet[start_cell.coordinate:end_cell.coordinate]:
+                        for box_cell in box_row:
+                            if box_cell.row == start_cell.row:
+                                box_cell.border = Border(top=thick_red_border, left=thick_red_border, right=thick_red_border)
+                            elif box_cell.row == end_cell.row:
+                                box_cell.border = Border(bottom=thick_red_border, left=thick_red_border, right=thick_red_border)
+                            else:
+                                box_cell.border = Border(left=thick_red_border, right=thick_red_border)
+
+    return sheet
+
+# Usage example:
+# Assuming user_inputs is defined and contains the necessary values
+# workbook = load_workbook('your_workbook.xlsx')
+# sheet = workbook['Your Sheet Name']
+# updated_sheet = red_marking(sheet)
+# workbook.save('your_workbook_updated.xlsx')
