@@ -3775,7 +3775,7 @@ def convert_to_number(sheet):
 
 
 if isinstance(target_cell.value, (int, float)):
-    if target_cell.value.is_integer():
+    if isinstance(target_cell.value, int) or (isinstance(target_cell.value, float) and target_cell.value.is_integer()):
         target_cell.number_format = '0'
     else:
         target_cell.number_format = '0.00'
