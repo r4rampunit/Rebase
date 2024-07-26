@@ -3768,3 +3768,14 @@ def convert_to_number(sheet):
 # sheet = workbook['Your Sheet Name']
 # updated_sheet = convert_to_number(sheet)
 # workbook.save('your_workbook_updated.xlsx')
+
+
+
+
+
+
+if isinstance(target_cell.value, (int, float)):
+    if target_cell.value.is_integer():
+        target_cell.number_format = '0'
+    else:
+        target_cell.number_format = '0.00'
