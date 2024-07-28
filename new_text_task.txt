@@ -4178,3 +4178,54 @@ def convert_to_number(sheet):
                     target_cell.font = new_font
 
     return sheet
+
+
+
+
+
+
+
+
+
+
+
+
+from openpyxl.styles import Font
+
+def convert_to_number(sheet):
+    for row in sheet.iter_rows():
+        for cell in row:
+            if cell.value == user_inputs[0]:
+                target_column = cell.column - 1
+                target_rows = [cell.row + offset for offset in [7, 12, 17, 18, 19]]
+
+                for target_row in target_rows:
+                    target_cell = sheet.cell(row=target_row, column=target_column)
+
+                    # Convert to number if it's a string that represents a year
+                    if isinstance(target_cell.value, (str, float)):
+                        try:
+                            # Try to convert to integer
+                            numeric_value = int(float(target_cell.value))
+                            # Check if it's a valid year (assuming years between 1900 and 2100)
+                            if 1900 <= numeric_value <= 2100:
+                                target_cell.value = numeric_value
+
+                                # Preserve existing font properties, only changing size and bold
+                                existing_font = target_cell.font
+                                new_font = Font(
+                                    name=existing_font.name,
+                                    size=9,  # Set size to 9
+                                    bold=True,  # Set bold to True
+                                    italic=existing_font.italic,
+                                    vertAlign=existing_font.vertAlign,
+                                    underline=existing_font.underline,
+                                    strike=existing_font.strike,
+                                    color=existing_font.color
+                                )
+                                target_cell.font = new_font
+                        except ValueError:
+                            # If conversion fails, leave the value as is
+                            pass
+
+    return sheet
