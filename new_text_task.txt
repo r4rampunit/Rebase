@@ -4257,7 +4257,8 @@ def convert_to_number(sheet):
                     target_cell = sheet.cell(row=target_row, column=target_column)
 
                     # Store the original background color
-                    original_fill = target_cell.fill
+                    original_fill_type = target_cell.fill.fill_type
+                    original_fill_color = target_cell.fill.start_color.rgb if target_cell.fill.start_color else None
 
                     # Convert to number if it's a string or float that represents a year
                     if isinstance(target_cell.value, (str, float)):
@@ -4289,6 +4290,9 @@ def convert_to_number(sheet):
                             pass
 
                     # Restore the original background color
-                    target_cell.fill = original_fill
+                    if original_fill_type and original_fill_color:
+                        target_cell.fill = PatternFill(fill_type=original_fill_type, start_color=original_fill_color)
+                    elif original_fill_type:
+                        target_cell.fill = PatternFill(fill_type=original_fill_type)
 
     return sheet
