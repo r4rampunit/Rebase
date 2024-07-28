@@ -4375,3 +4375,35 @@ def convert_to_number(sheet, user_inputs):
                             pass
 
     return sheet
+
+
+
+from openpyxl.styles import Font, PatternFill
+
+def convert_to_number(sheet, user_inputs):
+    for row in sheet.iter_rows():
+        for cell in row:
+            if cell.value == user_inputs[0]:
+                target_column = cell.column
+                target_rows = [cell.row + offset for offset in [7, 12, 17, 18, 19]]
+
+                for target_row in target_rows:
+                    target_cell = sheet.cell(row=target_row, column=target_column)
+
+                    # Convert to number if it's a string or float that represents a year
+                    if isinstance(target_cell.value, (str, float)):
+                        try:
+                            # Try to convert to integer
+                            numeric_value = int(float(target_cell.value))
+                            # Check if it's a valid year (assuming years between 1900 and 2100)
+                            if 1900 <= numeric_value <= 2100:
+                                target_cell.value = numeric_value
+
+                                # Set number format to display as integer
+                                target_cell.number_format = '0'
+                        except ValueError:
+                            # If conversion fails, leave the value as is
+                            pass
+
+    return sheet
+
