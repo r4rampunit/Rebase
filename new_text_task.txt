@@ -4592,3 +4592,495 @@ $.ajax({
     }
 });
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+from django.shortcuts import render
+import pandas as pd
+import os
+import json
+from django.views.decorators.csrf import csrf_exempt
+
+FOLDER_PATH = "path/to/your/folder"
+
+def get_folders():
+    # Implement this function to return a list of folders
+    pass
+
+def get_subfolders(folder):
+    # Implement this function to return a list of subfolders for a given folder
+    pass
+
+@csrf_exempt
+def mi_chart(request):
+    if request.method == 'POST':
+        selected_items = json.loads(request.POST.get('selectedItems', '{}'))
+
+        list_of_selected = [items for category, items in selected_items.items() if items]
+
+        Organisational_unit_level_1_selected = list_of_selected[0]
+        Organisational_unit_level_2_selected = list_of_selected[1]
+        Organisational_unit_level_3_selected = list_of_selected[2]
+        Country_of_Exposure_selected = list_of_selected[3]
+        Asset_class_selected = list_of_selected[4]
+        Product_Type_selected = list_of_selected[5]
+        Basel_Approach_selected = list_of_selected[6]
+        ST_scenario_selected = list_of_selected[7]
+
+        folders = get_folders()
+        selected_folder = request.POST.get("folder")
+        selected_subfolder = request.POST.get("subfolder")
+        subfolders = get_subfolders(selected_folder) if selected_folder else []
+
+        row_names = [
+            'Gross Balance ($ MM)', 'Net Balance ($ MM)', 'Net Balance Proportion S1', 'Net Balance Proportion S2',
+            'Net Balance Proportion S3', 'ECL ($ MM)', 'ECL Original ($ MM)', 'ECL Rate', 'Loss at WO ($ MM)',
+            'Loss at WO Original ($ MM)', 'LIC ($ MM)', 'LIC Original ($ MM)', 'LIC overlay ($ MM)', 'LIC Rate',
+            'Coverage ratio', 'PD', 'LGD', 'EAD ($ MM)', 'RWA ($ MM)', 'RWA Original ($ MM)', 'RWA Overlay ($ MM)',
+            'RWA Density', 'EL($ MM)', 'EL Overlay ($ MM)', 'EL Density'
+        ]
+
+        column_names = ['T0', 'T1', 'T2', 'T3', 'T4', 'T5']
+
+        table_df = pd.DataFrame(index=row_names, columns=column_names)
+
+        if selected_folder and selected_subfolder:
+            folder_path = os.path.join(FOLDER_PATH, selected_folder, selected_subfolder)
+            excel_files = [f for f in os.listdir(folder_path) if f.endswith('.xlsx')]
+
+            # Read the Excel files and process the data
+            # (Include your existing code for processing the Excel files here)
+
+            # After processing, update the table_df with the calculated values
+
+        table_html = table_df.to_html(classes="table table-striped table-bordered", index=True)
+
+    else:
+        folders = get_folders()
+        selected_folder = request.GET.get("folder", None)
+        selected_subfolder = request.GET.get("subfolder", None)
+        subfolders = get_subfolders(selected_folder) if selected_folder else []
+
+        table_df = pd.DataFrame(index=row_names)
+        table_html = table_df.to_html(classes="table table-striped table-bordered", index=True)
+
+    # Populate the lists (you need to implement these based on your data)
+    Organisational_unit_level_1_list = []  # Populate this list
+    Organisational_unit_level_2_list = []  # Populate this list
+    Organisational_unit_level_3_list = []  # Populate this list
+    Country_of_Exposure_list = []  # Populate this list
+    Asset_class_list = []  # Populate this list
+    Product_Type_list = []  # Populate this list
+    Basel_Approach_list = []  # Populate this list
+    ST_scenario_combo = []  # Populate this list
+
+    context = {
+        'Organisational_unit_level_1_list': Organisational_unit_level_1_list,
+        'Organisational_unit_level_2_list': Organisational_unit_level_2_list,
+        'Organisational_unit_level_3_list': Organisational_unit_level_3_list,
+        'Country_of_Exposure_list': Country_of_Exposure_list,
+        'Asset_class_list': Asset_class_list,
+        'Product_Type_list': Product_Type_list,
+        'Basel_Approach_list': Basel_Approach_list,
+        'ST_scenario_combo': ST_scenario_combo,
+        'table_html': table_html,
+        'folders': folders,
+        'selected_folder': selected_folder,
+        'subfolders': subfolders,
+        'selected_subfolder': selected_subfolder,
+    }
+
+    return render(request, 'mi_templates/mi_chart.html', context)
+
+
+
+
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MI Chart</title>
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+</head>
+<body>
+    <h1>MI Chart</h1>
+    <form method="post">
+        {% csrf_token %}
+        <div>
+            <label for="Organisational_unit_level_1">Organisational Unit Level 1:</label>
+            <select name="Organisational_unit_level_1" id="Organisational_unit_level_1" multiple>
+                {% for item in Organisational_unit_level_1_list %}
+                    <option value="{{ item }}">{{ item }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="Organisational_unit_level_2">Organisational Unit Level 2:</label>
+            <select name="Organisational_unit_level_2" id="Organisational_unit_level_2" multiple>
+                {% for item in Organisational_unit_level_2_list %}
+                    <option value="{{ item }}">{{ item }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="Organisational_unit_level_3">Organisational Unit Level 3:</label>
+            <select name="Organisational_unit_level_3" id="Organisational_unit_level_3" multiple>
+                {% for item in Organisational_unit_level_3_list %}
+                    <option value="{{ item }}">{{ item }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="Country_of_Exposure">Country of Exposure:</label>
+            <select name="Country_of_Exposure" id="Country_of_Exposure" multiple>
+                {% for item in Country_of_Exposure_list %}
+                    <option value="{{ item }}">{{ item }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="Asset_class">Asset Class:</label>
+            <select name="Asset_class" id="Asset_class" multiple>
+                {% for item in Asset_class_list %}
+                    <option value="{{ item }}">{{ item }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="Product_Type">Product Type:</label>
+            <select name="Product_Type" id="Product_Type" multiple>
+                {% for item in Product_Type_list %}
+                    <option value="{{ item }}">{{ item }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="Basel_Approach">Basel Approach:</label>
+            <select name="Basel_Approach" id="Basel_Approach" multiple>
+                {% for item in Basel_Approach_list %}
+                    <option value="{{ item }}">{{ item }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="ST_scenario">ST Scenario:</label>
+            <select name="ST_scenario" id="ST_scenario" multiple>
+                {% for item in ST_scenario_combo %}
+                    <option value="{{ item }}">{{ item }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="folder">Folder:</label>
+            <select name="folder" id="folder">
+                <option value="">Select a folder</option>
+                {% for folder in folders %}
+                    <option value="{{ folder }}" {% if folder == selected_folder %}selected{% endif %}>{{ folder }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="subfolder">Subfolder:</label>
+            <select name="subfolder" id="subfolder">
+                <option value="">Select a subfolder</option>
+                {% for subfolder in subfolders %}
+                    <option value="{{ subfolder }}" {% if subfolder == selected_subfolder %}selected{% endif %}>{{ subfolder }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit">Generate Chart</button>
+    </form>
+
+    <div id="chart-container">
+        {{ table_html|safe }}
+    </div>
+
+    <script>
+        $(document).ready(function() {
+            $('select').select2();
+
+            $('form').on('submit', function(e) {
+                e.preventDefault();
+                var selectedItems = {};
+                $('select[multiple]').each(function() {
+                    selectedItems[$(this).attr('name')] = $(this).val();
+                });
+                $('input[name="selectedItems"]').val(JSON.stringify(selectedItems));
+                this.submit();
+            });
+
+            $('#folder').on('change', function() {
+                var folder = $(this).val();
+                if (folder) {
+                    window.location.href = '?folder=' + folder;
+                }
+            });
+        });
+    </script>
+</body>
+</html>
+
+
+
+from django.shortcuts import render
+import pandas as pd
+import os
+import json
+from django.views.decorators.csrf import csrf_exempt
+
+FOLDER_PATH = "path/to/your/folder"
+
+def get_folders():
+    # Implement this function to return a list of folders
+    pass
+
+def get_subfolders(folder):
+    # Implement this function to return a list of subfolders for a given folder
+    pass
+
+@csrf_exempt
+def mi_chart(request):
+    folders = get_folders()
+    selected_folder = request.POST.get("folder") or request.GET.get("folder")
+    selected_subfolder = request.POST.get("subfolder") or request.GET.get("subfolder")
+    subfolders = get_subfolders(selected_folder) if selected_folder else []
+
+    row_names = [
+        'Gross Balance ($ MM)', 'Net Balance ($ MM)', 'Net Balance Proportion S1', 'Net Balance Proportion S2',
+        'Net Balance Proportion S3', 'ECL ($ MM)', 'ECL Original ($ MM)', 'ECL Rate', 'Loss at WO ($ MM)',
+        'Loss at WO Original ($ MM)', 'LIC ($ MM)', 'LIC Original ($ MM)', 'LIC overlay ($ MM)', 'LIC Rate',
+        'Coverage ratio', 'PD', 'LGD', 'EAD ($ MM)', 'RWA ($ MM)', 'RWA Original ($ MM)', 'RWA Overlay ($ MM)',
+        'RWA Density', 'EL($ MM)', 'EL Overlay ($ MM)', 'EL Density'
+    ]
+    column_names = ['T0', 'T1', 'T2', 'T3', 'T4', 'T5']
+    table_df = pd.DataFrame(index=row_names, columns=column_names)
+
+    if request.method == 'POST':
+        selected_items = json.loads(request.POST.get('selectedItems', '{}'))
+        list_of_selected = [items for category, items in selected_items.items() if items]
+
+        Organisational_unit_level_1_selected = list_of_selected[0]
+        Organisational_unit_level_2_selected = list_of_selected[1]
+        Organisational_unit_level_3_selected = list_of_selected[2]
+        Country_of_Exposure_selected = list_of_selected[3]
+        Asset_class_selected = list_of_selected[4]
+        Product_Type_selected = list_of_selected[5]
+        Basel_Approach_selected = list_of_selected[6]
+        ST_scenario_selected = list_of_selected[7]
+
+        if selected_folder and selected_subfolder:
+            folder_path = os.path.join(FOLDER_PATH, selected_folder, selected_subfolder)
+            excel_files = [f for f in os.listdir(folder_path) if f.endswith('.xlsx')]
+            dataframes = {}
+
+            for excel_file in excel_files:
+                file_path = os.path.join(folder_path, excel_file)
+                if "LIC" in excel_file and "HBAP" in excel_file:
+                    if "FirstRun" in excel_file:
+                        dataframes["lic_hbap_first_run"] = pd.read_excel(file_path, sheet_name="LPACT_OL_YTD_QTR_Final")
+                    elif "LastRun" in excel_file:
+                        dataframes['lic_hbap_last_run'] = pd.read_excel(file_path, sheet_name="LPACT_OL_YTD_QTR_Final")
+                elif "LPACT" in excel_file and "HBAP" in excel_file:
+                    dataframes['lpact_hbap_data'] = pd.read_excel(file_path, sheet_name="PD-series")
+                elif "LIC" in excel_file and "NonHBAP" in excel_file:
+                    if "FirstRun" in excel_file:
+                        dataframes['lic_non_hbap_first_run'] = pd.read_excel(file_path, sheet_name="LPACT_OL_YTD_QTR_Final")
+                    elif "LastRun" in excel_file:
+                        dataframes['lic_non_hbap_last_run'] = pd.read_excel(file_path, sheet_name="LPACT_OL_YTD_QTR_Final")
+                elif "LPACT" in excel_file and "Non" in excel_file and "HBAP" in excel_file:
+                    dataframes['lpact_non_hbap_data'] = pd.read_excel(file_path, sheet_name="PD series")
+                elif "MI" in excel_file and "HBAP" in excel_file:
+                    if "FirstRun" in excel_file:
+                        dataframes['rwa_hbap_first_run'] = pd.read_excel(file_path, sheet_name="Temp_RRM_Final_OL")
+                    elif "LastRun" in excel_file:
+                        dataframes['rwa_hbap_last_run'] = pd.read_excel(file_path, sheet_name="Temp_RRM_Final_OL")
+
+            # Process the dataframes and update table_df
+            # (Include your existing code for processing the dataframes here)
+
+            # After processing, update the table_df with the calculated values
+
+    table_html = table_df.to_html(classes="table table-striped table-bordered", index=True)
+
+    # Populate the lists (you need to implement these based on your data)
+    Organisational_unit_level_1_list = []  # Populate this list
+    Organisational_unit_level_2_list = []  # Populate this list
+    Organisational_unit_level_3_list = []  # Populate this list
+    Country_of_Exposure_list = []  # Populate this list
+    Asset_class_list = []  # Populate this list
+    Product_Type_list = []  # Populate this list
+    Basel_Approach_list = []  # Populate this list
+    ST_scenario_combo = []  # Populate this list
+
+    context = {
+        'Organisational_unit_level_1_list': Organisational_unit_level_1_list,
+        'Organisational_unit_level_2_list': Organisational_unit_level_2_list,
+        'Organisational_unit_level_3_list': Organisational_unit_level_3_list,
+        'Country_of_Exposure_list': Country_of_Exposure_list,
+        'Asset_class_list': Asset_class_list,
+        'Product_Type_list': Product_Type_list,
+        'Basel_Approach_list': Basel_Approach_list,
+        'ST_scenario_combo': ST_scenario_combo,
+        'table_html': table_html,
+        'folders': folders,
+        'selected_folder': selected_folder,
+        'subfolders': subfolders,
+        'selected_subfolder': selected_subfolder,
+    }
+
+    return render(request, 'mi_templates/mi_chart.html', context)
+
+
+
+
+
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MI Chart</title>
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+</head>
+<body>
+    <h1>MI Chart</h1>
+    <form method="post">
+        {% csrf_token %}
+        <div>
+            <label for="Organisational_unit_level_1">Organisational Unit Level 1:</label>
+            <select name="Organisational_unit_level_1" id="Organisational_unit_level_1" multiple>
+                {% for item in Organisational_unit_level_1_list %}
+                    <option value="{{ item }}">{{ item }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="Organisational_unit_level_2">Organisational Unit Level 2:</label>
+            <select name="Organisational_unit_level_2" id="Organisational_unit_level_2" multiple>
+                {% for item in Organisational_unit_level_2_list %}
+                    <option value="{{ item }}">{{ item }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="Organisational_unit_level_3">Organisational Unit Level 3:</label>
+            <select name="Organisational_unit_level_3" id="Organisational_unit_level_3" multiple>
+                {% for item in Organisational_unit_level_3_list %}
+                    <option value="{{ item }}">{{ item }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="Country_of_Exposure">Country of Exposure:</label>
+            <select name="Country_of_Exposure" id="Country_of_Exposure" multiple>
+                {% for item in Country_of_Exposure_list %}
+                    <option value="{{ item }}">{{ item }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="Asset_class">Asset Class:</label>
+            <select name="Asset_class" id="Asset_class" multiple>
+                {% for item in Asset_class_list %}
+                    <option value="{{ item }}">{{ item }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="Product_Type">Product Type:</label>
+            <select name="Product_Type" id="Product_Type" multiple>
+                {% for item in Product_Type_list %}
+                    <option value="{{ item }}">{{ item }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="Basel_Approach">Basel Approach:</label>
+            <select name="Basel_Approach" id="Basel_Approach" multiple>
+                {% for item in Basel_Approach_list %}
+                    <option value="{{ item }}">{{ item }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="ST_scenario">ST Scenario:</label>
+            <select name="ST_scenario" id="ST_scenario" multiple>
+                {% for item in ST_scenario_combo %}
+                    <option value="{{ item }}">{{ item }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="folder">Folder:</label>
+            <select name="folder" id="folder">
+                <option value="">Select a folder</option>
+                {% for folder in folders %}
+                    <option value="{{ folder }}" {% if folder == selected_folder %}selected{% endif %}>{{ folder }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="subfolder">Subfolder:</label>
+            <select name="subfolder" id="subfolder">
+                <option value="">Select a subfolder</option>
+                {% for subfolder in subfolders %}
+                    <option value="{{ subfolder }}" {% if subfolder == selected_subfolder %}selected{% endif %}>{{ subfolder }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit">Generate Chart</button>
+    </form>
+
+    <div id="chart-container">
+        {{ table_html|safe }}
+    </div>
+
+    <script>
+        $(document).ready(function() {
+            $('select').select2();
+
+            $('form').on('submit', function(e) {
+                e.preventDefault();
+                var selectedItems = {};
+                $('select[multiple]').each(function() {
+                    selectedItems[$(this).attr('name')] = $(this).val();
+                });
+                $('<input>').attr({
+                    type: 'hidden',
+                    name: 'selectedItems',
+                    value: JSON.stringify(selectedItems)
+                }).appendTo('form');
+                this.submit();
+            });
+
+            $('#folder').on('change', function() {
+                var folder = $(this).val();
+                if (folder) {
+                    $('form').submit();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
+
