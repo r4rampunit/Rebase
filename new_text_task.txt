@@ -4476,3 +4476,119 @@ def convert_to_number(sheet):
 
     return sheet
 
+
+
+
+
+
+
+
+
+
+
+@csrf_exempt
+def mi_chart(request):
+    if request.method == 'POST':
+        selected_items = json.loads(request.POST.get('selectedItems', '{}'))
+        print(selected_items)
+
+        list_of_selected = [items for category, items in selected_items.items() if items]
+
+        Organisational_unit_level_1_selected = list_of_selected[0]
+        Organisational_unit_level_2_selected = list_of_selected[1]
+        Organisational_unit_level_3_selected = list_of_selected[2]
+        Country_of_Exposure_selected = list_of_selected[3]
+        Asset_class_selected = list_of_selected[4]
+        Product_Type_selected = list_of_selected[5]
+        Basel_Approach_selected = list_of_selected[6]
+        ST_scenario_selected = list_of_selected[7]
+
+        folders = get_folders()
+        selected_folder = request.GET.get("folder")
+        selected_subfolder = request.GET.get("subfolder")
+        subfolders = get_subfolders(selected_folder) if selected_folder else []
+
+        row_names = [
+            'Gross Balance ($ MM)', 'Net Balance ($ MM)', 'Net Balance Proportion S1',
+            'Net Balance Proportion S2', 'Net Balance Proportion S3', 'ECL ($ MM)',
+            'ECL Original ($ MM)', 'ECL Rate', 'Loss at WO ($ MM)', 'Loss at WO Original ($ MM)',
+            'LIC ($ MM)', 'LIC Original ($ MM)', 'LIC overlay ($ MM)', 'LIC Rate', 'Coverage ratio',
+            'PD', 'LGD', 'EAD ($ MM)', 'RWA ($ MM)', 'RWA Original ($ MM)', 'RWA Overlay ($ MM)',
+            'RWA Density', 'EL($ MM)', 'EL Overlay ($ MM)', 'EL Density'
+        ]
+        column_names = ['T', 'T1', 'T2', 'T3', 'T4', 'T5']
+
+        table_df1 = pd.DataFrame(index=row_names, columns=column_names)
+        table_df = pd.DataFrame(index=row_names)
+
+        if selected_folder and selected_subfolder:
+            folder_path = os.path.join(FOLDER_PATH, selected_folder, selected_subfolder)
+            excel_files = [f for f in os.listdir(folder_path) if f.endswith('.xlsx')]
+            dataframes = {}
+
+            for excel_file in excel_files:
+                file_path = os.path.join(folder_path, excel_file)
+                # ... (rest of the file reading logic)
+
+            # ... (rest of the data processing logic)
+
+            table_df = pd.concat([table_df, table_df1], axis=1)
+            table_html = table_df.to_html(classes="table table-striped table-bordered", index=True)
+
+            return JsonResponse({'table_html': table_html})
+
+    folders = get_folders()
+    selected_folder = request.GET.get("folder", None)
+    selected_subfolder = request.GET.get("subfolder", None)
+    subfolders = get_subfolders(selected_folder) if selected_folder else []
+
+    if selected_folder and selected_subfolder:
+        folder_path = os.path.join(FOLDER_PATH, selected_folder, selected_subfolder)
+        excel_files = [f for f in os.listdir(folder_path) if f.endswith('.xlsx')]
+
+        # ... (rest of the file reading logic)
+
+    row_names = [
+        'Gross Balance ($ MM)', 'Net Balance ($ MM)', 'Net Balance Proportion S1',
+        'Net Balance Proportion S2', 'Net Balance Proportion S3', 'ECL ($ MM)',
+        'ECL Original ($ MM)', 'ECL Rate', 'Loss at WO ($ MM)', 'Loss at WO Original ($ MM)',
+        'LIC ($ MM)', 'LIC Original ($ MM)', 'LIC overlay ($ MM)', 'LIC Rate', 'Coverage ratio',
+        'PD', 'LGD', 'EAD ($ MM)', 'RWA ($ MM)', 'RWA Original ($ MM)', 'RWA Overlay ($ MM)',
+        'RWA Density', 'EL($ MM)', 'EL Overlay ($ MM)', 'EL Density'
+    ]
+    column_names = ['T', 'T1', 'T2', 'T3', 'T4', 'T5']
+    table_df = pd.DataFrame(index=row_names)
+
+    table_html = table_df.to_html(classes="table table-striped table-bordered", index=True)
+
+    context1 = {
+        'Organisational_unit_level_1_list': Organisational_unit_level_1_list,
+        'Organisational_unit_level_2_list': Organisational_unit_level_2_list,
+        'Organisational_unit_level_3_list': Organisational_unit_level_3_list,
+        'Country_of_Exposure_list': Country_of_Exposure_list,
+        'Asset_class_list': Asset_class_list,
+        'Product_Type_list': Product_Type_list,
+        'Basel_Approach_list': Basel_Approach_list,
+        'ST_scenario_combo': ST_scenario_combo,
+        'table_html': table_html
+    }
+
+    return render(request, 'mi_templates/mi_chart.html', context1)
+
+
+
+
+// Assuming you're using jQuery for AJAX
+$.ajax({
+    url: '/mi_chart/',  // Update this to your actual URL
+    type: 'POST',
+    data: JSON.stringify(selectedItems),
+    contentType: 'application/json',
+    success: function(response) {
+        $('#table-container').html(response.table_html);
+    },
+    error: function(error) {
+        console.log('Error:', error);
+    }
+});
+
