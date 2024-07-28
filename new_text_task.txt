@@ -4437,3 +4437,42 @@ def convert_to_number(sheet):
 
     return sheet
 
+
+
+
+
+
+
+
+
+
+
+
+
+from openpyxl.utils import column_index_from_string
+
+def convert_to_number(sheet):
+    for row in sheet.iter_rows():
+        for cell in row:
+            if cell.value == user_inputs[0]:
+                target_column = column_index_from_string(cell.column_letter) - 1
+                target_rows = [cell.row + offset for offset in [7, 12, 17, 18, 19]]
+
+                for target_row in target_rows:
+                    target_cell = sheet.cell(row=target_row, column=target_column)
+
+                    # Convert to number if it's a string or float
+                    if isinstance(target_cell.value, (str, float)):
+                        try:
+                            # Convert to integer
+                            numeric_value = int(float(target_cell.value))
+
+                            # Use Excel's built-in number format
+                            target_cell.value = numeric_value
+                            target_cell.number_format = 'General'
+                        except ValueError:
+                            # If conversion fails, leave the value as is
+                            pass
+
+    return sheet
+
