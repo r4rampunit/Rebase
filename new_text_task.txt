@@ -5169,3 +5169,49 @@ def Weighted_column_required(sheet_name):
 # Usage
 Weighted_column_required("Sheet1")  # Replace "Sheet1" with your actual sheet name
 
+
+
+
+
+
+
+
+
+import pandas as pd
+import openpyxl
+
+def Weighted_column_required(sheet):
+    # Read the Excel file
+    workbook_path = r".\Input\Mapping_File Copy.xlsx"
+    df = pd.read_excel(workbook_path, sheet_name="Data_Edge")
+
+    # Iterate through each row in the DataFrame
+    for index, row in df.iterrows():
+        description = row['Description']
+        weighted_required = row['Weighted_required']
+
+        # Find the cell with the description value
+        for row_cells in sheet.iter_rows():
+            for cell in row_cells:
+                if cell.value == description:
+                    row_num = cell.row
+                    col_num = cell.column
+
+                    # If Weighted_required is 'No', delete specified columns
+                    if weighted_required.lower() == 'no':
+                        columns_to_delete = [col_num + 3, col_num + 4, col_num + 10, col_num + 11]
+                        for col in sorted(columns_to_delete, reverse=True):
+                            sheet.delete_cols(col)
+                        print(f"Columns deleted for description: {description}")
+                    break
+            if cell.value == description:
+                break
+
+    print("Processing complete.")
+
+# Note: This function should be called with an openpyxl worksheet object
+# Example usage:
+# workbook = openpyxl.load_workbook(workbook_path)
+# sheet = workbook['Sheet1']
+# Weighted_column_required(sheet)
+# workbook.save(workbook_path)
