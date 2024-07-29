@@ -5084,3 +5084,41 @@ def mi_chart(request):
 </body>
 </html>
 
+
+
+
+
+import pandas as pd
+import openpyxl
+
+def Weighted_column_required(sheet):
+    # Read the Excel file
+    workbook_path = r".\Input\Mapping_File Copy.xlsx"
+    df = pd.read_excel(workbook_path, sheet_name="Data_Edge")
+
+    # Check the 'Weighted_required' column
+    weighted_required = df['Weighted_required'].iloc[0]
+
+    if weighted_required.lower() == 'no':
+        # If 'No', delete the 'Weighted' column and the column before it
+        workbook = openpyxl.load_workbook(workbook_path)
+        ws = workbook[sheet]
+
+        weighted_col = None
+        for col in ws.iter_cols():
+            if 'Weighted' in str(col[0].value):
+                weighted_col = col[0].column
+                break
+
+        if weighted_col:
+            ws.delete_cols(weighted_col - 1, 2)
+
+        # Save the modified workbook
+        workbook.save(workbook_path)
+        print("Columns deleted successfully.")
+    else:
+        print("No changes required.")
+
+# Usage
+Weighted_column_required("Data_Edge")
+
