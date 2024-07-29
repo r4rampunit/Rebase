@@ -5341,3 +5341,44 @@ def Weighted_column_required(sheet):
 # sheet = workbook['Sheet1']
 # Weighted_column_required(sheet)
 # workbook.save(workbook_path)
+
+
+
+
+
+
+from openpyxl.worksheet.datavalidation import DataValidation
+
+def ignore_the_error(sheet):
+    # Create a DataValidation object that ignores errors
+    dv = DataValidation(type="any")
+    dv.error = None
+    dv.errorTitle = None
+    dv.prompt = None
+    dv.promptTitle = None
+
+    # List of cells where you want to ignore errors
+    # Add your specific cell references here
+    cells_to_ignore = ['A1', 'B5', 'C10']  # Example cells, replace with your actual cells
+
+    for cell_ref in cells_to_ignore:
+        # Add the data validation to each cell
+        dv.add(cell_ref)
+
+        # Get the cell and preserve its value
+        cell = sheet[cell_ref]
+        value = cell.value
+
+        # Apply the data validation
+        sheet.add_data_validation(dv)
+
+        # Restore the cell's original value
+        cell.value = value
+
+    print("Errors ignored in specified cells.")
+
+# Usage:
+# workbook = openpyxl.load_workbook(workbook_path)
+# sheet = workbook['Sheet1']
+# ignore_the_error(sheet)
+# workbook.save(workbook_path)
