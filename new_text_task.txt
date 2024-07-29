@@ -5215,3 +5215,58 @@ def Weighted_column_required(sheet):
 # sheet = workbook['Sheet1']
 # Weighted_column_required(sheet)
 # workbook.save(workbook_path)
+
+
+
+
+
+
+import pandas as pd
+import openpyxl
+from openpyxl.utils import get_column_letter
+
+def Weighted_column_required(sheet):
+    # Read the Excel file
+    workbook_path = r".\Input\Mapping_File Copy.xlsx"
+    df = pd.read_excel(workbook_path, sheet_name="Data_Edge")
+
+    # Iterate through each row in the DataFrame
+    for index, row in df.iterrows():
+        description = row['Description']
+        weighted_required = row['Weighted_required']
+
+        # Find the cell with the description value
+        for row_num in range(1, sheet.max_row + 1):
+            for col_num in range(1, sheet.max_column + 1):
+                cell = sheet.cell(row=row_num, column=col_num)
+
+                # Check if the cell is part of a merged range
+                if sheet.merged_cells:
+                    for merged_range in sheet.merged_cells.ranges:
+                        if cell.coordinate in merged_range:
+                            cell_value = sheet.cell(merged_range.min_row, merged_range.min_col).value
+                            break
+                    else:
+                        cell_value = cell.value
+                else:
+                    cell_value = cell.value
+
+                if cell_value == description:
+                    # If Weighted_required is 'No', delete specified columns
+                    if weighted_required.lower() == 'no':
+                        columns_to_delete = [col_num + 3, col_num + 4, col_num + 10, col_num + 11]
+                        for col in sorted(columns_to_delete, reverse=True):
+                            sheet.delete_cols(col)
+                        print(f"Columns deleted for description: {description}")
+                    break
+            if cell_value == description:
+                break
+
+    print("Processing complete.")
+
+# Note: This function should be called with an openpyxl worksheet object
+# Example usage:
+# workbook = openpyxl.load_workbook(workbook_path)
+# sheet = workbook['Sheet1']
+# Weighted_column_required(sheet)
+# workbook.save(workbook_path)
