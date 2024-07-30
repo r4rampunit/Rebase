@@ -5883,3 +5883,28 @@ def remove_green(sheet):
 # sheet = workbook['Sheet1']  # Replace with your sheet name
 # remove_green(sheet)
 # workbook.save('your_excel_file.xlsx')
+
+
+import openpyxl
+
+def remove_green(sheet):
+    """
+    Removes the green triangles (error indicators) from cells in the given sheet.
+    :param sheet: An openpyxl worksheet object.
+    """
+    for row in sheet.iter_rows():
+        for cell in row:
+            if cell.error:
+                cell.clear_error()
+
+# Example usage:
+# Load your Excel file (replace 'your_file.xlsx' with the actual file path)
+workbook = openpyxl.load_workbook('your_file.xlsx')
+sheet = workbook.active
+
+# Call the function to remove green triangles
+remove_green(sheet)
+
+# Save the modified workbook (you can save it to a different file if needed)
+workbook.save('modified_file.xlsx')
+
