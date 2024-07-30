@@ -5382,3 +5382,38 @@ def ignore_the_error(sheet):
 # sheet = workbook['Sheet1']
 # ignore_the_error(sheet)
 # workbook.save(workbook_path)
+
+
+
+from openpyxl.worksheet.datavalidation import DataValidation
+from openpyxl.utils import get_column_letter, column_index_from_string
+
+def ignore_the_error(sheet, user_inputs):
+    dv = DataValidation(type="custom", formula1="TRUE")  # Changed to custom with always true formula
+    dv.error = None
+    dv.errorTitle = None
+    dv.prompt = None
+    dv.promptTitle = None
+
+    for row in sheet.iter_rows():
+        for cell in row:
+            if cell.value == user_inputs[0]:  # Changed '=' to '=='
+                target_column = column_index_from_string(cell.column_letter) - 1
+                target_rows = [cell.row + offset for offset in (7, 12, 17, 18, 19)]
+
+                for target_row in target_rows:
+                    cell_ref = f"{get_column_letter(target_column)}{target_row}"
+                    dv.add(cell_ref)
+                    cell = sheet[cell_ref]
+                    value = cell.value
+                    sheet.add_data_validation(dv)
+                    cell.value = value
+
+    print("Errors ignored in specified cells.")
+
+# Usage:
+# workbook = openpyxl.load_workbook(workbook_path)
+# sheet = workbook['Sheet1']
+# user_inputs = ["Your specific value to search for"]
+# ignore_the_error(sheet, user_inputs)
+# workbook.save(workbook_path)
