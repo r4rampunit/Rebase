@@ -5663,3 +5663,52 @@ def Weighted_column_required(sheet, data_only_sheet):
 # data_only_sheet = data_only_workbook['Sheet1']
 # Weighted_column_required(sheet, data_only_sheet)
 # workbook.save(workbook_path)
+
+
+
+
+
+
+
+
+import pandas as pd
+import openpyxl
+
+def delete_col_with_merged_ranges(sheet, idx):
+    sheet.delete_cols(idx)
+    for mcr in list(sheet.merged_cells.ranges):
+        if idx < mcr.min_col:
+            mcr.shift(col_shift=-1)
+        elif idx <= mcr.max_col:
+            mcr.shrink(right=1)
+
+def delete_weighted_columns(sheet):
+    workbook_path = r"./Input/Mapping_File Copy.xlsx"
+    df = pd.read_excel(workbook_path, sheet_name="Data_Edge")
+
+    for index, row in df.iterrows():
+        description = row['Description']
+        weighted_required = row['Weighted_required']
+
+        for sheet_row in sheet.iter_rows():
+            for cell in sheet_row:
+                if cell.value == description:
+                    if weighted_required.lower() == 'no':
+                        desc_range = next((r for r in sheet.merged_cells.ranges if cell.coordinate in r), None)
+                        if desc_range:
+                            start_col = desc_range.min_col
+                            columns_to_delete = [start_col + 3, start_col + 4, start_col + 10, start_col + 11]
+                            columns_to_delete = sorted(columns_to_delete, reverse=True)
+                            for col in columns_to_delete:
+                                delete_col_with_merged_ranges(sheet, col)
+                        print(f"Columns deleted for description: {description}")
+                        break
+
+    print("Processing complete.")
+
+# Usage example:
+workbook_path = r"./Input/Mapping_File Copy.xlsx"
+workbook = openpyxl.load_workbook(workbook_path)
+sheet = workbook['Sheet1']
+delete_weighted_columns(sheet)
+workbook.save(workbook_path)
