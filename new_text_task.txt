@@ -5795,3 +5795,39 @@ workbook = openpyxl.load_workbook(workbook_path)
 sheet = workbook['Sheet1']
 delete_weighted_columns(sheet)
 workbook.save(workbook_path)
+
+
+
+
+
+
+
+
+
+
+
+import openpyxl
+from openpyxl.styles import numbers
+
+def remove_green_triangles(workbook_path, sheet_name):
+    # Load the workbook and the specific sheet
+    workbook = openpyxl.load_workbook(workbook_path)
+    sheet = workbook[sheet_name]
+
+    # Iterate over all cells in the sheet
+    for row in sheet.iter_rows():
+        for cell in row:
+            # Remove data validation (if any)
+            if cell.data_type == 'n' and isinstance(cell.value, int):
+                # Set number format to avoid warnings
+                cell.number_format = numbers.FORMAT_NUMBER
+
+    # Save the workbook
+    workbook.save(workbook_path)
+    print("Green triangles removed and workbook saved.")
+
+# Usage example
+workbook_path = r"./Input/Mapping_File Copy.xlsx"
+sheet_name = 'Sheet1'
+remove_green_triangles(workbook_path, sheet_name)
+
