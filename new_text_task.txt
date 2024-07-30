@@ -5594,3 +5594,72 @@ def Weighted_column_required(sheet):
 # sheet = workbook['Sheet1']
 # Weighted_column_required(sheet)
 # workbook.save(workbook_path)
+
+
+
+import pandas as pd
+import openpyxl
+from openpyxl.utils import get_column_letter
+
+def Weighted_column_required(sheet, data_only_sheet):
+    workbook_path = r".\Input\Mapping_File Copy.xlsx"
+    df = pd.read_excel(workbook_path, sheet_name="Data_Edge")
+
+    # Store merged ranges
+    merged_ranges = list(sheet.merged_cells.ranges)
+
+    for index, row in df.iterrows():
+        description = row['Description']
+        weighted_required = row['Weighted_required']
+
+        for merged_range in merged_ranges:
+            top_left_cell_value = data_only_sheet.cell(row=merged_range.min_row, column=merged_range.min_col).value
+            if top_left_cell_value == description:
+                if weighted_required.lower() == 'no':
+                    start_col = merged_range.min_col
+                    columns_to_delete = [start_col + 3, start_col + 4, start_col + 10, start_col + 11]
+
+                    # Delete columns
+                    for col in sorted(columns_to_delete, reverse=True):
+                        sheet.delete_cols(col)
+
+                    # Adjust merged ranges
+                    new_merged_ranges = []
+                    for r in merged_ranges:
+                        new_min_col = r.min_col
+                        new_max_col = r.max_col
+                        for col in columns_to_delete:
+                            if r.min_col < col <= r.max_col:
+                                new_max_col -= 1
+                            elif col < r.min_col:
+                                new_min_col -= 1
+                                new_max_col -= 1
+                        if new_min_col != new_max_col:
+                            new_range = openpyxl.worksheet.cell_range.CellRange(
+                                min_col=new_min_col,
+                                min_row=r.min_row,
+                                max_col=new_max_col,
+                                max_row=r.max_row
+                            )
+                            new_merged_ranges.append(new_range)
+                        else:
+                            new_merged_ranges.append(r)
+
+                    # Clear all merges and set new ones
+                    sheet.merged_cells.ranges.clear()
+                    for r in new_merged_ranges:
+                        sheet.merge_cells(range_string=str(r))
+
+                    print(f"Columns deleted for description: {description}")
+                break
+
+    print("Processing complete.")
+
+# Usage example:
+# workbook_path = r".\Input\Mapping_File Copy.xlsx"
+# workbook = openpyxl.load_workbook(workbook_path)
+# sheet = workbook['Sheet1']
+# data_only_workbook = openpyxl.load_workbook(workbook_path, data_only=True)
+# data_only_sheet = data_only_workbook['Sheet1']
+# Weighted_column_required(sheet, data_only_sheet)
+# workbook.save(workbook_path)
