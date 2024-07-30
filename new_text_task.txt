@@ -5417,3 +5417,6 @@ def ignore_the_error(sheet, user_inputs):
 # user_inputs = ["Your specific value to search for"]
 # ignore_the_error(sheet, user_inputs)
 # workbook.save(workbook_path)
+
+min_row = r.min_row[0] if isinstance(r.min_row, tuple) else r.min_row
+                            max_row = r.max_row[0] if isinstance(r.max_row, tuple) else r.max_row
