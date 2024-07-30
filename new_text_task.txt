@@ -5853,3 +5853,33 @@ def remove_green(sheet):
 # sheet = workbook['Sheet1']  # Replace with your sheet name
 # remove_green(sheet)
 # workbook.save('your_excel_file.xlsx')
+
+
+
+
+
+from openpyxl.styles import PatternFill
+
+def remove_green(sheet):
+    # Iterate through all cells in the sheet
+    for row in sheet.iter_rows():
+        for cell in row:
+            # Check if the cell contains a number stored as text
+            if cell.data_type == 's' and cell.value and cell.value.isdigit():
+                # Convert the value to a number
+                cell.value = int(cell.value)
+
+                # If you want to keep leading zeros, format the cell as text
+                cell.number_format = '@'
+
+                # Optionally, you can change the cell color to indicate it's been processed
+                # cell.fill = PatternFill(start_color="FFFFFF", end_color="FFFFFF", fill_type="solid")
+
+    print("Green triangles should now be removed from all cells.")
+
+# Usage:
+# import openpyxl
+# workbook = openpyxl.load_workbook('your_excel_file.xlsx')
+# sheet = workbook['Sheet1']  # Replace with your sheet name
+# remove_green(sheet)
+# workbook.save('your_excel_file.xlsx')
