@@ -5831,3 +5831,25 @@ workbook_path = r"./Input/Mapping_File Copy.xlsx"
 sheet_name = 'Sheet1'
 remove_green_triangles(workbook_path, sheet_name)
 
+
+
+
+from openpyxl.worksheet.datavalidation import DataValidation
+
+def remove_green(sheet):
+    # Iterate through all cells in the sheet
+    for row in sheet.iter_rows():
+        for cell in row:
+            # Remove any existing data validation
+            cell.data_validation = None
+
+    # Clear all data validations from the sheet
+    sheet.data_validations = DataValidation()
+
+    print("Green triangles removed from all cells.")
+
+# Usage:
+# workbook = openpyxl.load_workbook('your_excel_file.xlsx')
+# sheet = workbook['Sheet1']  # Replace with your sheet name
+# remove_green(sheet)
+# workbook.save('your_excel_file.xlsx')
