@@ -430,3 +430,26 @@ for x, col in itertools.product(listl, column_names):
 table_df = pd.concat([table_df, table_df1], axis=1)
 table_html = table_df.to_html(classes="table table-striped table-bordered", index=True)
 return JsonResponse({'table_html': table_html})
+
+
+
+def view_function(request):
+    folders = get_folders()
+    selected_folder = request.GET.get("folder") or None
+    selected_subfolder = request.GET.get("subfolder") or None
+
+    subfolders = get_subfolders(selected_folder) if selected_folder else []
+
+    folder_path = os.path.join(FOLDER_PATH, selected_folder or '', selected_subfolder or '')
+    excel_files = [f for f in os.listdir(folder_path) if f.endswith('.xlsx')] if (selected_folder and selected_subfolder) else []
+
+    # Rest of your view logic here
+
+    return render(request, 'your_template.html', {
+        'folders': folders,
+        'subfolders': subfolders,
+        'selected_folder': selected_folder,
+        'selected_subfolder': selected_subfolder,
+        'excel_files': excel_files,
+        # Other context variables
+    })
