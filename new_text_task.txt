@@ -453,3 +453,27 @@ def view_function(request):
         'excel_files': excel_files,
         # Other context variables
     })
+
+
+
+
+
+
+
+def read_excel_files(folder_path, excel_files):
+    file_paths = {excel_file: os.path.join(folder_path, excel_file) for excel_file in excel_files}
+
+    return {
+        'lic_hbap_first_run': pd.read_excel(file_paths[next((f for f in excel_files if all(s in f for s in ["LIC", "HBAP", "FirstRun"])), '')], sheet_name="LPACT_OL_YTD_QTR_Final") if any(all(s in f for s in ["LIC", "HBAP", "FirstRun"]) for f in excel_files) else None,
+        'lic_hbap_last_run': pd.read_excel(file_paths[next((f for f in excel_files if all(s in f for s in ["LIC", "HBAP", "LastRun"])), '')], sheet_name="LPACT_OL_YTD_QTR_Final") if any(all(s in f for s in ["LIC", "HBAP", "LastRun"]) for f in excel_files) else None,
+        'lpact_hbap_data': pd.read_excel(file_paths[next((f for f in excel_files if all(s in f for s in ["LPACT", "HBAP"])), '')], sheet_name="PD_series") if any(all(s in f for s in ["LPACT", "HBAP"]) for f in excel_files) else None,
+        'lic_non_hbap_first_run': pd.read_excel(file_paths[next((f for f in excel_files if all(s in f for s in ["LIC", "NonHBAP", "FirstRun"])), '')], sheet_name="LPACT_OL_YTD_QTR_Final") if any(all(s in f for s in ["LIC", "NonHBAP", "FirstRun"]) for f in excel_files) else None,
+        'lic_non_hbap_last_run': pd.read_excel(file_paths[next((f for f in excel_files if all(s in f for s in ["LIC", "NonHBAP", "LastRun"])), '')], sheet_name="LPACT_OL_YTD_QTR_Final") if any(all(s in f for s in ["LIC", "NonHBAP", "LastRun"]) for f in excel_files) else None,
+        'lpact_non_hbap_data': pd.read_excel(file_paths[next((f for f in excel_files if all(s in f for s in ["LPACT", "Non", "HBAP"])), '')], sheet_name="PD_series") if any(all(s in f for s in ["LPACT", "Non", "HBAP"]) for f in excel_files) else None,
+        'rwa_hbap_first_run': pd.read_excel(file_paths[next((f for f in excel_files if all(s in f for s in ["MI", "HBAP", "FirstRun"])), '')], sheet_name="Temp_RRM_Final_OL") if any(all(s in f for s in ["MI", "HBAP", "FirstRun"]) for f in excel_files) else None,
+        'rwa_hbap_last_run': pd.read_excel(file_paths[next((f for f in excel_files if all(s in f for s in ["MI", "HBAP", "LastRun"])), '')], sheet_name="Temp_RRM_Final_OL") if any(all(s in f for s in ["MI", "HBAP", "LastRun"]) for f in excel_files) else None,
+        'rwa_non_hbap_first_run': pd.read_excel(file_paths[next((f for f in excel_files if all(s in f for s in ["MI", "Non", "HBAP", "FirstRun"])), '')], sheet_name="Temp_RRM_Final_OL") if any(all(s in f for s in ["MI", "Non", "HBAP", "FirstRun"]) for f in excel_files) else None,
+        'rwa_non_hbap_last_run': pd.read_excel(file_paths[next((f for f in excel_files if all(s in f for s in ["MI", "Non", "HBAP", "LastRun"])), '')], sheet_name="Temp_RRM_Final_OL") if any(all(s in f for s in ["MI", "Non", "HBAP", "LastRun"]) for f in excel_files) else None,
+        'lic_views_previous': pd.read_excel(file_paths[next((f for f in excel_files if all(s in f for s in ["LIC", "Previous"])), '')], sheet_name="LIC_raw1") if any(all(s in f for s in ["LIC", "Previous"]) for f in excel_files) else None,
+        'rwa_views_previous': pd.read_excel(file_paths[next((f for f in excel_files if all(s in f for s in ["RWA", "Previous"])), '')], sheet_name="RWA_raw1") if any(all(s in f for s in ["RWA", "Previous"]) for f in excel_files) else None,
+    }
