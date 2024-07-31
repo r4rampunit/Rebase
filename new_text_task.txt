@@ -299,3 +299,11 @@ for x, col in itertools.product(listl, column_names):
 table_df = pd.concat([table_df, table_df1], axis=1)
 table_html = table_df.to_html(classes="table table-striped table-bordered", index=True)
 return JsonResponse({'table_html': table_html})
+
+
+
+
+
+weighted_required = input_mapping_df.loc[input_mapping_df["trans variable"] == col, "weighted_required"].values[0]
+            if weighted_required == "Ne":
+                df.drop(columns=[col, f"{col}, Weighted"], inplace=True)
