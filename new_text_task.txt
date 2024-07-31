@@ -176,3 +176,126 @@ filename = 'example.xlsx'
 sheet_name = 'Sheet1'
 
 delete_4th_column_after_first_of_merged_cell(filename, sheet_name)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import itertools
+
+projection_mappings = {
+    "T1": ([4], [1, 2, 3, 4]),
+    "T2": ([8], [5, 6, 7, 8]),
+    "T3": ([12], [9, 10, 11, 12]),
+    "T4": ([16], [13, 14, 15, 16]),
+    "T5": ([20], [17, 18, 19, 20])
+}
+
+for x, col in itertools.product(listl, column_names):
+    scenario = x[1]
+    ST = x[0]
+    print(ST)
+
+    projection_period, projection_period_range = projection_mappings.get(col, ([0], [0]))
+
+    filter_conditions = (
+        (lic_df["Organisational unit level 1"].isin(Organisational_unit_level_1_selected)) &
+        (lic_df["ST"] == ST) &
+        (lic_df["Organisational unit level 2"].isin(Organisational_unit_level_2_selected)) &
+        (lic_df["Organisational unit level 3"].isin(Organisational_unit_level_3_selected)) &
+        (lic_df["Country of Exposure"].isin(Country_of_Exposure_selected)) &
+        (lic_df["Asset class"].isin(Asset_class_selected)) &
+        (lic_df["Product Type"].isin(Product_Type_selected)) &
+        (lic_df["Basel_Approach"].isin(Basel_Approach_selected)) &
+        (lic_df["scenario"] == scenario) &
+        (lic_df["Projection Period"].isin(projection_period))
+    )
+
+    rwa_filter_conditions = (
+        (rwa_df["Organisational unit level 1"].isin(Organisational_unit_level_1_selected)) &
+        (rwa_df["ST"] == ST) &
+        (rwa_df["Organisational unit level 2"].isin(Organisational_unit_level_2_selected)) &
+        (rwa_df["Organisational unit level 3"].isin(Organisational_unit_level_3_selected)) &
+        (rwa_df["Country of Exposure"].isin(Country_of_Exposure_selected)) &
+        (rwa_df["Asset class"].isin(Asset_class_selected)) &
+        (rwa_df["Product Type"].isin(Product_Type_selected)) &
+        (rwa_df["Basel_Approach"].isin(Basel_Approach_selected)) &
+        (rwa_df["scenario"] == scenario) &
+        (rwa_df["Projection Period"] == 0)
+    )
+
+    net_balance = lic_df[filter_conditions]["Balance"].sum()
+    table_df1.loc["Net Balance ($ MM)", col] = round(net_balance / 1000000, 2)
+
+    gross_balance = net_balance + lic_df[filter_conditions]["Comm Gross WO"].sum()
+    table_df1.loc["Gross Balance ($ MM)", col] = round(gross_balance / 1000000, 2)
+
+    for stage in [1, 2, 3]:
+        stage_balance = lic_df[filter_conditions & (lic_df["IFRS9 Stage"] == stage)]["Balance"].sum()
+        proportion = (stage_balance / net_balance) * 100 if net_balance != 0 else 0
+        table_df1.loc[f"Net Balance Proportion S{stage}", col] = f"{proportion:.2f}%"
+
+    provisions = lic_df[filter_conditions]["Provisions"].sum()
+    table_df1.loc["ECL ($ MM)", col] = round(provisions / 1000000, 2)
+
+    provisions_orig = lic_df[filter_conditions]["Provisions orig"].sum()
+    table_df1.loc["ECL Original ($ MM)", col] = round(provisions_orig / 1000000, 2)
+
+    ecl_rate = (provisions / net_balance) * 100 if net_balance != 0 else 0
+    table_df1.loc["ECL Rate", col] = f"{ecl_rate:.2f}%"
+
+    loss_at_wo = lic_df[filter_conditions & (lic_df["Projection_Period"].isin(projection_period_range))]["Loss_at_WO"].sum()
+    table_df1.loc["Loss at WO ($ MM)", col] = round(loss_at_wo / 1000000, 2)
+
+    loss_at_wo_orig = lic_df[filter_conditions & (lic_df["Projection_Period"].isin(projection_period_range))]["Loss_at_WO_orig"].sum()
+    table_df1.loc["Loss at WO Original ($ MM)", col] = round(loss_at_wo_orig / 1000000, 2)
+
+    lic = lic_df[filter_conditions & (lic_df["Projection_Period"].isin(projection_period_range))]["LIC"].sum()
+    table_df1.loc["LIC ($ MM)", col] = round(lic / 1000000, 2)
+
+    lic_orig = lic_df[filter_conditions & (lic_df["Projection_Period"].isin(projection_period_range))]["LIC_orig"].sum()
+    table_df1.loc["LIC Original ($ MM)", col] = round(lic_orig / 1000000, 2)
+
+    table_df1.loc["LIC overlay ($ MM)", col] = table_df1.loc["LIC ($ MM)", col] - table_df1.loc["LIC Original ($ MM)", col]
+
+    lic_rate = (lic / net_balance) * 100 if net_balance != 0 else 0
+    table_df1.loc["LIC Rate", col] = f"{lic_rate:.2f}%"
+
+    ead = rwa_df[rwa_filter_conditions]["Exposure_for_RWA"].sum()
+    table_df1.loc["EAD ($ MM)", col] = round(ead / 1000000, 2)
+
+    rwa = rwa_df[rwa_filter_conditions]["RWA"].sum()
+    table_df1.loc["RWA ($ MM)", col] = round(rwa / 1000000, 2)
+
+    rwa_orig = rwa_df[rwa_filter_conditions]["RWA_Orig"].sum()
+    table_df1.loc["RWA Original ($ MM)", col] = round(rwa_orig / 1000000, 2)
+
+    table_df1.loc["RWA Overlay ($ MM)", col] = round(table_df1.loc["RWA ($ MM)", col] - table_df1.loc["RWA Original ($ MM)", col], 2)
+
+    rwa_density = (rwa / ead) * 100 if ead != 0 else 0
+    table_df1.loc["RWA Density", col] = f"{rwa_density:.2f}%"
+
+    el = rwa_df[rwa_filter_conditions]["Expected_Loss_Regulatory"].sum()
+    table_df1.loc["EL ($ MM)", col] = round(el / 1000000, 2)
+
+    el_orig = rwa_df[rwa_filter_conditions]["Expected_Loss_Regulatory_Orig"].sum()
+    table_df1.loc["EL Overlay ($ MM)", col] = round((el - el_orig) / 1000000, 2)
+
+    el_density = (el / ead) * 100 if ead != 0 else 0
+    table_df1.loc["EL Density", col] = f"{el_density:.2f}%"
+
+table_df = pd.concat([table_df, table_df1], axis=1)
+table_html = table_df.to_html(classes="table table-striped table-bordered", index=True)
+return JsonResponse({'table_html': table_html})
