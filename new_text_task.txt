@@ -1438,3 +1438,33 @@ def remove_weighted_and_preceding(columns):
             new_columns.append(col)
 
     return new_columns
+
+
+
+
+def remove_weighted_and_preceding(columns):
+    new_columns = []
+    skip_next = False
+
+    for i, col in enumerate(columns):
+        if skip_next:
+            skip_next = False
+            continue
+
+        if 'Weighted' in col[-1]:
+            if new_columns:
+                new_columns.pop()  # Remove the preceding column
+            skip_next = True
+        elif ' ' in col[-1] and ('IFRS9 1024 Scenarios' in col[1] or 'IFRS9 4023 Scenarios' in col[1]):
+            if new_columns:
+                new_columns.pop()  # Remove the preceding column
+            skip_next = True
+        else:
+            new_columns.append(col)
+
+    # Ensure the column with the structure ('Unemployment Rate (%)', ' ', '  ') is kept
+    required_column = ('Unemployment Rate (%)', ' ', '  ')
+    if required_column not in new_columns:
+        new_columns.append(required_column)
+
+    return new_columns
