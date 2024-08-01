@@ -1297,3 +1297,48 @@ def remove_weighted_and_preceding(columns):
 
 def remove_weighted(columns):
     return [col for col in columns if 'Weighted' not in col[-1]]
+
+
+
+
+
+
+
+
+
+import pandas as pd
+
+# Assuming 'table' is your existing DataFrame with the original columns
+# If not, replace 'table' with the actual name of your DataFrame
+
+# Create a list to store the new columns
+new_columns = []
+
+# Iterate through the existing columns
+for col in table.columns:
+    # Check if the column is not a 'Weighted' column
+    if col[2] != 'Weighted' and col[1] != ' ':
+        new_columns.append(col)
+
+    # Add a blank column after each scenario group (except Moody's)
+    if col[2] == 'Down 2' and col[1] != "Moody's":
+        new_columns.append((col[0], ' ', ' '))
+
+# Create a new DataFrame with the modified columns
+new_table = pd.DataFrame(columns=pd.MultiIndex.from_tuples(new_columns))
+
+# Copy data from the original table to the new table
+for col in new_columns:
+    if col in table.columns:
+        new_table[col] = table[col]
+
+# Now 'new_table' has the desired column structure
+
+# Print the new columns to verify
+print(new_table.columns)
+
+# If you want to replace the original table with the new one:
+table = new_table
+
+# If you need to write this to Excel:
+# table.to_excel('your_output_file.xlsx', index=False)
