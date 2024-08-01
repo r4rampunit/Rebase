@@ -766,3 +766,63 @@ scenario, ST = zip(*[st.split('-') for st in ST_scenario_selected])
     </script>
 </body>
 </html>
+
+
+
+
+
+
+
+
+
+
+import pandas as pd
+from openpyxl import Workbook
+
+# Read the Excel file
+workbook_path = r".\Input\Mapping_File Copy.xlsx"
+Table_List = pd.read_excel(workbook_path, sheet_name="Table_List")
+Data_Edge_1 = pd.read_excel(workbook_path, sheet_name="Data_Edge")
+country_list = list(Data_Edge_1["ISOCODES"].unique())
+
+# Create a new workbook
+wb = Workbook()
+wb.save(user_inputs[19])
+
+def should_keep_column(col, df):
+    for _, row in df.iterrows():
+        if row['Trans_variable'] == col[0]:
+            return row['Weighted_required'] != 'No'
+    return True
+
+for Isocode in country_list:
+    col_list = (Table_List["MEV"].loc[Table_List.Country == Isocode]).tolist()
+
+    with pd.ExcelWriter(user_inputs[19], engine='openpyxl', mode="a", if_sheet_exists="overlay") as writer:
+        start_row = 1
+        start_col = 1
+
+        for col in col_list:
+            table = construct_and_populate_tables(Isocode, tzero_date, col).round(1)
+
+            # Filter columns based on Data_Edge sheet
+            df = pd.read_excel(workbook_path, sheet_name="Data_Edge")
+            current_columns = table.columns
+            new_columns = [col for col in current_columns if should_keep_column(col, df)]
+
+            # Remove 'Weighted' column and the column before it
+            weighted_index = next((i for i, col in enumerate(new_columns) if 'Weighted' in col), None)
+            if weighted_index is not None and weighted_index > 0:
+                new_columns = new_columns[:weighted_index-1] + new_columns[weighted_index+1:]
+
+            table = table[new_columns]
+
+            # Write the table to Excel
+            table.to_excel(writer, sheet_name=Isocode, startrow=start_row, startcol=start_col, index=True)
+            print(table.columns)
+
+            # Adjust the worksheet properties
+            worksheet = writer.sheets[Isocode]
+            worksheet.sheet_view.showGridLines = False
+
+print("Process completed successfully.")
