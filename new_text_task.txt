@@ -1116,3 +1116,91 @@ for Isocode in country_list:
     wb.save(output_path)
 
 print("Process completed successfully.")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import pandas as pd
+from openpyxl import Workbook
+
+# Read the Excel file
+workbook_path = r".\Input\Mapping_File Copy.xlsx"
+Table_List = pd.read_excel(workbook_path, sheet_name="Table_List")
+Data_Edge_1 = pd.read_excel(workbook_path, sheet_name="Data_Edge")
+country_list = list(Data_Edge_1["ISOCODES"].unique())
+
+# Create a new workbook
+wb = Workbook()
+wb.save(user_inputs[19])
+
+for Isocode in country_list:
+    col_list = (Table_List["MEV"].loc[Table_List.Country == Isocode]).tolist()
+
+    with pd.ExcelWriter(user_inputs[19], engine='openpyxl', mode="a", if_sheet_exists="overlay") as writer:
+        start_row = 1
+        start_col = 1
+
+        for col in col_list:
+            table = construct_and_populate_tables(Isocode, tzero_date, col).round(1)
+
+            # Check if Weighted_required is 'Yes' in Data_Edge
+            df = pd.read_excel(workbook_path, sheet_name="Data_Edge")
+            weighted_required = df.loc[df['Trans_variable'] == col, 'Weighted_required'].iloc[0]
+
+            if weighted_required == 'Yes':
+                # Keep original columns
+                new_columns = table.columns
+            else:
+                # Process columns
+                new_columns = []
+                scenario_groups = {}
+
+                for column in table.columns:
+                    scenario = column[1]
+                    if scenario not in scenario_groups:
+                        scenario_groups[scenario] = []
+                    scenario_groups[scenario].append(column)
+
+                for scenario, cols in scenario_groups.items():
+                    new_columns.extend(cols)
+                    if scenario != "Moody's":
+                        new_columns.append((cols[0][0], ' ', ' '))
+
+            # Create a new table with the processed columns
+            new_table = pd.DataFrame(columns=pd.MultiIndex.from_tuples(new_columns))
+
+            # Copy data from the original table to the new table
+            for column in table.columns:
+                if column in new_table.columns:
+                    new_table[column] = table[column]
+
+            # Write the table to Excel
+            new_table.to_excel(writer, sheet_name=Isocode, startrow=start_row, startcol=start_col, index=True)
+            print(new_table.columns)
+
+            # Adjust the worksheet properties
+            worksheet = writer.sheets[Isocode]
+            worksheet.sheet_view.showGridLines = False
+
+print("Process completed successfully.")
