@@ -691,3 +691,9 @@ lic_orig = lic_df[
 ]["LIC_orig"].sum()
 
 table_df1.loc["LIC Original ($ MM)", col] = round(lic_orig / 1000000)
+
+
+
+
+
+scenario, ST = zip(*[st.split('-') for st in ST_scenario_selected])
