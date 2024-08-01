@@ -1283,4 +1283,14 @@ for Isocode in country_list:
 print("Process completed successfully.")
 
 
-
+def remove_weighted_and_preceding(columns):
+    new_columns = []
+    for i, col in enumerate(columns):
+        if 'Weighted' in col[-1]:
+            if new_columns:
+                new_columns.pop()  # Remove the preceding column
+        elif i > 0 and 'Weighted' in columns[i-1][-1]:
+            continue  # Skip this column (it's the one after 'Weighted')
+        else:
+            new_columns.append(col)
+    return new_columns
