@@ -1342,3 +1342,70 @@ table = new_table
 
 # If you need to write this to Excel:
 # table.to_excel('your_output_file.xlsx', index=False)
+
+
+
+
+
+
+
+
+def remove_weighted_and_preceding(columns):
+    new_columns = []
+    skip_next = False
+
+    for i, col in enumerate(columns):
+        if skip_next:
+            skip_next = False
+            continue
+
+        if 'Weighted' in col[-1]:
+            if new_columns:
+                new_columns.pop()  # Remove the preceding column
+            skip_next = True
+        elif ' ' in col[-1] and 'IFRS9 1024 Scenarios' in col[1]:
+            if new_columns:
+                new_columns.pop()  # Remove the preceding column
+            skip_next = True
+        elif ' ' in col[-1] and 'IFRS9 4023 Scenarios' in col[1]:
+            if new_columns:
+                new_columns.pop()  # Remove the preceding column
+            skip_next = True
+        else:
+            new_columns.append(col)
+
+    return new_columns
+
+# Example usage:
+import pandas as pd
+
+# Assuming 'table' is your well-defined DataFrame
+table = pd.DataFrame(columns=pd.MultiIndex.from_tuples([
+    ('Unemployment Rate (%)', 'IFRS9 1024 Scenarios', 'Upside'),
+    ('Unemployment Rate (%)', 'IFRS9 1024 Scenarios', 'Central'),
+    ('Unemployment Rate (%)', 'IFRS9 1024 Scenarios', 'Down 1'),
+    ('Unemployment Rate (%)', 'IFRS9 1024 Scenarios', 'Down 2'),
+    ('Unemployment Rate (%)', 'IFRS9 1024 Scenarios', ' '),
+    ('Unemployment Rate (%)', 'IFRS9 1024 Scenarios', 'Weighted'),
+    ('Unemployment Rate (%)', ' ', '  '),
+    ('Unemployment Rate (%)', 'IFRS9 1024 Scenarios', 'Upside'),
+    ('Unemployment Rate (%)', 'IFRS9 1024 Scenarios', 'Central'),
+    ('Unemployment Rate (%)', 'IFRS9 1024 Scenarios', 'Down 1'),
+    ('Unemployment Rate (%)', 'IFRS9 1024 Scenarios', 'Down 2'),
+    ('Unemployment Rate (%)', 'IFRS9 1024 Scenarios', ' '),
+    ('Unemployment Rate (%)', 'IFRS9 1024 Scenarios', 'Weighted'),
+    ('Unemployment Rate (%)', ' ', ' '),
+    ('Unemployment Rate (%)', 'Moody\'s', '10 % UP'),
+    ('Unemployment Rate (%)', 'Moody\'s', 'Central'),
+    ('Unemployment Rate (%)', 'Moody\'s', '10% DN'),
+    ('Unemployment Rate (%)', 'Moody\'s', '4% DN')
+]))
+
+# Use the function to get the new columns
+new_columns = remove_weighted_and_preceding(table.columns)
+
+# Create a new DataFrame with the filtered columns
+filtered_table = table[new_columns]
+
+# Print the updated DataFrame columns
+print(filtered_table.columns)
