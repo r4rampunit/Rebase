@@ -1294,3 +1294,6 @@ def remove_weighted_and_preceding(columns):
         else:
             new_columns.append(col)
     return new_columns
+
+def remove_weighted(columns):
+    return [col for col in columns if 'Weighted' not in col[-1]]
