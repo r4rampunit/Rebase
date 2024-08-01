@@ -697,3 +697,72 @@ table_df1.loc["LIC Original ($ MM)", col] = round(lic_orig / 1000000)
 
 
 scenario, ST = zip(*[st.split('-') for st in ST_scenario_selected])
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MI Chart</title>
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+</head>
+<body>
+    <div class="container mt-5">
+        <h1>MI Chart</h1>
+        <form id="dropdown-form">
+            {% csrf_token %}
+            {% for dropdown_name, options in dropdowns.items %}
+            <div class="mb-3">
+                <label for="{{ dropdown_name }}" class="form-label">{{ dropdown_name|title }}</label>
+                <select class="form-select select2" name="{{ dropdown_name }}" id="{{ dropdown_name }}" multiple>
+                    {% for option in options %}
+                    <option value="{{ option }}">{{ option }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endfor %}
+        </form>
+
+        <h2 class="mt-5">Data Table</h2>
+        <div id="table-container">
+            {{ initial_table_html|safe }}
+        </div>
+    </div>
+
+    <script>
+        $(document).ready(function() {
+            $('.select2').select2();
+
+            function updateTable() {
+                $.ajax({
+                    url: '{% url "mi_chart" %}',
+                    type: 'POST',
+                    data: $('#dropdown-form').serialize(),
+                    success: function(response) {
+                        $('#table-container').html(response.table_html);
+                    }
+                });
+            }
+
+            $('.select2').on('change', updateTable);
+        });
+    </script>
+</body>
+</html>
