@@ -1042,3 +1042,77 @@ for Isocode in country_list:
             worksheet.sheet_view.showGridLines = False
 
 print("Process completed successfully.")
+
+
+
+
+
+
+
+
+
+
+import pandas as pd
+from openpyxl import Workbook
+import openpyxl
+
+# Read the Excel file
+workbook_path = r".\Input\Mapping_File Copy.xlsx"
+Table_List = pd.read_excel(workbook_path, sheet_name="Table_List")
+Data_Edge_1 = pd.read_excel(workbook_path, sheet_name="Data_Edge")
+country_list = list(Data_Edge_1["ISOCODES"].unique())
+
+# Create a new workbook
+output_path = user_inputs[19]
+wb = Workbook()
+wb.save(output_path)
+
+def process_columns(columns):
+    new_columns = []
+    current_scenario = None
+    for col in columns:
+        if col[1] != current_scenario:
+            if current_scenario and current_scenario != "Moody's":
+                new_columns.append((col[0], ' ', ' '))
+            current_scenario = col[1]
+        new_columns.append(col)
+    return new_columns
+
+for Isocode in country_list:
+    col_list = (Table_List["MEV"].loc[Table_List.Country == Isocode]).tolist()
+
+    wb = openpyxl.load_workbook(output_path)
+    if Isocode in wb.sheetnames:
+        wb.remove(wb[Isocode])
+    ws = wb.create_sheet(Isocode)
+
+    start_row = 1
+    start_col = 1
+
+    for col in col_list:
+        table = construct_and_populate_tables(Isocode, tzero_date, col).round(1)
+
+        # Check if Weighted_required is 'Yes' in Data_Edge
+        df = pd.read_excel(workbook_path, sheet_name="Data_Edge")
+        weighted_required = df.loc[df['Trans_variable'] == col, 'Weighted_required'].iloc[0]
+
+        if weighted_required == 'Yes':
+            new_columns = table.columns
+        else:
+            new_columns = process_columns(table.columns)
+
+        # Write the column headers
+        for i, col_header in enumerate(new_columns):
+            ws.cell(row=start_row, column=start_col+i, value=str(col_header))
+
+        # Write the data
+        for i, row in enumerate(table.values):
+            for j, value in enumerate(row):
+                ws.cell(row=start_row+i+1, column=start_col+j, value=value)
+
+        print(f"Processed table for {col} in {Isocode}")
+
+    ws.sheet_view.showGridLines = False
+    wb.save(output_path)
+
+print("Process completed successfully.")
