@@ -826,3 +826,67 @@ for Isocode in country_list:
             worksheet.sheet_view.showGridLines = False
 
 print("Process completed successfully.")
+
+
+
+
+
+
+
+
+
+
+
+
+import pandas as pd
+from openpyxl import Workbook
+
+# Read the Excel file
+workbook_path = r".\Input\Mapping_File Copy.xlsx"
+Table_List = pd.read_excel(workbook_path, sheet_name="Table_List")
+Data_Edge_1 = pd.read_excel(workbook_path, sheet_name="Data_Edge")
+country_list = list(Data_Edge_1["ISOCODES"].unique())
+
+# Create a new workbook
+wb = Workbook()
+wb.save(user_inputs[19])
+
+def remove_weighted_and_preceding(columns):
+    new_columns = []
+    skip_next = False
+    for i, col in enumerate(columns):
+        if skip_next:
+            skip_next = False
+            continue
+        if 'Weighted' in col[-1]:
+            if i > 0:
+                new_columns.pop()  # Remove the preceding column
+            skip_next = True  # Skip the Weighted column
+        else:
+            new_columns.append(col)
+    return new_columns
+
+for Isocode in country_list:
+    col_list = (Table_List["MEV"].loc[Table_List.Country == Isocode]).tolist()
+
+    with pd.ExcelWriter(user_inputs[19], engine='openpyxl', mode="a", if_sheet_exists="overlay") as writer:
+        start_row = 1
+        start_col = 1
+
+        for col in col_list:
+            table = construct_and_populate_tables(Isocode, tzero_date, col).round(1)
+
+            # Remove 'Weighted' columns and the columns before them
+            new_columns = remove_weighted_and_preceding(table.columns)
+
+            table = table[new_columns]
+
+            # Write the table to Excel
+            table.to_excel(writer, sheet_name=Isocode, startrow=start_row, startcol=start_col, index=True)
+            print(table.columns)
+
+            # Adjust the worksheet properties
+            worksheet = writer.sheets[Isocode]
+            worksheet.sheet_view.showGridLines = False
+
+print("Process completed successfully.")
