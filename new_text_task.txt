@@ -548,3 +548,146 @@ def view_function(request):
         'excel_files': excel_files,
         # Other context variables
     })
+
+
+
+
+
+
+
+# Calculate net balance
+table_df1.loc["Net Balance (SMM)", col] = round(net_balance / 1000000)
+
+# Calculate gross balance
+gross_balance = net_balance + lic_df[
+    (lic_df["Organisational_unit_level_1"].isin(Organisational_unit_level_1_selected)) &
+    (lic_df["Organisational_unit_level_2"].isin(Organisational_unit_level_2_selected)) &
+    (lic_df["ST"] == ST) &
+    (lic_df["Organisational_unit_level_3"].isin(Organisational_unit_level_3_selected)) &
+    (lic_df["Country_of_Exposure"].isin(Country_of_Exposure_selected)) &
+    (lic_df["Asset_class"].isin(Asset_class_selected)) &
+    (lic_df["Product_Type"].isin(Product_Type_selected)) &
+    (lic_df["Basel_Approach"].isin(Basel_Approach_selected)) &
+    (lic_df["scenario"] == scenario) &
+    (lic_df["Projection_Period"].isin(Projection_Period))
+]["Cumm_Gross_WO"].sum()
+
+table_df1.loc["Gross Balance ($ MM)", col] = round(gross_balance / 1000000)
+
+# Calculate net balance proportions for different stages
+for stage in [1, 2, 3]:
+    proportion = lic_df[
+        (lic_df["Organisational_unit_level_1"].isin(Organisational_unit_level_1_selected)) &
+        (lic_df["ST"] == ST) &
+        (lic_df["Organisational_unit_level_2"].isin(Organisational_unit_level_2_selected)) &
+        (lic_df["Organisational_unit_level_3"].isin(Organisational_unit_level_3_selected)) &
+        (lic_df["Country_of_Exposure"].isin(Country_of_Exposure_selected)) &
+        (lic_df["Asset_class"].isin(Asset_class_selected)) &
+        (lic_df["Product_Type"].isin(Product_Type_selected)) &
+        (lic_df["Basel_Approach"].isin(Basel_Approach_selected)) &
+        (lic_df["scenario"] == scenario) &
+        (lic_df["Projection_Period"].isin(Projection_Period)) &
+        (lic_df["IFRS9_Stage"] == stage)
+    ]["Balance"].sum() / net_balance
+
+    table_df1.loc[f"Net Balance Proportion ${stage}", col] = f"{round(proportion * 100, 2)}%"
+
+# Calculate provisions
+provisions = lic_df[
+    (lic_df["Organisational_unit_level_1"].isin(Organisational_unit_level_1_selected)) &
+    (lic_df["ST"] == ST) &
+    (lic_df["Organisational_unit_level_2"].isin(Organisational_unit_level_2_selected)) &
+    (lic_df["Organisational_unit_level_3"].isin(Organisational_unit_level_3_selected)) &
+    (lic_df["Country_of_Exposure"].isin(Country_of_Exposure_selected)) &
+    (lic_df["Asset_class"].isin(Asset_class_selected)) &
+    (lic_df["Product_Type"].isin(Product_Type_selected)) &
+    (lic_df["Basel_Approach"].isin(Basel_Approach_selected)) &
+    (lic_df["scenario"] == scenario) &
+    (lic_df["Projection_Period"].isin(Projection_Period)) &
+    (lic_df["IFRS9_Stage"] == 3)
+]["Provisions"].sum()
+
+table_df1.loc["ECL ($ MM)", col] = round(provisions / 1000000)
+
+# Calculate original provisions
+provisions_orig = lic_df[
+    (lic_df["Organisational_unit_level_1"].isin(Organisational_unit_level_1_selected)) &
+    (lic_df["ST"] == ST) &
+    (lic_df["Organisational_unit_level_2"].isin(Organisational_unit_level_2_selected)) &
+    (lic_df["Organisational_unit_level_3"].isin(Organisational_unit_level_3_selected)) &
+    (lic_df["Country_of_Exposure"].isin(Country_of_Exposure_selected)) &
+    (lic_df["Asset_class"].isin(Asset_class_selected)) &
+    (lic_df["Product_Type"].isin(Product_Type_selected)) &
+    (lic_df["Basel_Approach"].isin(Basel_Approach_selected)) &
+    (lic_df["scenario"] == scenario) &
+    (lic_df["Projection_Period"].isin(Projection_Period))
+]["Provisions_orig"].sum()
+
+table_df1.loc["ECL Original ($ MM)", col] = round(provisions_orig / 1000000)
+
+# Calculate ECL rate
+table_df1.loc["ECL Rate", col] = f"{round((provisions / net_balance) * 100, 2)}%"
+
+# Calculate Loss at WO
+loss_at_wo = lic_df[
+    (lic_df["Organisational_unit_level_1"].isin(Organisational_unit_level_1_selected)) &
+    (lic_df["ST"] == ST) &
+    (lic_df["Organisational_unit_level_2"].isin(Organisational_unit_level_2_selected)) &
+    (lic_df["Organisational_unit_level_3"].isin(Organisational_unit_level_3_selected)) &
+    (lic_df["Country_of_Exposure"].isin(Country_of_Exposure_selected)) &
+    (lic_df["Asset_class"].isin(Asset_class_selected)) &
+    (lic_df["Product_Type"].isin(Product_Type_selected)) &
+    (lic_df["Basel_Approach"].isin(Basel_Approach_selected)) &
+    (lic_df["scenario"] == scenario) &
+    (lic_df["Projection_Period"].isin(projection_period_range))
+]["Loss_at_WO"].sum()
+
+table_df1.loc["Loss at WO ($ MM)", col] = round(loss_at_wo / 1000000)
+
+# Calculate original Loss at WO
+loss_at_wo_orig = lic_df[
+    (lic_df["Organisational_unit_level_1"].isin(Organisational_unit_level_1_selected)) &
+    (lic_df["ST"] == ST) &
+    (lic_df["Organisational_unit_level_2"].isin(Organisational_unit_level_2_selected)) &
+    (lic_df["Organisational_unit_level_3"].isin(Organisational_unit_level_3_selected)) &
+    (lic_df["Country_of_Exposure"].isin(Country_of_Exposure_selected)) &
+    (lic_df["Asset_class"].isin(Asset_class_selected)) &
+    (lic_df["Product_Type"].isin(Product_Type_selected)) &
+    (lic_df["Basel_Approach"].isin(Basel_Approach_selected)) &
+    (lic_df["scenario"] == scenario) &
+    (lic_df["Projection_Period"].isin(projection_period_range))
+]["Loss_at_WO_orig"].sum()
+
+table_df1.loc["Loss at WO Original ($ MM)", col] = round(loss_at_wo_orig / 1000000)
+
+# Calculate LIC
+lic = lic_df[
+    (lic_df["Organisational_unit_level_1"].isin(Organisational_unit_level_1_selected)) &
+    (lic_df["ST"] == ST) &
+    (lic_df["Organisational_unit_level_2"].isin(Organisational_unit_level_2_selected)) &
+    (lic_df["Organisational_unit_level_3"].isin(Organisational_unit_level_3_selected)) &
+    (lic_df["Country_of_Exposure"].isin(Country_of_Exposure_selected)) &
+    (lic_df["Asset_class"].isin(Asset_class_selected)) &
+    (lic_df["Product_Type"].isin(Product_Type_selected)) &
+    (lic_df["Basel_Approach"].isin(Basel_Approach_selected)) &
+    (lic_df["scenario"] == scenario) &
+    (lic_df["Projection_Period"].isin(projection_period_range))
+]["LIC"].sum()
+
+table_df1.loc["LIC ($ MM)", col] = round(lic / 1000000)
+
+# Calculate original LIC
+lic_orig = lic_df[
+    (lic_df["Organisational_unit_level_1"].isin(Organisational_unit_level_1_selected)) &
+    (lic_df["ST"] == ST) &
+    (lic_df["Organisational_unit_level_2"].isin(Organisational_unit_level_2_selected)) &
+    (lic_df["Organisational_unit_level_3"].isin(Organisational_unit_level_3_selected)) &
+    (lic_df["Country_of_Exposure"].isin(Country_of_Exposure_selected)) &
+    (lic_df["Asset_class"].isin(Asset_class_selected)) &
+    (lic_df["Product_Type"].isin(Product_Type_selected)) &
+    (lic_df["Basel_Approach"].isin(Basel_Approach_selected)) &
+    (lic_df["scenario"] == scenario) &
+    (lic_df["Projection_Period"].isin(projection_period_range))
+]["LIC_orig"].sum()
+
+table_df1.loc["LIC Original ($ MM)", col] = round(lic_orig / 1000000)
