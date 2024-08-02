@@ -1468,3 +1468,17 @@ def remove_weighted_and_preceding(columns):
         new_columns.append(required_column)
 
     return new_columns
+
+
+
+
+
+
+def update_col(sheet):
+    for row in sheet.iter_rows():
+        for cell in row:
+            if cell.value == "Upside":
+                target_cell = sheet.cell(row=cell.row, column=cell.column + 4)
+                if target_cell.value == 'a':
+                    target_cell.value = ' '
+                break
