@@ -1482,3 +1482,55 @@ def update_col(sheet):
                 if target_cell.value == 'a':
                     target_cell.value = ' '
                 break
+
+
+
+
+
+import pandas as pd
+from openpyxl import load_workbook
+from openpyxl.styles import PatternFill
+
+# Define the path to your workbook
+workbook_path = r".\Input\Rapping_File Copy.xlsx"
+
+# Load the workbook and select the required sheet
+workbook = load_workbook(workbook_path)
+sheet = workbook['Data_Edge']
+
+# Read the sheet into a DataFrame
+df = pd.read_excel(workbook_path, sheet_name="Data_Edge")
+
+# Iterate over the rows in the sheet
+for row in sheet.iter_rows():
+    for cell in row:
+        if cell.value == '5yr Avg':
+            # Determine the target column
+            target_column = sheet.iter_rows(min_row=cell.row + 21, max_row=cell.row + 21, min_col=cell.column + 1, max_col=cell.column + 1)
+
+            # Retrieve the target column value from the DataFrame
+            target_column_value = None
+            for target_cell in target_column:
+                for value_cell in target_cell:
+                    target_column_value = value_cell.value
+
+            # Check if the target column exists in the DataFrame
+            if target_column_value in df['Description'].values:
+                weighted_required = df.loc[df['Description'] == target_column_value, 'Weighted_required'].iloc[0]
+            else:
+                print(f"Target column {target_column_value} not found in DataFrame")
+                continue
+
+            # Conditional formatting based on 'Weighted_required' value
+            if weighted_required == "Yes":
+                column_to_format = sheet.iter_rows(min_row=cell.row + 18, max_row=cell.row + 18, min_col=cell.column + 13, max_col=cell.column + 13)
+                grey_fill = PatternFill(start_color='FFF5F5F5', end_color='FFF5F5F5', fill_type='solid')
+
+                for row_to_format in column_to_format:
+                    for cell_to_format in row_to_format:
+                        cell_to_format.fill = grey_fill
+            else:
+                pass
+
+# Save the modified workbook
+workbook.save(workbook_path)
