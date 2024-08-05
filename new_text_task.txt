@@ -1618,3 +1618,59 @@ def format_sheet_1(sheet):
 # workbook = openpyxl.load_workbook('your_workbook.xlsx')
 # worksheet = workbook['Sheet1']
 # format_sheet_1(worksheet)
+
+
+
+
+
+
+
+
+
+import pandas as pd
+from openpyxl.styles import PatternFill
+
+def format_sheet_1(sheet):
+    workbook_path = r".\Input\Mapping_File Copy.xlsx"
+    df = pd.read_excel(workbook_path, sheet_name="Data_Edge")
+
+    grey_fill = PatternFill(start_color='FFF5F5F5', end_color='FFF5F5F5', fill_type="solid")
+
+    for row in sheet.iter_rows():
+        for cell in row:
+            if cell.value == "5yr Avg":
+                target_value = sheet.cell(row=cell.row - 21, column=cell.column + 1).value
+                matching_rows = df[df['Description'] == target_value]
+
+                if not matching_rows.empty:
+                    weighted_required = matching_rows['Weighted_required'].iloc[0]
+
+                    if weighted_required == 'Yes':
+                        for r in range(cell.row - 18, cell.row + 1):
+                            for c in range(cell.column + 8, cell.column + 12):
+                                sheet.cell(row=r, column=c).fill = grey_fill
+                    elif weighted_required == 'No':
+                        for r in range(cell.row - 18, cell.row + 1):
+                            for c in range(cell.column + 6, cell.column + 10):
+                                sheet.cell(row=r, column=c).fill = grey_fill
+
+            elif cell.value == "5yr Avg":
+                target_value = sheet.cell(row=cell.row - 21, column=cell.column + 1).value
+                matching_rows = df[df['Description'] == target_value]
+
+                if not matching_rows.empty:
+                    weighted_required = matching_rows['Weighted_required'].iloc[0]
+
+                    if weighted_required == 'Yes':
+                        for r in range(cell.row - 18, cell.row + 1):
+                            for c in range(cell.column + 15, cell.column + 19):
+                                sheet.cell(row=r, column=c).fill = grey_fill
+                    elif weighted_required == 'No':
+                        for r in range(cell.row - 18, cell.row + 1):
+                            for c in range(cell.column + 11, cell.column + 15):
+                                sheet.cell(row=r, column=c).fill = grey_fill
+
+# Usage:
+# workbook = openpyxl.load_workbook('your_workbook.xlsx')
+# worksheet = workbook['Sheet1']
+# format_sheet_1(worksheet)
