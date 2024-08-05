@@ -1581,3 +1581,40 @@ def format_sheet_1(sheet):
 # workbook = openpyxl.load_workbook('your_workbook.xlsx')
 # worksheet = workbook['Sheet1']
 # format_sheet_1(worksheet)
+
+
+
+
+
+import pandas as pd
+from openpyxl.styles import PatternFill
+
+def format_sheet_1(sheet):
+    workbook_path = r".\Input\Mapping_File Copy.xlsx"
+    df = pd.read_excel(workbook_path, sheet_name="Data_Edge")
+
+    for row in sheet.iter_rows():
+        for cell in row:
+            if cell.value == '5yr Avg':
+                # Get the value 21 rows above and 1 column after
+                target_value = sheet.cell(row=cell.row - 21, column=cell.column + 1).value
+
+                # Check if this value exists in the 'Description' column of the DataFrame
+                matching_rows = df[df['Description'] == target_value]
+
+                if not matching_rows.empty:
+                    weighted_required = matching_rows['Weighted_required'].iloc[0]
+
+                    if weighted_required == 'Yes':
+                        # Apply formatting
+                        grey_fill = PatternFill(start_color='FFF5F5F5', end_color='FFF5F5F5', fill_type='solid')
+                        for r in range(cell.row - 18, cell.row + 1):
+                            target_cell = sheet.cell(row=r, column=cell.column + 6)
+                            target_cell.fill = grey_fill
+                else:
+                    print(f"No matching 'Description' found for {target_value}")
+
+# Usage:
+# workbook = openpyxl.load_workbook('your_workbook.xlsx')
+# worksheet = workbook['Sheet1']
+# format_sheet_1(worksheet)
