@@ -1534,3 +1534,50 @@ for row in sheet.iter_rows():
 
 # Save the modified workbook
 workbook.save(workbook_path)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import pandas as pd
+from openpyxl.styles import PatternFill
+
+def format_sheet_1(sheet):
+    workbook_path = r".\Input\Mapping_File Copy.xlsx"
+    df = pd.read_excel(workbook_path, sheet_name="Data_Edge")
+
+    for row in sheet.iter_rows():
+        for cell in row:
+            if cell.value == 'Syr Avg':
+                target_column = sheet.cell(row=cell.row - 21, column=cell.column + 1).value
+
+                try:
+                    weighted_required = df.loc[df['Description'] == target_column, 'Weighted_required'].iloc[0]
+
+                    if weighted_required == 'Yes':
+                        column_to_format = sheet.iter_rows(min_row=cell.row - 18, max_row=cell.row,
+                                                           min_col=cell.column + 6, max_col=cell.column + 6)
+
+                        grey_fill = PatternFill(start_color='FFF5F5F5', end_color='FFF5F5F5', fill_type='solid')
+
+                        for cell_in_row in column_to_format:
+                            for cell_in in cell_in_row:
+                                cell_in.fill = grey_fill
+                except IndexError:
+                    print(f"No matching 'Description' found for {target_column}")
+                except Exception as e:
+                    print(f"An error occurred: {str(e)}")
+
+# Assuming you have a workbook and worksheet object
+# workbook = openpyxl.load_workbook('your_workbook.xlsx')
+# worksheet = workbook['Sheet1']
+# format_sheet_1(worksheet)
