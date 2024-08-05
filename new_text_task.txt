@@ -1674,3 +1674,48 @@ def format_sheet_1(sheet):
 # workbook = openpyxl.load_workbook('your_workbook.xlsx')
 # worksheet = workbook['Sheet1']
 # format_sheet_1(worksheet)
+
+
+
+
+
+
+import pandas as pd
+from openpyxl.styles import PatternFill
+
+def format_sheet_1(sheet, df, curr_year):
+    grey_fill = PatternFill(start_color='FFF5F5F5', end_color='FFF5F5F5', fill_type='solid')
+    index_rows = [str(curr_year-1), str(curr_year), str(curr_year + 1), '5yr Avg']
+
+    for row in sheet.iter_rows():
+        for cell in row:
+            if cell.value in index_rows:
+                # Set different offsets based on the cell value
+                if cell.value == '5yr Avg':
+                    target_row_offset = 21
+                    format_row_offset = 18
+                else:
+                    target_row_offset = 3
+                    format_row_offset = 0
+
+                target_value = sheet.cell(row=cell.row - target_row_offset, column=cell.column + 1).value
+                matching_rows = df[df['Description'] == target_value]
+
+                if not matching_rows.empty:
+                    weighted_required = matching_rows['Weighted_required'].iloc[0]
+
+                    if weighted_required == 'Yes':
+                        for r in range(cell.row - format_row_offset, cell.row + 1):
+                            for c in range(cell.column + 8, cell.column + 12):
+                                sheet.cell(row=r, column=c).fill = grey_fill
+                    elif weighted_required == 'No':
+                        for r in range(cell.row - format_row_offset, cell.row + 1):
+                            for c in range(cell.column + 6, cell.column + 10):
+                                sheet.cell(row=r, column=c).fill = grey_fill
+
+# Usage:
+# workbook = openpyxl.load_workbook('your_workbook.xlsx')
+# worksheet = workbook['Sheet1']
+# df = pd.read_excel(r".\Input\Mapping_File Copy.xlsx", sheet_name="Data_Edge")
+# curr_year = 2024  # Set this to your current year
+# format_sheet_1(worksheet, df, curr_year)
