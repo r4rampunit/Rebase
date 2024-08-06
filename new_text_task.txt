@@ -1768,3 +1768,76 @@ def format_sheet_1(sheet, df, curr_year):
 # df = pd.read_excel(r".\Input\Mapping_File Copy.xlsx", sheet_name="Data_Edge")
 # curr_year = 2024  # Set this to your current year
 # format_sheet_1(worksheet, df, curr_year)
+
+
+
+
+import pandas as pd
+from openpyxl.styles import Font
+from datetime import datetime
+from dateutil.relativedelta import relativedelta
+
+def formatting_red_IFRS4Q(sheet):
+    workbook_path = r".\Input\Mapping_File Copy.xlsx"
+    df = pd.read_excel(workbook_path, sheet_name="Data_Edge")
+
+    # Generate dates
+    tzero_date = "2024-03-31"
+    zero_date = datetime.strptime(tzero_date, "%Y-%m-%d")
+    dates = []
+    current_date = zero_date.replace(year=zero_date.year - 1)
+
+    for _ in range(14):
+        dates.append(current_date)
+        current_date = (current_date + relativedelta(months=3)).replace(day=1) - relativedelta(days=1)
+
+    formatted_dates = [date.strftime('%Y-%m-%d') for date in dates]
+
+    red_font_color = 'FFFF0000'
+
+    df['ISOCODES'] = df['ISOCODES'].astype(str)
+    df['Description'] = df['Description'].astype(str)
+    df['Prev_Data_Edge'] = pd.to_datetime(df['Prev_Data_Edge'])
+
+    data_edge_dict = {(row['ISOCODES'], row['Description']): row['Prev_Data_Edge'] for _, row in df.iterrows()}
+
+    for row in sheet.iter_rows():
+        for cell in row:
+            if cell.value == '5yr Avg':
+                target_value = sheet.cell(row=cell.row - 21, column=cell.column + 1).value
+                matching_rows = df[df['Description'] == target_value]
+
+                if not matching_rows.empty:
+                    weighted_required = matching_rows['Weighted_required'].iloc[0]
+
+                    if weighted_required == 'No':
+                        isocodes = sheet.cell(row=cell.row - 21, column=cell.column + 8).value
+                        checks = sheet.cell(row=cell.row - 22, column=cell.column + 7).value
+
+                        prev_data_edge = data_edge_dict.get((str(isocodes), str(checks)))
+
+                        if prev_data_edge is None:
+                            continue
+
+                        prev_data_edge_str = prev_data_edge.strftime('%Y-%m-%d')
+
+                        if prev_data_edge_str not in formatted_dates:
+                            continue
+
+                        row_matched_with_date = formatted_dates.index(prev_data_edge_str)
+
+                        range_to_change_font_color = sheet[
+                            sheet.cell(row=cell.row - 18, column=cell.column).coordinate:
+                            sheet.cell(row=cell.row - 21 + row_matched_with_date, column=cell.column + 5).coordinate
+                        ]
+
+                        new_font = Font(color=red_font_color, italic=True, name='Univers Next for HSBC Light')
+                        for row in range_to_change_font_color:
+                            for cell in row:
+                                cell.font = new_font
+
+# Usage:
+# workbook = openpyxl.load_workbook('your_workbook.xlsx')
+# worksheet = workbook['Sheet1']
+# formatting_red_IFRS4Q(worksheet)
+# workbook.save('your_workbook_updated.xlsx')
