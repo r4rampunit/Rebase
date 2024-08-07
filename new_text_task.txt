@@ -2484,3 +2484,95 @@ def red_marking(sheet, tzero_date, above_date, below_date):
 # red_marking(worksheet, tzero_date, above_date, below_date)
 #
 # workbook.save('your_workbook_updated.xlsx')
+
+
+
+
+
+
+
+import pandas as pd
+from openpyxl.styles import Border, Side
+from datetime import datetime
+from dateutil.relativedelta import relativedelta
+
+def red_marking(sheet, tzero_date, user_inputs):
+    # Define the medium red border style
+    medium_red_border = Side(style="medium", color='FF0000')
+
+    # Generate dates
+    zero_date = datetime.strptime(tzero_date, "%Y-%m-%d")
+    zero_date_1 = zero_date.replace(year=zero_date.year - 1)
+    date1 = zero_date_1
+    date2 = ((date1 + relativedelta(months=3)).replace(day=1) + relativedelta(months=1, days=-1))
+    date3 = ((date2 + relativedelta(months=3)).replace(day=1) + relativedelta(months=1, days=-1))
+    date4 = ((date3 + relativedelta(months=3)).replace(day=1) + relativedelta(months=1, days=-1))
+    date5 = ((date4 + relativedelta(months=3)).replace(day=1) + relativedelta(months=1, days=-1))
+    date6 = ((date5 + relativedelta(months=3)).replace(day=1) + relativedelta(months=1, days=-1))
+    date7 = ((date6 + relativedelta(months=3)).replace(day=1) + relativedelta(months=1, days=-1))
+    date8 = ((date7 + relativedelta(months=3)).replace(day=1) + relativedelta(months=1, days=-1))
+    date9 = ((date8 + relativedelta(months=3)).replace(day=1) + relativedelta(months=1, days=-1))
+    date10 = ((date9 + relativedelta(months=3)).replace(day=1) + relativedelta(months=1, days=-1))
+    date11 = ((date10 + relativedelta(months=3)).replace(day=1) + relativedelta(months=1, days=-1))
+    date12 = ((date11 + relativedelta(months=3)).replace(day=1) + relativedelta(months=1, days=-1))
+    date13 = ((date12 + relativedelta(months=3)).replace(day=1) + relativedelta(months=1, days=-1))
+    date14 = ((date13 + relativedelta(months=3)).replace(day=1) + relativedelta(months=1, days=-1))
+
+    dates = [date1, date2, date3, date4, date5, date6, date7, date8, date9, date10, date11, date12, date13, date14]
+
+    # Assign dates to specific row offsets
+    date_row_offsets = [17, 16, 15, 14, 12, 11, 10, 9, 7, 6, 5, 4, 3, 2]
+    date_mapping = dict(zip(date_row_offsets, dates))
+
+    # Extract dates from the first column, keeping track of their row numbers
+    date_column = [date.strftime("%m/%d/%Y") for date in dates]
+    date_rows = date_row_offsets
+
+    datetime_index = pd.to_datetime(date_column, format="%m/%d/%Y", errors='coerce')
+
+    # Get the boundary dates from user inputs
+    above_date = pd.to_datetime(user_inputs[17], format='%Y-%m-%d', errors='coerce')
+    below_date = pd.to_datetime(user_inputs[18], format='%Y-%m-%d', errors='coerce')
+
+    # Find the rows for the boundary dates
+    above_row = below_row = None
+    for i, date in enumerate(datetime_index):
+        if pd.notnull(date):
+            if date >= above_date and above_row is None:
+                above_row = date_rows[i]  # 4 cells above the matching date
+            if date <= below_date:
+                below_row = date_rows[i]  # Start with the row of the matching date
+                # Check if there's a date after this one
+                if i + 1 < len(datetime_index):
+                    below_row = date_rows[i]  # Use the row of the current date
+                else:
+                    # If it's the last date, use the last row
+                    below_row = date_rows[-1]
+                break
+
+    if above_row and below_row:
+        for row in sheet.iter_rows():
+            for cell in row:
+                if cell.value == user_inputs[0]:
+                    start_cell = sheet.cell(row=above_row, column=cell.column + 1)
+                    end_cell = sheet.cell(row=below_row, column=cell.column + 1)
+                    for box_row in sheet[start_cell.coordinate:end_cell.coordinate]:
+                        for box_cell in box_row:
+                            if box_cell.row == start_cell.row:
+                                box_cell.border = Border(top=medium_red_border, left=medium_red_border, right=medium_red_border)
+                            elif box_cell.row == end_cell.row:
+                                box_cell.border = Border(bottom=medium_red_border, left=medium_red_border, right=medium_red_border)
+                            else:
+                                box_cell.border = Border(left=medium_red_border, right=medium_red_border)
+
+# Usage example:
+# import openpyxl
+#
+# workbook = openpyxl.load_workbook('your_workbook.xlsx')
+# worksheet = workbook['Sheet1']
+#
+# tzero_date = "2024-03-31"
+# user_inputs = [...] # Make sure to include the necessary inputs, especially at indices 0, 17, and 18
+# red_marking(worksheet, tzero_date, user_inputs)
+#
+# workbook.save('your_workbook_updated.xlsx')
