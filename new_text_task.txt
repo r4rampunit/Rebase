@@ -2669,3 +2669,73 @@ def red_marking(sheet, tzero_date, user_inputs):
 # red_marking(worksheet, tzero_date, user_inputs)
 #
 # workbook.save('your_workbook_updated.xlsx')
+
+
+
+
+
+
+
+
+
+
+import pandas as pd
+from openpyxl.styles import Border, Side
+from datetime import datetime
+from dateutil.relativedelta import relativedelta
+
+def red_marking(sheet, tzero_date, user_inputs):
+    # Define the medium red border style
+    medium_red_border = Side(style="medium", color='FF0000')
+
+    # Generate dates
+    zero_date = datetime.strptime(tzero_date, "%Y-%m-%d")
+    zero_date_1 = zero_date.replace(year=zero_date.year - 1)
+    dates = [zero_date_1]
+    for _ in range(13):
+        dates.append(((dates[-1] + relativedelta(months=3)).replace(day=1) + relativedelta(months=1, days=-1)))
+
+    # Assign dates to specific row offsets (relative to '5yr Avg' row)
+    date_row_offsets = [17, 16, 15, 14, 12, 11, 10, 9, 7, 6, 5, 4, 3, 2]
+    date_mapping = dict(zip(date_row_offsets, dates))
+
+    # Convert user input dates to datetime
+    above_date = pd.to_datetime(user_inputs[17], format='%Y-%m-%d', errors='coerce')
+    below_date = pd.to_datetime(user_inputs[18], format='%Y-%m-%d', errors='coerce')
+
+    for row in sheet.iter_rows():
+        for cell in row:
+            if cell.value == '5yr Avg':
+                avg_row = cell.row
+                avg_col = cell.column
+
+                # Find the rows for the boundary dates
+                above_offset = next((offset for offset, date in date_mapping.items() if date >= above_date), None)
+                below_offset = next((offset for offset, date in reversed(date_mapping.items()) if date <= below_date), None)
+
+                if above_offset is not None and below_offset is not None:
+                    start_row = avg_row - above_offset
+                    end_row = avg_row - below_offset
+
+                    # Apply red border
+                    for box_row in range(start_row, end_row + 1):
+                        for box_col in range(avg_col + 1, avg_col + 6):  # 5 columns to the right
+                            box_cell = sheet.cell(row=box_row, column=box_col)
+                            if box_row == start_row:
+                                box_cell.border = Border(top=medium_red_border, left=medium_red_border, right=medium_red_border)
+                            elif box_row == end_row:
+                                box_cell.border = Border(bottom=medium_red_border, left=medium_red_border, right=medium_red_border)
+                            else:
+                                box_cell.border = Border(left=medium_red_border, right=medium_red_border)
+
+# Usage example:
+# import openpyxl
+#
+# workbook = openpyxl.load_workbook('your_workbook.xlsx')
+# worksheet = workbook['Sheet1']
+#
+# tzero_date = "2024-03-31"
+# user_inputs = [...] # Make sure to include the necessary inputs, especially at indices 17 and 18
+# red_marking(worksheet, tzero_date, user_inputs)
+#
+# workbook.save('your_workbook_updated.xlsx')
