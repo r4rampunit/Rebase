@@ -2321,3 +2321,166 @@ def formatting_red_IFRS4Q(sheet):
 # worksheet = workbook['Sheet1']
 # formatting_red_IFRS4Q(worksheet)
 # workbook.save('your_workbook_updated.xlsx')
+
+
+
+
+
+
+
+
+import pandas as pd
+from openpyxl.styles import Font, Border, Side
+from datetime import datetime
+from dateutil.relativedelta import relativedelta
+
+def formatting_red_IFRS4Q(sheet):
+    workbook_path = r".\Input\Mapping_File Copy.xlsx"
+    data_edge = pd.read_excel(workbook_path, sheet_name="Data_Edge")
+    red_font_color = 'FFFF0000'
+
+    data_edge['ISOCODES'] = data_edge['ISOCODES'].astype(str)
+    data_edge['Description'] = data_edge['Description'].astype(str)
+    data_edge['Prev_Data_Edge'] = pd.to_datetime(data_edge['Prev_Data_Edge'])
+
+    data_edge_dict = {(row['ISOCODES'], row['Description']): row['Prev_Data_Edge'] for _, row in data_edge.iterrows()}
+
+    # Generate dates
+    tzero_date = "2024-03-31"
+    zero_date = datetime.strptime(tzero_date, "%Y-%m-%d")
+    zero_date_1 = zero_date.replace(year=zero_date.year - 1)
+    date1 = zero_date_1
+    date2 = ((date1 + relativedelta(months=3)).replace(day=1) + relativedelta(months=1, days=-1))
+    date3 = ((date2 + relativedelta(months=3)).replace(day=1) + relativedelta(months=1, days=-1))
+    date4 = ((date3 + relativedelta(months=3)).replace(day=1) + relativedelta(months=1, days=-1))
+    date5 = ((date4 + relativedelta(months=3)).replace(day=1) + relativedelta(months=1, days=-1))
+    date6 = ((date5 + relativedelta(months=3)).replace(day=1) + relativedelta(months=1, days=-1))
+    date7 = ((date6 + relativedelta(months=3)).replace(day=1) + relativedelta(months=1, days=-1))
+    date8 = ((date7 + relativedelta(months=3)).replace(day=1) + relativedelta(months=1, days=-1))
+    date9 = ((date8 + relativedelta(months=3)).replace(day=1) + relativedelta(months=1, days=-1))
+    date10 = ((date9 + relativedelta(months=3)).replace(day=1) + relativedelta(months=1, days=-1))
+    date11 = ((date10 + relativedelta(months=3)).replace(day=1) + relativedelta(months=1, days=-1))
+    date12 = ((date11 + relativedelta(months=3)).replace(day=1) + relativedelta(months=1, days=-1))
+    date13 = ((date12 + relativedelta(months=3)).replace(day=1) + relativedelta(months=1, days=-1))
+    date14 = ((date13 + relativedelta(months=3)).replace(day=1) + relativedelta(months=1, days=-1))
+
+    dates = [date1, date2, date3, date4, date5, date6, date7, date8, date9, date10, date11, date12, date13, date14]
+
+    # Assign dates to specific row offsets
+    date_row_offsets = [17, 16, 15, 14, 12, 11, 10, 9, 7, 6, 5, 4, 3, 2]
+    date_mapping = dict(zip(date_row_offsets, dates))
+
+    all_cells = list(sheet.iter_rows(values_only=True))
+    target_cells = [(row_idx, col_idx) for row_idx, row in enumerate(all_cells, 1)
+                    for col_idx, cell_value in enumerate(row, 1) if cell_value == '5yr Avg']
+
+    for row, col in target_cells:
+        isocodes = sheet.cell(row=row-21, column=col + 8).value
+        checks = sheet.cell(row=row-22, column=col + 7).value
+        prev_data_edge = data_edge_dict.get((str(isocodes), str(checks)))
+
+        if prev_data_edge is None:
+            continue
+
+        prev_data_edge_str = prev_data_edge.strftime('%m/%d/%Y')
+
+        # Find matching row offset
+        matching_offset = None
+        for offset, date in date_mapping.items():
+            if date.strftime('%m/%d/%Y') == prev_data_edge_str:
+                matching_offset = offset
+                break
+
+        if matching_offset is None:
+            continue
+
+        row_matched_with_date = row - matching_offset
+
+        range_to_change_font_color = sheet[
+            sheet.cell(row=row-18, column=col).coordinate:
+            sheet.cell(row=row_matched_with_date, column=col + 5).coordinate
+        ]
+
+        new_font = Font(color=red_font_color, italic=True, name='Univers Next for HSBC Light')
+        for row in range_to_change_font_color:
+            for cell in row:
+                cell.font = new_font
+
+def red_marking(sheet, tzero_date, above_date, below_date):
+    # Define the medium red border style
+    medium_red_border = Side(style="medium", color='FF0000')
+
+    # Generate dates
+    zero_date = datetime.strptime(tzero_date, "%Y-%m-%d")
+    zero_date_1 = zero_date.replace(year=zero_date.year - 1)
+    date1 = zero_date_1
+    date2 = ((date1 + relativedelta(months=3)).replace(day=1) + relativedelta(months=1, days=-1))
+    date3 = ((date2 + relativedelta(months=3)).replace(day=1) + relativedelta(months=1, days=-1))
+    date4 = ((date3 + relativedelta(months=3)).replace(day=1) + relativedelta(months=1, days=-1))
+    date5 = ((date4 + relativedelta(months=3)).replace(day=1) + relativedelta(months=1, days=-1))
+    date6 = ((date5 + relativedelta(months=3)).replace(day=1) + relativedelta(months=1, days=-1))
+    date7 = ((date6 + relativedelta(months=3)).replace(day=1) + relativedelta(months=1, days=-1))
+    date8 = ((date7 + relativedelta(months=3)).replace(day=1) + relativedelta(months=1, days=-1))
+    date9 = ((date8 + relativedelta(months=3)).replace(day=1) + relativedelta(months=1, days=-1))
+    date10 = ((date9 + relativedelta(months=3)).replace(day=1) + relativedelta(months=1, days=-1))
+    date11 = ((date10 + relativedelta(months=3)).replace(day=1) + relativedelta(months=1, days=-1))
+    date12 = ((date11 + relativedelta(months=3)).replace(day=1) + relativedelta(months=1, days=-1))
+    date13 = ((date12 + relativedelta(months=3)).replace(day=1) + relativedelta(months=1, days=-1))
+    date14 = ((date13 + relativedelta(months=3)).replace(day=1) + relativedelta(months=1, days=-1))
+
+    dates = [date1, date2, date3, date4, date5, date6, date7, date8, date9, date10, date11, date12, date13, date14]
+
+    # Assign dates to specific row offsets
+    date_row_offsets = [17, 16, 15, 14, 12, 11, 10, 9, 7, 6, 5, 4, 3, 2]
+    date_mapping = dict(zip(date_row_offsets, dates))
+
+    # Convert boundary dates to datetime objects
+    above_date = datetime.strptime(above_date, "%Y-%m-%d")
+    below_date = datetime.strptime(below_date, "%Y-%m-%d")
+
+    # Find the rows for the boundary dates
+    above_row = None
+    below_row = None
+
+    for offset, date in date_mapping.items():
+        if date >= above_date and above_row is None:
+            above_row = offset
+        if date <= below_date:
+            below_row = offset
+        if above_row is not None and below_row is not None:
+            break
+
+    if above_row is None or below_row is None:
+        return
+
+    all_cells = list(sheet.iter_rows(values_only=True))
+    target_cells = [(row_idx, col_idx) for row_idx, row in enumerate(all_cells, 1)
+                    for col_idx, cell_value in enumerate(row, 1) if cell_value == '5yr Avg']
+
+    for row, col in target_cells:
+        start_cell = sheet.cell(row=row-above_row, column=col)
+        end_cell = sheet.cell(row=row-below_row, column=col+5)
+
+        for box_row in sheet[start_cell.coordinate:end_cell.coordinate]:
+            for box_cell in box_row:
+                if box_cell.row == start_cell.row:
+                    box_cell.border = Border(top=medium_red_border, left=medium_red_border, right=medium_red_border)
+                elif box_cell.row == end_cell.row:
+                    box_cell.border = Border(bottom=medium_red_border, left=medium_red_border, right=medium_red_border)
+                else:
+                    box_cell.border = Border(left=medium_red_border, right=medium_red_border)
+
+# Usage example:
+# import openpyxl
+#
+# workbook = openpyxl.load_workbook('your_workbook.xlsx')
+# worksheet = workbook['Sheet1']
+#
+# formatting_red_IFRS4Q(worksheet)
+#
+# tzero_date = "2024-03-31"
+# above_date = "2023-06-30"
+# below_date = "2024-03-31"
+# red_marking(worksheet, tzero_date, above_date, below_date)
+#
+# workbook.save('your_workbook_updated.xlsx')
