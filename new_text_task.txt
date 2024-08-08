@@ -2875,3 +2875,63 @@ def desc(sheet, isocode):
                                     break  # Break the inner loop once a match is found
 
     return sheet
+
+
+
+
+
+
+def desc(sheet, isocode):
+    country_list = [isocode]
+    col_list = (Table_List["MEV"].loc[Table_List.Country == isocode]).tolist()
+
+    q1, q2, q3, q4, q5 = [], [], [], [], []
+    for col in col_list:
+        col_q1, col_q2, col_q3, col_q4, col_q5 = [], [], [], [], []
+        for frame in All:
+            for row in frame.itertuples():
+                if row.ISOCODES == isocode:
+                    if row.date == datetime.strptime(str(curr_year - 1) + "-03-31 00:00:00", "%Y-%m-%d %H:%M:%S"):
+                        col_q1.append(round(getattr(row, col), 1))
+                    elif row.date == datetime.strptime(str(curr_year - 1) + "-06-30 00:00:00", "%Y-%m-%d %H:%M:%S"):
+                        col_q2.append(round(getattr(row, col), 1))
+                    elif row.date == datetime.strptime(str(curr_year - 1) + "-09-30 00:00:00", "%Y-%m-%d %H:%M:%S"):
+                        col_q3.append(round(getattr(row, col), 1))
+                    elif row.date == datetime.strptime(str(curr_year - 1) + "-12-31 00:00:00", "%Y-%m-%d %H:%M:%S"):
+                        col_q4.append(round(getattr(row, col), 1))
+                    elif row.date == datetime.strptime(str(curr_year) + "-03-31 00:00:00", "%Y-%m-%d %H:%M:%S"):
+                        col_q5.append(round(getattr(row, col), 1))
+        q1.append(col_q1)
+        q2.append(col_q2)
+        q3.append(col_q3)
+        q4.append(col_q4)
+        q5.append(col_q5)
+
+    for i, j, k, l, m in zip(q1, q2, q3, q4, q5):
+        for a, b, c, d, e in zip(i, j, k, l, m):
+            for row in sheet.iter_rows():
+                for cell in row:
+                    if cell.value == user_inputs[0]:
+                        match_count = 0
+                        if sheet.cell(row=cell.row + 3, column=cell.column).value == a:
+                            match_count += 1
+                        if sheet.cell(row=cell.row + 4, column=cell.column).value == b:
+                            match_count += 1
+                        if sheet.cell(row=cell.row + 5, column=cell.column).value == c:
+                            match_count += 1
+                        if sheet.cell(row=cell.row + 6, column=cell.column).value == d:
+                            match_count += 1
+                        if sheet.cell(row=cell.row + 7, column=cell.column).value == e:
+                            match_count += 1
+
+                        if match_count >= 3:
+                            # Find matching description
+                            trans_variable = col_list[0]  # Assuming all columns have the same trans_variable
+                            match = df[(df['Trans_variable'] == trans_variable) & (df['ISOCODES'] == isocode)]
+                            if not match.empty:
+                                description = match['Description'].values[0]
+                                sheet.cell(row=cell.row - 1, column=cell.column).value = description
+                                sheet.cell(row=cell.row - 1, column=cell.column).font = Font(color='00000000', bold=True, size=9, name='Univers Next for HSBC Light')
+                                break  # Break the inner loop once a match is found
+
+    return sheet
