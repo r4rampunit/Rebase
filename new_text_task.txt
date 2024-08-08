@@ -2793,3 +2793,29 @@ def red_marking(sheet, tzero_date, user_inputs):
                             box_cell.border = Border(left=medium_red_border, right=medium_red_border, top=thin_white_border, bottom=thin_white_border)
 
 # Usage example remains the same
+
+
+
+
+
+
+
+for i, j, k, l, m in zip(q1, q2, q3, q4, q5):
+        for a, b, c, d, e in zip(i, j, k, l, m):
+            for row in sheet.iter_rows():
+                for cell in row:
+                    if cell.value == user_inputs[0]:
+                        if (sheet.cell(row=cell.row + 2, column=cell.column).value == a and
+                            sheet.cell(row=cell.row + 3, column=cell.column).value == b and
+                            sheet.cell(row=cell.row + 4, column=cell.column).value == c and
+                            sheet.cell(row=cell.row + 5, column=cell.column).value == d and
+                            sheet.cell(row=cell.row + 6, column=cell.column).value == e):
+
+                            # Find matching description
+                            trans_variable = col_list[0]  # Assuming all columns have the same trans_variable
+                            match = df[(df['Trans_variable'] == trans_variable) & (df['ISOCODES'] == Isocode)]
+                            if not match.empty:
+                                description = match['Description'].values[0]
+                                sheet.cell(row=cell.row - 1, column=cell.column).value = description
+                                sheet.cell(row=cell.row - 1, column=cell.column).font = Font(color='00000000', bold=True, size=9, name='Univers Next for HSBC Light')
+                                break
