@@ -2935,3 +2935,21 @@ def desc(sheet, isocode):
                                 break  # Break the inner loop once a match is found
 
     return sheet
+
+
+
+
+
+
+
+
+
+
+
+scenarios_offsets = [(2, 1, user_inputs[3]), (2, 2, user_inputs[4]), (2, 3, user_inputs[5]), (2, 4, user_inputs[6]), (2, 8, user_inputs[3]), (2, 9, user_inputs[4]), (2, 10, user_inputs[5]), (2, 11, user_inputs[6])]
+
+for r_offset, c_offset, text in scenarios_offsets:
+    cell = sheet.cell(row=row + r_offset, column=col + c_offset)
+    cell.value = text
+    cell.alignment = Alignment(wrap_text=True, vertical='center', horizontal='center')
+    cell.font = Font(color="FF0000", name='Univers Next for HSBC Light', bold=True)
