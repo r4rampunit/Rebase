@@ -3401,3 +3401,145 @@ def mi_chart(request):
     </script>
 </body>
 </html>
+
+
+
+
+
+
+<div class="container">
+    <h2>MI Chart</h2>
+
+    <div class="row">
+        {% for dropdown_name, options in dropdown_options.items %}
+        <div class="col-md-3 mb-3">
+            <label for="{{ dropdown_name }}">{{ dropdown_name|title|replace:'_',' ' }}</label>
+            <select id="{{ dropdown_name }}" name="{{ dropdown_name }}" class="form-control select2" multiple>
+                {% for option in options %}
+                <option value="{{ option }}">{{ option }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div id="tableContainer">
+        <table id="miTable" class="table table-striped">
+            <thead>
+                <tr>
+                    <th></th>
+                    <th colspan="6" class="text-center">Base Scenario</th>
+                    <th colspan="6" class="text-center">Stress Scenario</th>
+                    <th colspan="6" class="text-center">Another Scenario</th>
+                </tr>
+                <tr>
+                    <th>Metric</th>
+                    <th>T0</th><th>T1</th><th>T2</th><th>T3</th><th>T4</th><th>T5</th>
+                    <th>T0</th><th>T1</th><th>T2</th><th>T3</th><th>T4</th><th>T5</th>
+                    <th>T0</th><th>T1</th><th>T2</th><th>T3</th><th>T4</th><th>T5</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Table body will be populated dynamically -->
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<style>
+    .select2-container {
+        width: 100% !important;
+    }
+    .select2-selection--multiple {
+        min-height: 38px !important;
+    }
+    label {
+        font-weight: bold;
+        margin-bottom: 5px;
+    }
+    #miTable th, #miTable td {
+        text-align: center;
+        vertical-align: middle;
+    }
+    #miTable thead th {
+        background-color: #f8f9fa;
+    }
+</style>
+
+<script>
+$(document).ready(function() {
+    $('.select2').select2({
+        placeholder: "Select options",
+        allowClear: true
+    });
+
+    // AJAX call to update table based on selections
+    $('select').on('change', function() {
+        var selectedItems = {};
+        $('select').each(function() {
+            selectedItems[$(this).attr('name')] = $(this).val();
+        });
+
+        $.ajax({
+            url: '{% url "mi_chart" %}',
+            type: 'POST',
+            data: {
+                selectedItems: JSON.stringify(selectedItems),
+                csrfmiddlewaretoken: '{{ csrf_token }}'
+            },
+            success: function(response) {
+                $('#tableContainer').html(response.table_html);
+            }
+        });
+    });
+});
+</script>
+
+
+
+
+
+
+
+
+
+def mi_chart(request):
+    # ... (previous code remains the same)
+
+    if request.method == 'POST':
+        selected_items = json.loads(request.POST.get('selectedItems'))
+        selected_scenarios = selected_items.get('ST_scenario', [])
+
+        if selected_scenarios:
+            filtered_df = df[selected_scenarios]
+        else:
+            filtered_df = df
+
+        # Create a new DataFrame with the desired structure
+        new_df = pd.DataFrame(index=filtered_df.index)
+        for i, scenario in enumerate(['Base Scenario', 'Stress Scenario', 'Another Scenario']):
+            if i < len(selected_scenarios):
+                scenario_data = filtered_df[selected_scenarios[i]].rename(columns={col: f'{scenario} {col}' for col in filtered_df.columns})
+                new_df = pd.concat([new_df, scenario_data], axis=1)
+
+        table_html = new_df.to_html(classes='table table-striped', escape=False)
+
+        # Modify the table HTML to include merged headers
+        soup = BeautifulSoup(table_html, 'html.parser')
+        thead = soup.find('thead')
+        new_header_row = soup.new_tag('tr')
+        new_header_row.append(soup.new_tag('th'))  # Empty cell for 'Metric'
+        for scenario in ['Base Scenario', 'Stress Scenario', 'Another Scenario']:
+            th = soup.new_tag('th', colspan="6", class_="text-center")
+            th.string = scenario
+            new_header_row.append(th)
+        thead.insert(0, new_header_row)
+
+        return JsonResponse({'table_html': str(soup)})
+
+    else:
+        context = {
+            'initial_table_html': df.to_html(classes='table table-striped'),
+            'dropdown_options': dropdown_options
+        }
+        return render(request, 'mi_chart.html', context)
