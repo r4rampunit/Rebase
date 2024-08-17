@@ -4107,3 +4107,266 @@ $(document).ready(function() {
     </div>
   </div>
 </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MI Chart</title>
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    {% csrf_token %}
+    <style>
+        body {
+            background-color: #87CEEB;
+            font-family: Arial, sans-serif;
+            overflow-x: hidden;
+        }
+        .logo {
+            position: absolute;
+            top: 0.1px;
+            right: 10px;
+            width: 90px;
+        }
+        .dropdowns-container {
+            display: flex;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            padding: 15px 0;
+            margin: 35px 0;
+        }
+        .dropdown-wrapper {
+            flex: 0 0 auto;
+            width: 250px;
+            margin-right: 20px;
+        }
+        .dropdown-label {
+            display: block;
+            font-size: 14px;
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #333;
+        }
+        .multiselect {
+            width: 100%;
+            padding: 10px 15px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            background-color: #fff;
+            color: #333;
+            outline: none;
+            transition: border-color 0.3s ease;
+        }
+        .multiselect:focus {
+            border-color: #4a90e2;
+            box-shadow: 0 0 5px rgba(74, 144, 226, 0.5);
+        }
+        .dashboard {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            padding: 20px;
+        }
+        .select2-container {
+            width: 100% !important;
+        }
+        .select2-container--default .select2-selection--multiple {
+            border-radius: 15px;
+        }
+        .select2-container--default .select2-selection--multiple .select2-selection__choice {
+            background-color: #A9A9A9;
+            width: 200%;
+            color: white;
+            border: 5px solid #A9A9A9;
+            border-radius: 50px;
+            cursor: default;
+            float: left;
+            margin-right: 5px;
+            margin-top: 5px;
+            padding: 0 5px;
+        }
+        .select2-container--default .select2-selection--multiple .select2-selection__rendered {
+            background-color: #008B8B;
+            border-radius: 55px;
+            padding: 15px;
+        }
+        .select2-container--default.select2-container--focus .select2-selection--multiple {
+            border-color: #A9A9A9;
+        }
+        #selectedItems {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #A9A9A9;
+            border-radius: 5px;
+            background-color: #fff;
+        }
+        .select2-container--default .select2-selection--multiple .select2-search__field::placeholder {
+            color: white;
+            font-weight: bold;
+        }
+        #table-container table {
+            width: 200%;
+            border-collapse: collapse;
+        }
+        #table-container th, #table-container td {
+            border: 4px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        #table-container th, #table-container .row-index {
+            background-color: #B22222;
+            color: white;
+        }
+        #table-container .row-index {
+            font-weight: bold;
+        }
+        .table-responsive {
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <div class="container mt-5">
+            <h1>MI Chart</h1>
+            <div class="dropdowns-container">
+                <div class="dropdown-wrapper">
+                    <label class="dropdown-label" for="Organisational_unit_level_1">Organisational Unit Level 1</label>
+                    <select class="multiselect" name="Organisational_unit_level_1" multiple>
+                        {% for option in Organisational_unit_level_1_list %}
+                            <option value="{{ option }}">{{ option }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="dropdown-wrapper">
+                    <label class="dropdown-label" for="Organisational_unit_level_2">Organisational Unit Level 2</label>
+                    <select class="multiselect" name="Organisational_unit_level_2" multiple>
+                        {% for option in Organisational_unit_level_2_list %}
+                            <option value="{{ option }}">{{ option }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="dropdown-wrapper">
+                    <label class="dropdown-label" for="Organisational_unit_level_3">Organisational Unit Level 3</label>
+                    <select class="multiselect" name="Organisational_unit_level_3" multiple>
+                        {% for option in Organisational_unit_level_3_list %}
+                            <option value="{{ option }}">{{ option }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="dropdown-wrapper">
+                    <label class="dropdown-label" for="Country_of_Exposure">Country of Exposure</label>
+                    <select class="multiselect" name="Country_of_Exposure" multiple>
+                        {% for option in Country_of_Exposure_list %}
+                            <option value="{{ option }}">{{ option }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="dropdown-wrapper">
+                    <label class="dropdown-label" for="Asset_class">Asset Class</label>
+                    <select class="multiselect" name="Asset_class" multiple>
+                        {% for option in Asset_class_list %}
+                            <option value="{{ option }}">{{ option }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="dropdown-wrapper">
+                    <label class="dropdown-label" for="Product_Type">Product Type</label>
+                    <select class="multiselect" name="Product_Type" multiple>
+                        {% for option in Product_Type_list %}
+                            <option value="{{ option }}">{{ option }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="dropdown-wrapper">
+                    <label class="dropdown-label" for="Basel_Approach">Basel Approach</label>
+                    <select class="multiselect" name="Basel_Approach" multiple>
+                        {% for option in Basel_Approach_list %}
+                            <option value="{{ option }}">{{ option }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="dropdown-wrapper">
+                    <label class="dropdown-label" for="ST_scenario">ST Scenario</label>
+                    <select class="multiselect" name="ST_scenario" multiple>
+                        {% for option in ST_scenario_combo %}
+                            <option value="{{ option }}">{{ option }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <div class="table-responsive" id="table-container">
+                {{ initial_table_html|safe }}
+            </div>
+        </div>
+    </div>
+
+    <script>
+        $(document).ready(function() {
+            $(".multiselect").select2({
+                placeholder: "Select options",
+                closeOnSelect: false,
+                allowClear: true
+            });
+
+            function updateTable() {
+                var selectedItems = {};
+                $('.multiselect').each(function() {
+                    var dropdownName = $(this).attr('name');
+                    var selected = $(this).select2("data");
+                    selectedItems[dropdownName] = selected.map(item => item.text);
+                });
+
+                $.ajax({
+                    url: "{% url 'mi_chart' %}",
+                    method: "POST",
+                    data: {
+                        selectedItems: JSON.stringify(selectedItems),
+                        csrfmiddlewaretoken: $('input[name=csrfmiddlewaretoken]').val()
+                    },
+                    success: function(response) {
+                        $('#table-container').html(response.table_html);
+                    },
+                    error: function(xhr, status, error) {
+                        console.error("Error updating table:", error);
+                    }
+                });
+            }
+
+            $('.multiselect').on('change', updateTable);
+        });
+    </script>
+</body>
+</html>
