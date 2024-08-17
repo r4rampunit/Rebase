@@ -3906,3 +3906,103 @@ $(document).ready(function() {
     });
 });
 </script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<style>
+  /* ... (previous styles remain unchanged) ... */
+
+  .dropdown-wrapper {
+    display: flex;
+    flex-direction: column;
+    margin-right: 40px;
+    width: 300px;
+  }
+
+  .dropdown-label {
+    font-size: 14px;
+    font-weight: bold;
+    margin-bottom: 5px;
+    color: #333;
+  }
+
+  .multiselect {
+    width: 100%;
+    padding: 12px 15px;
+    font-size: 16px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    background-color: #fff;
+    color: #333;
+    outline: none;
+    transition: border-color 0.3s ease;
+  }
+
+  .multiselect:focus {
+    border-color: #4a90e2;
+    box-shadow: 0 0 5px rgba(74, 144, 226, 0.5);
+  }
+
+  /* ... (remaining styles unchanged) ... */
+</style>
+
+<div class="dashboard">
+  <div class="container mt-5">
+    <h1>MI Chart</h1>
+    <div class="dropdowns-container">
+      <div class="dropdown-wrapper">
+        <label class="dropdown-label" for="Organisational_unit_level_1">Organisational Unit Level 1</label>
+        <select class="multiselect" name="Organisational_unit_level_1" multiple>
+          {% for option in Organisational_unit_level_1_list %}
+            <option value="{{ option }}">{{ option }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="dropdown-wrapper">
+        <label class="dropdown-label" for="Organisational_unit_level_2">Organisational Unit Level 2</label>
+        <select class="multiselect" name="Organisational_unit_level_2" multiple>
+          {% for option in Organisational_unit_level_2_list %}
+            <option value="{{ option }}">{{ option }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="dropdown-wrapper">
+        <label class="dropdown-label" for="Organisational_unit_level_3">Organisational Unit Level 3</label>
+        <select class="multiselect" name="Organisational_unit_level_3" multiple>
+          {% for option in Organisational_unit_level_3_list %}
+            <option value="{{ option }}">{{ option }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="dropdown-wrapper">
+        <label class="dropdown-label" for="Country_of_Exposure">Country of Exposure</label>
+        <select class="multiselect" name="Country_of_Exposure" multiple>
+          {% for option in Country_of_Exposure_list %}
+            <option value="{{ option }}">{{ option }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+  </div>
+</div>
