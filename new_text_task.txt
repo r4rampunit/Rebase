@@ -4370,3 +4370,72 @@ $(document).ready(function() {
     </script>
 </body>
 </html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+# After creating table_df1 for each scenario, but before converting to HTML
+
+# Create a list to store DataFrames for each scenario
+scenario_dfs = []
+
+for st, scenario in list1:
+    # Your existing code to create table_df1 for each scenario
+    # ...
+
+    # Rename columns to include the scenario
+    table_df1.columns = pd.MultiIndex.from_product([[f"{st}-{scenario}"], table_df1.columns])
+    scenario_dfs.append(table_df1)
+
+# Combine all scenario DataFrames
+table_df = pd.concat(scenario_dfs, axis=1)
+
+# Create the top-level header for ST_scenarios
+st_scenario_header = pd.MultiIndex.from_product([
+    [f"{st}-{scenario.split('-')[0]}" for st, scenario in list1],
+    [''] * len(column_names)
+])
+
+# Combine the ST_scenario header with the existing column names
+table_df.columns = pd.MultiIndex.from_arrays([
+    st_scenario_header,
+    table_df.columns.get_level_values(1)
+])
+
+# Convert to HTML
+table_html = table_df.to_html(classes="table table-striped table-bordered", index=True)
+
+# Modify the HTML to merge cells in the top header row
+from bs.BeautifulSoup import BeautifulSoup
+
+soup = BeautifulSoup(table_html, 'html.parser')
+header_row = soup.find('thead').find_all('tr')[0]
+current_scenario = None
+current_colspan = 0
+
+for th in header_row.find_all('th')[1:]:  # Skip the first th (index)
+    if th.string != '':
+        if current_scenario:
+            current_scenario['colspan'] = str(current_colspan)
+        current_scenario = th
+        current_colspan = 1
+    else:
+        th.decompose()
+        current_colspan += 1
+
+if current_scenario:
+    current_scenario['colspan'] = str(current_colspan)
+
+# Convert back to string
+table_html = str(soup)
+
+return JsonResponse({'table_html': table_html})
