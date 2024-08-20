@@ -4736,3 +4736,25 @@ return JsonResponse({"table_html": table_html})
 
 
 if pd.notna(table_df1.loc["Net Balance ($ MM)", col]) and table_df1.loc["Net Balance ($ MM)", col] == 0:
+
+
+
+
+
+
+
+
+
+
+
+
+
+net_balance = table_df1.loc["Net Balance ($ MM)", col]
+if net_balance == 0:
+    table_df1.loc["LIC Rate", col] = 0
+else:
+    lic_rate = table_df1.loc["LIC ($ MM)", col] / net_balance * 100
+    table_df1.loc["LIC Rate", col] = f"{round(lic_rate, 2)}%"
+
+
+
