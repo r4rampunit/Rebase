@@ -4724,3 +4724,15 @@ for st in ST_scenario_selected:
 table_html = table_df.to_html(classes="table table-striped table-bordered", index=True)
 
 return JsonResponse({"table_html": table_html})
+
+
+
+
+
+
+
+
+
+
+
+if pd.notna(table_df1.loc["Net Balance ($ MM)", col]) and table_df1.loc["Net Balance ($ MM)", col] == 0:
