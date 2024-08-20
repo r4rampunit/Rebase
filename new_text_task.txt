@@ -4491,3 +4491,119 @@ if request.method == 'POST':
     return JsonResponse({"table_html": table_html})
 else:
     # ... (rest of your existing code for the GET request)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+if request.method == 'POST':
+    selected_items = json.loads(request.POST.get('selectedItems'))
+    Product_Type_selected = selected_items.get('Product_Type', [])
+    Basel_Approach_selected = selected_items.get('Basel_Approach', [])
+    ST_scenario_selected = selected_items.get('ST_scenario', [])
+
+    list1 = []
+    for st in ST_scenario_selected:
+        list1.append(st.split('-'))
+
+    table_df = pd.DataFrame(index=row_names)
+
+    for x in list1:
+        scenario = x[1]
+        projection_period_range = [8]
+        for col in column_names:
+            if col == "T1":
+                projection_period_range = [1, 2, 3, 4]
+            # ... (rest of your existing code for creating table_df1)
+
+        if table_df1.loc["EAD ($ MM)"][col] == 0:
+            table_df1.loc["EL Density"][col] = 0
+        else:
+            table_df1.loc["EL Density"][col] = str(round((table_df1.loc["EL($ MM)"][col] / table_df1.loc["EAD ($ MM)"][col]) * 100, 2)) + "%"
+
+        # Create a MultiIndex for columns with ST scenario as the top level
+        table_df1.columns = pd.MultiIndex.from_product([[scenario], table_df1.columns])
+
+        table_df = pd.concat([table_df, table_df1], axis=1)
+
+    # Create a new top-level index for 'ST_scenario_selected'
+    top_level = ['ST_scenario_selected'] * len(table_df.columns)
+    mid_level = table_df.columns.get_level_values(0)
+    bottom_level = table_df.columns.get_level_values(1)
+
+    # Create new MultiIndex
+    new_columns = pd.MultiIndex.from_arrays([top_level, mid_level, bottom_level])
+    table_df.columns = new_columns
+
+    table_html = table_df.to_html(classes="table table-striped table-bordered", index=True)
+
+    return JsonResponse({"table_html": table_html})
+else:
+    # ... (rest of your existing code for the GET request)if request.method == 'POST':
+    selected_items = json.loads(request.POST.get('selectedItems'))
+    Product_Type_selected = selected_items.get('Product_Type', [])
+    Basel_Approach_selected = selected_items.get('Basel_Approach', [])
+    ST_scenario_selected = selected_items.get('ST_scenario', [])
+
+    list1 = []
+    for st in ST_scenario_selected:
+        list1.append(st.split('-'))
+
+    table_df = pd.DataFrame(index=row_names)
+
+    for x in list1:
+        scenario = x[1]
+        projection_period_range = [8]
+        for col in column_names:
+            if col == "T1":
+                projection_period_range = [1, 2, 3, 4]
+            # ... (rest of your existing code for creating table_df1)
+
+        if table_df1.loc["EAD ($ MM)"][col] == 0:
+            table_df1.loc["EL Density"][col] = 0
+        else:
+            table_df1.loc["EL Density"][col] = str(round((table_df1.loc["EL($ MM)"][col] / table_df1.loc["EAD ($ MM)"][col]) * 100, 2)) + "%"
+
+        # Create a MultiIndex for columns with ST scenario as the top level
+        table_df1.columns = pd.MultiIndex.from_product([[scenario], table_df1.columns])
+
+        table_df = pd.concat([table_df, table_df1], axis=1)
+
+    # Create a new top-level index for 'ST_scenario_selected'
+    top_level = ['ST_scenario_selected'] * len(table_df.columns)
+    mid_level = table_df.columns.get_level_values(0)
+    bottom_level = table_df.columns.get_level_values(1)
+
+    # Create new MultiIndex
+    new_columns = pd.MultiIndex.from_arrays([top_level, mid_level, bottom_level])
+    table_df.columns = new_columns
+
+    table_html = table_df.to_html(classes="table table-striped table-bordered", index=True)
+
+    return JsonResponse({"table_html": table_html})
+else:
+    # ... (rest of your existing code for the GET request)
