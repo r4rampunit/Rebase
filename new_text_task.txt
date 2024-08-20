@@ -4665,3 +4665,19 @@ if request.method == 'POST':
     return JsonResponse({"table_html": table_html})
 else:
     # ... (rest of your existing code for the GET request)
+
+
+
+
+
+
+
+<style>
+    .table th[colspan] {
+        text-align: center;
+    }
+    .table th, .table td {
+        white-space: nowrap;
+        text-align: center;
+    }
+</style>
