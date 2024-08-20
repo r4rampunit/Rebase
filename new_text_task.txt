@@ -4681,3 +4681,46 @@ else:
         text-align: center;
     }
 </style>
+
+
+
+
+
+
+
+
+
+
+
+
+for st in ST_scenario_selected:
+    scenario = st.split('-')[1]
+    table_df1 = pd.DataFrame(index=row_names, columns=column_names)
+
+    for col in column_names:
+        projection_period_range = [8]
+        if col == "T1":
+            projection_period_range = [1, 2, 3, 4]
+        # ... (rest of your existing code for populating table_df1)
+
+        table_df1.loc["LIC overlay ($ MM)"][col] = table_df1.loc["LIC ($ MM)"][col] - table_df1.loc["LIC Original ($ MM)"][col]
+
+        # Use numpy.where for vectorized operation
+        table_df1.loc["LIC Rate", col] = np.where(
+            table_df1.loc["Net Balance ($ MM)", col] == 0,
+            0,
+            (table_df1.loc["LIC ($ MM)", col] / table_df1.loc["Net Balance ($ MM)", col]) * 100
+        )
+
+        # Format the LIC Rate as a string with percentage
+        table_df1.loc["LIC Rate", col] = table_df1.loc["LIC Rate", col].apply(lambda x: f"{x:.2f}%" if x != 0 else "0%")
+
+    # Create a MultiIndex for columns with scenario as the top level
+    table_df1.columns = pd.MultiIndex.from_product([[scenario], table_df1.columns])
+
+    # Concatenate to the main dataframe
+    table_df = pd.concat([table_df, table_df1], axis=1)
+
+table_html = table_df.to_html(classes="table table-striped table-bordered", index=True)
+
+return JsonResponse({"table_html": table_html})
