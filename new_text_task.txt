@@ -4607,3 +4607,11 @@ else:
     return JsonResponse({"table_html": table_html})
 else:
     # ... (rest of your existing code for the GET request)
+
+
+
+
+
+
+
+    table_df.columns = pd.MultiIndex.from_product([['ST_scenario_selected'], table_df.columns.get_level_values(0), table_df.columns.get_level_values(1)])
