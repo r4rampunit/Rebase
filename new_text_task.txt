@@ -4758,3 +4758,15 @@ else:
 
 
 
+
+
+
+net_balance = table_df1.loc["Net Balance ($ MM)", col]
+if isinstance(net_balance, (int, float)) and net_balance == 0:
+    table_df1.loc["LIC Rate", col] = 0
+elif isinstance(net_balance, (int, float)):
+    lic_rate = table_df1.loc["LIC ($ MM)", col] / net_balance * 100
+    table_df1.loc["LIC Rate", col] = f"{round(lic_rate, 2)}%"
+else:
+    # Handle the case where net_balance is None or NaN
+    table_df1.loc["LIC Rate", col] = "N/A"
