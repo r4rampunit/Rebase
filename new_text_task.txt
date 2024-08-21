@@ -4770,3 +4770,35 @@ elif isinstance(net_balance, (int, float)):
 else:
     # Handle the case where net_balance is None or NaN
     table_df1.loc["LIC Rate", col] = "N/A"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+if table_df1.loc["EAD ($ MM)", col] == 0:
+    table_df1.loc["RWA Density", col] = 0
+else:
+    rwa_density = (table_df1.loc["RWA ($ MM)", col] / table_df1.loc["EAD ($ MM)", col]) * 100
+    table_df1.loc["RWA Density", col] = f"{round(rwa_density, 2)}%"
+
+if table_df1.loc["EAD ($ MM)", col] == 0:
+    table_df1.loc["EL Density", col] = 0
+else:
+    el_density = (table_df1.loc["EL($ MM)", col] / table_df1.loc["EAD ($ MM)", col]) * 100
+    table_df1.loc["EL Density", col] = f"{round(el_density, 2)}%"
