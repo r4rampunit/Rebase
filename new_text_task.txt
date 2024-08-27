@@ -4802,3 +4802,39 @@ if table_df1.loc["EAD ($ MM)", col] == 0:
 else:
     el_density = (table_df1.loc["EL($ MM)", col] / table_df1.loc["EAD ($ MM)", col]) * 100
     table_df1.loc["EL Density", col] = f"{round(el_density, 2)}%"
+
+
+
+
+
+
+import json
+import requests
+import pandas as pd
+
+# Request access token
+token_url = 'https://api.focus-ecofuntus.com/v1/token-exchange'
+token_headers = {
+    'Authorization': 'jwt eyJhbGciOIHsfggywunnhjswkncbjjsjXVCJ9.aWQiOiIdhhjjjd1ZjUwYmYzYzkyY2VkZDAWNTF1YWVjYjgiLCJ1bWFpbCI6ImRlbW9AZGVtby5hbsjbiuhdinewuh ININddhjwplannheijfadjbbxhjac wiurhghjajkqlwiuurfbvhhxbnskskwZjNhOGQwMmZjNWR1YzVmMzRlMjJhYzY2NzU@YzAiLCJpYXQ1OjE1OTkxMjczNTZ9.jMqLXN3vB90wm01_oky_VFuUoyABziqZ9z-02MufKng'
+}
+
+try:
+    token_response = requests.post(token_url, headers=token_headers)
+    token_response.raise_for_status()  # Raise an exception for bad status codes
+    access_token = token_response.json()['accesstoken']
+
+    # Get data from /clients
+    clients_url = 'https://api.focus-ecofuntus.com/v1/clients/'
+    clients_headers = {
+        'Authorization': f'Bearer {access_token}'
+    }
+
+    clients_response = requests.get(clients_url, headers=clients_headers)
+    clients_response.raise_for_status()  # Raise an exception for bad status codes
+
+    clients_data = clients_response.json()
+    df = pd.DataFrame(clients_data)
+    print(df)
+
+except requests.exceptions.RequestException as e:
+    print(f"An error occurred: {e}")
