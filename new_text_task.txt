@@ -4838,3 +4838,86 @@ try:
 
 except requests.exceptions.RequestException as e:
     print(f"An error occurred: {e}")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import json
+import requests
+import pandas as pd
+import socket
+
+# Function to check if a domain is reachable
+def is_domain_reachable(domain):
+    try:
+        socket.gethostbyname(domain)
+        return True
+    except socket.gaierror:
+        return False
+
+# Set up proxy if needed (uncomment and modify if you're behind a proxy)
+# proxies = {
+#     'http': 'http://your_proxy:your_port',
+#     'https': 'https://your_proxy:your_port'
+# }
+
+# Request access token
+token_url = 'https://api.focus-economics.com/v1/token-exchange'
+token_headers = {
+    'Authorization': 'jwt eyJhbGciOIHsfggywunnhjswkncbjjsjXVCJ9.aWQiOiIdhhjjjd1ZjUwYmYzYzkyY2VkZDAWNTF1YWVjYjgiLCJ1bWFpbCI6ImRlbW9AZGVtby5hbsjbiuhdinewuh ININddhjwplannheijfadjbbxhjac wiurhghjajkqlwiuurfbvhhxbnskskwZjNhOGQwMmZjNWR1YzVmMzRlMjJhYzY2NzU@YzAiLCJpYXQ1OjE1OTkxMjczNTZ9.jMqLXN3vB90wm01_oky_VFuUoyABziqZ9z-02MufKng'
+}
+
+try:
+    # Check if the domain is reachable
+    domain = 'api.focus-economics.com'
+    if not is_domain_reachable(domain):
+        print(f"Error: Unable to resolve the domain '{domain}'. Please check your internet connection and DNS settings.")
+        exit(1)
+
+    # Make the token request
+    token_response = requests.post(token_url, headers=token_headers)  # Add ", proxies=proxies" here if using a proxy
+    token_response.raise_for_status()
+    access_token = token_response.json()['accesstoken']
+
+    # Get data from /clients
+    clients_url = f'https://{domain}/v1/clients/'
+    clients_headers = {
+        'Authorization': f'Bearer {access_token}'
+    }
+
+    clients_response = requests.get(clients_url, headers=clients_headers)  # Add ", proxies=proxies" here if using a proxy
+    clients_response.raise_for_status()
+
+    clients_data = clients_response.json()
+    df = pd.DataFrame(clients_data)
+    print(df)
+
+except requests.exceptions.RequestException as e:
+    print(f"An error occurred during the API request: {e}")
+except json.JSONDecodeError as e:
+    print(f"Error decoding JSON response: {e}")
+except KeyError as e:
+    print(f"Error accessing data from the response: {e}")
+except Exception as e:
+    print(f"An unexpected error occurred: {e}")
