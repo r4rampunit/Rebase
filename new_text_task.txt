@@ -4921,3 +4921,76 @@ except KeyError as e:
     print(f"Error accessing data from the response: {e}")
 except Exception as e:
     print(f"An unexpected error occurred: {e}")
+
+
+
+
+
+
+import json
+import requests
+import pandas as pd
+import socket
+import dns.resolver
+
+def check_dns(domain):
+    try:
+        answers = dns.resolver.resolve(domain, 'A')
+        return [rdata.address for rdata in answers]
+    except Exception as e:
+        return f"DNS lookup failed: {str(e)}"
+
+def is_domain_reachable(domain):
+    try:
+        socket.gethostbyname(domain)
+        return True
+    except socket.gaierror:
+        return False
+
+# API details
+domain = 'api.focus-ecofuntus.com'
+token_url = f'https://{domain}/v1/token-exchange'
+token_headers = {
+    'Authorization': 'jwt eyJhbGciOIHsfggywunnhjswkncbjjsjXVCJ9.aWQiOiIdhhjjjd1ZjUwYmYzYzkyY2VkZDAWNTF1YWVjYjgiLCJ1bWFpbCI6ImRlbW9AZGVtby5hbsjbiuhdinewuh ININddhjwplannheijfadjbbxhjac wiurhghjajkqlwiuurfbvhhxbnskskwZjNhOGQwMmZjNWR1YzVmMzRlMjJhYzY2NzU@YzAiLCJpYXQ1OjE1OTkxMjczNTZ9.jMqLXN3vB90wm01_oky_VFuUoyABziqZ9z-02MufKng'
+}
+
+print(f"Checking DNS for {domain}...")
+dns_result = check_dns(domain)
+print(f"DNS lookup result: {dns_result}")
+
+print(f"Checking if domain is reachable...")
+is_reachable = is_domain_reachable(domain)
+print(f"Domain reachable: {is_reachable}")
+
+try:
+    print(f"Attempting to connect to {token_url}...")
+    token_response = requests.post(token_url, headers=token_headers, timeout=10)
+    token_response.raise_for_status()
+    access_token = token_response.json()['accesstoken']
+
+    clients_url = f'https://{domain}/v1/clients/'
+    clients_headers = {
+        'Authorization': f'Bearer {access_token}'
+    }
+
+    print(f"Fetching client data from {clients_url}...")
+    clients_response = requests.get(clients_url, headers=clients_headers, timeout=10)
+    clients_response.raise_for_status()
+
+    clients_data = clients_response.json()
+    df = pd.DataFrame(clients_data)
+    print(df)
+
+except requests.exceptions.RequestException as e:
+    print(f"Request error: {e}")
+    if hasattr(e, 'response'):
+        print(f"Response status code: {e.response.status_code}")
+        print(f"Response headers: {e.response.headers}")
+        print(f"Response content: {e.response.content}")
+except Exception as e:
+    print(f"An unexpected error occurred: {e}")
+
+print("\nAdditional diagnostics:")
+print(f"Python version: {sys.version}")
+print(f"Requests library version: {requests.__version__}")
+print(f"Pandas version: {pd.__version__}")
