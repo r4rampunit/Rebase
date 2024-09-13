@@ -73,3 +73,60 @@ print("\nAdditional diagnostics:")
 print(f"Python version: {sys.version}")
 print(f"Requests library version: {requests.__version__}")
 print(f"Pandas version: {pd.__version__}")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import sqlite3
+import pandas as pd
+
+# Use raw string for file path to avoid escape character issues
+sqlite_file = r'C:\Users\45363901\PycharmProjects\Imp\Python-Environment\db\Test_db.sqlite'
+
+# Connect to the database
+conn = sqlite3.connect(sqlite_file)
+cursor = conn.cursor()
+
+# Get all table names
+cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+tables = cursor.fetchall()
+
+print("List of tables:")
+for table in tables:
+    print(table[0])
+
+# Function to check if a column exists in a table
+def column_exists(cursor, table_name, column_name):
+    cursor.execute(f"PRAGMA table_info('{table_name}')")
+    columns = [col[1] for col in cursor.fetchall()]
+    return column_name in columns
+
+# Search for 'Colaro' column in all tables
+column_name = 'Colaro'
+found_in_tables = []
+
+for table in tables:
+    table_name = table[0]
+    if column_exists(cursor, table_name, column_name):
+        found_in_tables.append(table_name)
+
+if found_in_tables:
+    print(f"\nThe column '{column_name}' was found in the following tables:")
+    for table in found_in_tables:
+        print(table)
+else:
+    print(f"\nThe column '{column_name}' was not found in any table.")
+
+# Close the connection
+conn.close()
