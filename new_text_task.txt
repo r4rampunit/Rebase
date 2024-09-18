@@ -156,3 +156,70 @@ six = "^1.16.0"
 statsmodels = "^0.12.2"
 threadpoolctl = "^3.1.0"
 xlrd = "^1.2.0"
+
+
+
+
+
+
+
+import os
+import pandas as pd
+from bs4 import BeautifulSoup
+import win32com.client as win32
+import schedule
+import time
+from datetime import datetime
+
+def process_html_files():
+    folder_path = r"D:\IITJ_Drive"
+    output_files = []
+    mismatch_found = False
+
+    for filename in os.listdir(folder_path):
+        if filename.startswith('r_') and filename.endswith('.html'):
+            file_path = os.path.join(folder_path, filename)
+
+            with open(file_path, 'r') as file:
+                soup = BeautifulSoup(file, 'html.parser')
+                table = soup.find('table')
+                df = pd.read_html(str(table))[0]
+
+            df['Mismatch'] = df['smd'] != df['Prod']
+
+            if df['Mismatch'].any():
+                mismatch_found = True
+
+            styled_df = df.style.apply(lambda x: ['background-color: yellow' if v else '' for v in x['Mismatch']], axis=1)
+            output_file = os.path.join(folder_path, f"processed_{filename}")
+            styled_df.to_html(output_file)
+            output_files.append(output_file)
+
+    create_draft_email(output_files, mismatch_found)
+
+def create_draft_email(attachments, mismatch_found):
+    outlook = win32.Dispatch('outlook.application')
+    mail = outlook.CreateItem(0)
+
+    if mismatch_found:
+        mail.To = "rampunit.kumar@hsbc.com"
+        mail.Subject = "Mismatch Found in HTML Tables"
+        mail.Body = "Please find attached the processed HTML files with highlighted mismatches."
+    else:
+        mail.To = "rashmi.moghanty@hsbc.com"
+        mail.Subject = "Daily HTML Table Comparison Report"
+        mail.Body = "Please find attached the processed HTML files. No mismatches were found."
+
+    for attachment in attachments:
+        mail.Attachments.Add(attachment)
+
+    mail.Save()
+
+def run_daily_task():
+    process_html_files()
+
+schedule.every().day.at("11:00").do(run_daily_task)
+
+while True:
+    schedule.run_pending()
+    time.sleep(60)
