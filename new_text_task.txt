@@ -262,3 +262,54 @@ poetry add cycler@^0.11.0 \
 
 # Activate the virtual environment
 poetry shell
+
+
+
+
+
+
+
+
+
+
+[tool.poetry]
+name = "your-project-name"
+version = "0.1.0"
+description = "Your project description"
+authors = ["Your Name <you@example.com>"]
+
+[tool.poetry.dependencies]
+python = "~3.9"  # This specifies Python 3.9.x
+cycler = "0.11.0"
+et-xmlfile = "1.1.0"
+joblib = "1.1.1"
+kiwisolver = "1.3.1"
+lxml = "4.9.2"
+matplotlib = "3.2.8"
+numpy = "1.19.5"
+openpyxl = "3.1.2"
+pandas = "1.1.5"
+patsy = "0.5.2"
+Pillow = "8.4.0"
+pyparsing = "3.0.7"
+python-dateutil = "2.8.2"
+python-docx = "0.8.11"
+pytz = "2017.2"
+scikit-learn = "0.18.2"
+scipy = "1.5.4"
+seaborn = "0.11.2"
+six = "1.16.0"
+statsmodels = "0.12.2"
+xlrd = "1.2.0"
+threadpoolctl = "3.1.0"
+PyQt5 = "5.15.4"
+pyqtgraph = "0.12.3"
+python-pptx = "0.6.21"
+numba = "0.53.1"
+
+[tool.poetry.dev-dependencies]
+# Add any development dependencies here
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
