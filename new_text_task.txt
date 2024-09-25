@@ -382,3 +382,36 @@ waterfall-chart = "^0.4.0"
 PyQt5-sip = "^12.9.0"
 PyQt5-Qt5 = "^5.15.2"
 
+
+
+
+
+
+
+
+
+
+import sys
+import os
+import pandas as pd
+
+# Add the Model_Validation_3.9 directory to sys.path
+model_validation_path = r"C:\Users\45363901\Pycharm Projects\pythonProject\Model_Validation_3.9"
+sys.path.append(model_validation_path)
+
+# Import the create_leap function from model.py
+from model.model import create_leap
+
+# Create a dummy DataFrame
+df = pd.DataFrame({
+    'date': pd.date_range(start='2023-01-01', end='2023-12-31', freq='D'),
+    'value': range(365)
+})
+
+# Apply the create_leap function to the dummy DataFrame
+result = create_leap(df)
+
+# Print the result
+print(result)
+
+# You might want to add more code here to further process or analyze the result
