@@ -414,4 +414,20 @@ result = create_leap(df)
 # Print the result
 print(result)
 
-# You might want to add more code here to further process or analyze the result
+import importlib.util
+import pandas as pd
+
+# Specify the full path to model.py
+model_file_path = r'C:\Users\45363901\PycharmProjects\pythonProject\Model_Validation_3.9\model\model.py'
+
+# Load the model.py module dynamically
+spec = importlib.util.spec_from_file_location("model", model_file_path)
+model = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(model)
+
+
+mklink /D Model_Validation_3.9 C:\Users\45363901\PycharmProjects\pythonProject\Model_Validation_3.9
+
+
+import pandas as pd
+from Model_Validation_3.9.model.model import create_leap
