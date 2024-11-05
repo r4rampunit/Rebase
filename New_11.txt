@@ -1,0 +1,145 @@
+class LinearReg(ModelSpec):
+    def __init__(self, order, executionStatus, Portfolio, GMIS, modelSegment, modelSubsegment, 
+                 LOB, modelType, modelScoremethodology, cycleInfo, depVarData, depVarName, 
+                 depVarTransform, indepVarNames, indepVarTransform, modelEq, Fcst_Moving_Avg, 
+                 Fcst_Moving_Avg_Period, actualsStartDate, modelDataFormat, outputDataFormat):
+        
+        super().__init__(order, executionStatus, Portfolio, GMIS, modelSegment, modelSubsegment, 
+                        LOB, modelType, modelScoremethodology, cycleInfo, depVarData, depVarName, 
+                        depVarTransform, indepVarNames, indepVarTransform, modelEq, Fcst_Moving_Avg, 
+                        Fcst_Moving_Avg_Period, actualsStartDate, modelDataFormat, outputDataFormat)
+        
+        self.projections = self.LINscoring()
+
+    def parse_model_equation(self, equation):
+        """Parse the model equation string into coefficients and variables"""
+        terms = []
+        # Split by + or -
+        parts = equation.replace('-', '+-').split('+')
+        
+        for part in parts:
+            part = part.strip()
+            if not part:
+                continue
+                
+            if '*' in part:
+                # Handle coefficient * variable terms
+                coef, var = part.split('*', 1)
+                terms.append({
+                    'coefficient': float(coef),
+                    'variable': var.strip()
+                })
+            else:
+                # Handle constant terms
+                try:
+                    terms.append({
+                        'coefficient': float(part),
+                        'variable': None
+                    })
+                except ValueError:
+                    # Handle standalone variables (coefficient = 1)
+                    terms.append({
+                        'coefficient': 1.0,
+                        'variable': part.strip()
+                    })
+        return terms
+
+    def calculate_predictions(self, ds_1):
+        """Calculate predictions using parsed model equation"""
+        try:
+            terms = self.parse_model_equation(self.modelEq)
+            predictions = np.zeros(len(ds_1))
+            
+            for term in terms:
+                if term['variable'] is None:
+                    # Add constant term
+                    predictions += term['coefficient']
+                else:
+                    # Add coefficient * variable term
+                    if term['variable'] in ds_1.columns:
+                        predictions += term['coefficient'] * ds_1[term['variable']].values
+                    else:
+                        print(f"Warning: Variable {term['variable']} not found in dataset")
+            
+            return predictions
+        except Exception as e:
+            print(f"Error in calculation: {str(e)}")
+            print(f"Model equation: {self.modelEq}")
+            return None
+
+    def LINscoring(self):
+        # Validation checks
+        if len(self.indepVarNames) != len(self.indepVarTransform):
+            print('\n\n\nError! Not all independent variables details are provided!\n\n\n')
+        if len(self.cycleInfo['scenarios']) != len(self.cycleInfo['MVData']):
+            print('\n\n\nError! Not all scenario details are provided!\n\n\n')
+
+        # Change strings to dates
+        actualsStartDateD = self.str2date(self.actualsStartDate)
+        JODateD = self.str2date(self.cycleInfo['Jumpoff'])
+        endProjectionsDateD = self.str2date(self.cycleInfo['endProjectionsDate'])
+
+        # Transform variables
+        transformedVariables = []
+        for var in range(len(self.indepVarNames)):
+            transformedVariables.append(self.indepVarNames[var] + self.indepVarTransform[var])
+
+        dependentTransform = self.depVarName + self.depVarTransform
+        self.indepVarNames.append('month')  # add month for later transformation
+
+        ds_1 = []
+        depVarData_1 = self.depVarData[[self.depVarName]]  # select applicable dependent variable
+
+        # Calculate projections for each scenario
+        for scen in range(len(self.cycleInfo['MVData'])):
+            df = self.cycleInfo['MVData'][scen]
+            unique_indep = copy.deepcopy(self.indepVarNames)
+            unique_indep = list(set(unique_indep))
+            MVData_1 = df[unique_indep].copy()  # select only independent variables and month
+
+            ds_1 = pd.merge(MVData_1, depVarData_1, how='left', left_index=True, right_index=True)
+
+            # Perform independent variables transformations
+            if self.modelDataFormat.lower() == 'quarterly':
+                for ii in range(len(self.indepVarTransform)):
+                    ds_1 = self.transformIndepDataMtoQ(ds_1, self.indepVarNames[ii], 
+                                                      self.indepVarTransform[ii])
+            elif self.modelDataFormat.lower() == 'monthly':
+                for ii in range(len(self.indepVarTransform)):
+                    ds_1 = self.transformIndepData(ds_1, self.indepVarNames[ii], 
+                                                 self.indepVarTransform[ii])
+            else:
+                print('\n\n\nError! Incorrectly defined date format!\n\n\n')
+                return
+
+            # Reorder columns
+            cols = list(ds_1.columns)
+            ds_1 = ds_1[cols[0:-len(self.indepVarNames)] + 
+                       cols[-len(self.indepVarNames)+1:] + 
+                       cols[-len(self.indepVarNames):-len(self.indepVarNames)+1]]
+
+            # Perform dependent variables transformations
+            if self.modelDataFormat.lower() == 'quarterly':
+                ds_1 = self.transformDepDataMtoQ(ds_1, self.depVarName, self.depVarTransform)
+            elif self.modelDataFormat.lower() == 'monthly':
+                ds_1 = self.transformDepDataM(ds_1, self.depVarName, self.depVarTransform)
+            else:
+                print('\n\n\nError! Incorrectly defined date format!\n\n\n')
+                return
+
+            # Filter data by dates
+            ds_1 = ds_1.loc[actualsStartDateD:]  # data after actualsStartDate
+            ds_1 = ds_1.loc[:endProjectionsDateD]  # data till endProjectionsDate
+
+            # Handle output format
+            if self.outputDataFormat.lower() == 'quarterly':
+                ds_1 = ds_1.loc[ds_1['month'].isin([3, 6, 9, 12])]
+            elif self.outputDataFormat.lower() != 'monthly':
+                print('\n\n\nError! Incorrectly defined outputDataFormat!\n\n\n')
+                return
+
+            # Calculate predictions
+            print(self.modelEq)
+            ds_1['pred'] = self.calculate_predictions(ds_1)
+
+            return ds_1
