@@ -4,34 +4,29 @@ try:
     # Connect to the SQLite database
     conn = sqlite3.connect(self_path)
     cursor = conn.cursor()
-
-    # Step 1: Get all columns except 2015_flag
-    cursor.execute('PRAGMA table_info(Monthly_table);')
-    columns = cursor.fetchall()
-    column_names = [col[1] for col in columns if col[1] != '2015_flag']
-    columns_string = ', '.join(column_names)
-
-    # Step 2: Create new table with desired columns
-    cursor.execute(f'''
-        CREATE TABLE Monthly_table_new AS 
-        SELECT {columns_string}
-        FROM Monthly_table;
+    
+    # First add the column if it doesn't exist
+    try:
+        cursor.execute('ALTER TABLE Monthly_table ADD COLUMN 2015_flag INTEGER DEFAULT 0')
+    except sqlite3.OperationalError:
+        # Column might already exist, continue
+        pass
+    
+    # Update specific dates with value 1
+    cursor.execute('''
+        UPDATE Monthly_table 
+        SET [2015_flag] = CASE 
+            WHEN date IN ('2015-02-28 00:00:00', '2015-03-31 00:00:00', '2015-04-30 00:00:00') THEN 1 
+            ELSE 0 
+        END
     ''')
-
-    # Step 3: Drop the old table
-    cursor.execute('DROP TABLE Monthly_table;')
-
-    # Step 4: Rename the new table to the original name
-    cursor.execute('ALTER TABLE Monthly_table_new RENAME TO Monthly_table;')
-
+    
     # Commit the changes
     conn.commit()
-    print("Column '2015_flag' successfully deleted")
-
+    print("2015_flag column updated successfully")
+    
 except sqlite3.Error as e:
     print(f"An error occurred: {e}")
     conn.rollback()
-
 finally:
-    # Close the connection
     conn.close()
