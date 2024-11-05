@@ -5,28 +5,45 @@ try:
     conn = sqlite3.connect(self_path)
     cursor = conn.cursor()
     
-    # First add the column if it doesn't exist
-    try:
-        cursor.execute('ALTER TABLE Monthly_table ADD COLUMN 2015_flag INTEGER DEFAULT 0')
-    except sqlite3.OperationalError:
-        # Column might already exist, continue
-        pass
+    # Check if 2015_flag column exists
+    cursor.execute("PRAGMA table_info(Monthly_table)")
+    columns = [column[1] for column in cursor.fetchall()]
+    
+    # Add the column only if it doesn't exist
+    if "2015_flag" not in columns:
+        cursor.execute('ALTER TABLE Monthly_table ADD COLUMN "2015_flag" INTEGER DEFAULT 0')
+        print("2015_flag column added successfully")
+    else:
+        print("2015_flag column already exists")
     
     # Update specific dates with value 1
-    cursor.execute('''
+    update_query = '''
         UPDATE Monthly_table 
-        SET [2015_flag] = CASE 
+        SET "2015_flag" = CASE 
             WHEN date IN ('2015-02-28 00:00:00', '2015-03-31 00:00:00', '2015-04-30 00:00:00') THEN 1 
             ELSE 0 
         END
-    ''')
+    '''
+    cursor.execute(update_query)
     
     # Commit the changes
     conn.commit()
     print("2015_flag column updated successfully")
     
+    # Verify the update (optional)
+    cursor.execute('''
+        SELECT date, "2015_flag" 
+        FROM Monthly_table 
+        WHERE "2015_flag" = 1
+    ''')
+    results = cursor.fetchall()
+    print("\nRows with flag = 1:")
+    for row in results:
+        print(row)
+    
 except sqlite3.Error as e:
     print(f"An error occurred: {e}")
     conn.rollback()
 finally:
-    conn.close()
+    if conn:
+        conn.close()
