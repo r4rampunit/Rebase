@@ -1,0 +1,80 @@
+def MVdataTransform(cycleInfo, modelyticsMVfile, indepVarNames):
+    MVData = []
+    data = modelyticsMVfile.copy()
+    data['date'] = data['date'].dt.date
+    data = data.set_index('date')
+
+    # Debug print to check inputs
+    print(f"Available columns: {data.columns.tolist()}")
+    print(f"Independent variables: {indepVarNames}")
+    print(f"Cycle info: {cycleInfo}")
+
+    # Helper function to get scenario value
+    def get_scenario_val(scenario):
+        scenario_mapping = {
+            'Baseline': 'Base',
+            'Adverse': 'Adv',
+            'Severely Adverse': 'SevAdv'
+        }
+        return scenario_mapping.get(scenario, scenario)
+
+    try:
+        # Add historical values to all forecasted variables
+        for aa in range(len(indepVarNames)):
+            for bb in range(len(cycleInfo['scenarios'])):
+                scenario_val = get_scenario_val(cycleInfo['scenarios'][bb])
+                
+                # Construct column name
+                cc = f"{indepVarNames[aa]}_{cycleInfo['type']}_{scenario_val}_{cycleInfo['cycle']}_{cycleInfo['year']}"
+                
+                # Debug print
+                print(f"Processing column: {cc}")
+                
+                if cc not in data.columns:
+                    print(f"Warning: Column {cc} not found in DataFrame")
+                    # Create the column if it doesn't exist
+                    data[cc] = None
+                
+                # Fill NA values
+                if indepVarNames[aa] in data.columns:
+                    data[cc] = data[cc].fillna(data[indepVarNames[aa]])
+                else:
+                    print(f"Warning: Source column {indepVarNames[aa]} not found")
+
+        # Separate MVs into lists by scenarios
+        for dd in range(len(cycleInfo['scenarios'])):
+            scenario_val = get_scenario_val(cycleInfo['scenarios'][dd])
+            
+            # Create regex pattern for filtering
+            pattern = f"{cycleInfo['type']}_{scenario_val}_{cycleInfo['cycle']}_{cycleInfo['year']}$"
+            filtered_data = data.filter(regex=pattern)
+            
+            # Debug print
+            print(f"Filtered columns for scenario {scenario_val}: {filtered_data.columns.tolist()}")
+            
+            MVData.append(filtered_data)
+
+        # Process each scenario's data
+        for ee in range(len(MVData)):
+            scenario_val = get_scenario_val(cycleInfo['scenarios'][ee])
+            
+            # Rename columns
+            for ff in range(len(indepVarNames)):
+                old_name = f"{indepVarNames[ff]}_{cycleInfo['type']}_{scenario_val}_{cycleInfo['cycle']}_{cycleInfo['year']}"
+                MVData[ee] = MVData[ee].rename(columns={old_name: indepVarNames[ff]})
+            
+            # Reset index and add month column
+            MVData[ee] = MVData[ee].reset_index()
+            MVData[ee] = MVData[ee].rename(columns={'index': 'date'})
+            MVData[ee]['month'] = pd.DatetimeIndex(MVData[ee]['date']).month
+            MVData[ee] = MVData[ee].set_index('date')
+
+        return MVData
+
+    except Exception as e:
+        print(f"Error in MVdataTransform: {str(e)}")
+        print(f"Current state:")
+        print(f"- Processing independent variable: {indepVarNames[aa] if 'aa' in locals() else 'N/A'}")
+        print(f"- Current scenario: {scenario_val if 'scenario_val' in locals() else 'N/A'}")
+        print(f"- Attempting to process column: {cc if 'cc' in locals() else 'N/A'}")
+        raise
