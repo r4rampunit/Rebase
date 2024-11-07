@@ -3,15 +3,7 @@ import re
 
 def MVdataTransform(cycleInfo, modelyticsMVfile, indepVarNames):
     """
-    Transform model variables data based on cycle information and scenarios.
-    
-    Args:
-        cycleInfo (dict): Dictionary containing cycle information including scenarios, type, and year
-        modelyticsMVfile (pd.DataFrame): Input DataFrame containing model variables
-        indepVarNames (list): List of independent variable names
-    
-    Returns:
-        list: List of transformed DataFrames for each scenario
+    Transform model variables data with enhanced debugging
     """
     def get_scenario_val(scenario):
         scenario_mapping = {
@@ -21,7 +13,19 @@ def MVdataTransform(cycleInfo, modelyticsMVfile, indepVarNames):
         }
         return scenario_mapping.get(scenario, scenario)
     
+    def construct_column_name(var_name, cycle_info, scenario):
+        """Construct column name with logging"""
+        scenario_val = get_scenario_val(scenario)
+        col_name = f"{var_name}_{cycle_info['type']}_{scenario_val}_{cycle_info['cycle']}_{cycle_info['year']}"
+        print(f"Constructed column name: {col_name}")
+        return col_name, scenario_val
+    
     try:
+        print("\n=== Starting MVdataTransform ===")
+        print("Input variables:", indepVarNames)
+        print("Available columns in input data:", modelyticsMVfile.columns.tolist())
+        print("Cycle Info:", cycleInfo)
+        
         MVData = []
         data = modelyticsMVfile.copy()
         
@@ -29,37 +33,63 @@ def MVdataTransform(cycleInfo, modelyticsMVfile, indepVarNames):
         data['date'] = pd.to_datetime(data['date']).dt.date
         data = data.set_index('date')
         
-        # Add historical values to all forecasted variables
+        # First pass: just construct and verify all column names
+        all_required_columns = []
         for var_name in indepVarNames:
             for scenario in cycleInfo['scenarios']:
-                scenario_val = get_scenario_val(scenario)
+                col_name, _ = construct_column_name(var_name, cycleInfo, scenario)
+                all_required_columns.append(col_name)
+        
+        print("\nAll required columns:", all_required_columns)
+        print("Missing columns:", [col for col in all_required_columns if col not in data.columns])
+        
+        # Add historical values to all forecasted variables
+        for var_name in indepVarNames:
+            print(f"\nProcessing variable: {var_name}")
+            for scenario in cycleInfo['scenarios']:
+                col_name, scenario_val = construct_column_name(var_name, cycleInfo, scenario)
                 
-                # Construct column name with proper formatting
-                new_col = f"{var_name}_{cycleInfo['type']}_{scenario_val}_{cycleInfo['cycle']}_{cycleInfo['year']}"
+                if col_name not in data.columns:
+                    print(f"Warning: Column {col_name} not found in data")
+                    # Try alternative column name formats
+                    alt_col_name = f"FGOP_US_AD_{cycleInfo['type']}_{scenario_val}_{cycleInfo['cycle']}_{cycleInfo['year']}"
+                    print(f"Trying alternative column name: {alt_col_name}")
+                    
+                    if alt_col_name in data.columns:
+                        col_name = alt_col_name
+                        print(f"Found alternative column: {alt_col_name}")
                 
-                # Handle the fillna operation safely
-                if var_name in data.columns:
-                    data[new_col] = data[new_col].fillna(data[var_name])
+                if var_name in data.columns and col_name in data.columns:
+                    print(f"Filling NA values in {col_name} with values from {var_name}")
+                    data[col_name] = data[col_name].fillna(data[var_name])
                 else:
-                    print(f"Warning: Variable {var_name} not found in data columns")
+                    print(f"Skip fillna: Missing either {var_name} or {col_name}")
         
         # Separate MVs into lists by scenarios
         for scenario in cycleInfo['scenarios']:
             scenario_val = get_scenario_val(scenario)
+            print(f"\nProcessing scenario: {scenario} (transformed to: {scenario_val})")
             
             # Create regex pattern for filtering
             pattern = f".*_{cycleInfo['type']}_{scenario_val}_{cycleInfo['cycle']}_{cycleInfo['year']}$"
+            print(f"Using regex pattern: {pattern}")
             
             # Filter columns and append to MVData
             scenario_data = data.filter(regex=pattern)
+            print(f"Filtered columns for scenario: {scenario_data.columns.tolist()}")
+            
+            if scenario_data.empty:
+                print(f"Warning: No columns found for scenario {scenario}")
+                continue
             
             # Rename columns to remove scenario suffix
             rename_dict = {}
             for col in scenario_data.columns:
-                base_name = col.split('_')[0]  # Get the base variable name
+                base_name = col.split('_')[0]
                 if base_name in indepVarNames:
                     rename_dict[col] = base_name
             
+            print(f"Renaming columns: {rename_dict}")
             scenario_data = scenario_data.rename(columns=rename_dict)
             
             # Add month column and reset index
@@ -69,23 +99,24 @@ def MVdataTransform(cycleInfo, modelyticsMVfile, indepVarNames):
             
             MVData.append(scenario_data)
         
+        print("\n=== MVdataTransform completed successfully ===")
         return MVData
     
     except Exception as e:
-        print(f"Error in MVdataTransform: {str(e)}")
-        print("Available columns:", data.columns.tolist())
-        print("Attempted scenario values:", [get_scenario_val(s) for s in cycleInfo['scenarios']])
+        print("\n=== Error in MVdataTransform ===")
+        print(f"Error type: {type(e).__name__}")
+        print(f"Error message: {str(e)}")
+        print("\nDebug information:")
+        print("Available columns:", modelyticsMVfile.columns.tolist())
+        print("Cycle Info:", cycleInfo)
+        print("Independent Variables:", indepVarNames)
         raise
 
 # Example usage:
-"""
-cycleInfo = {
-    'scenarios': ['Baseline', 'Adverse', 'Severely Adverse'],
-    'type': 'BHC',
-    'cycle': 'CCAR',
-    'year': 2024
-}
-modelyticsMVfile = pd.DataFrame(...)  # Your input DataFrame
-indepVarNames = ['FGOP_US_AD', ...]  # Your variable names
-result = MVdataTransform(cycleInfo, modelyticsMVfile, indepVarNames)
-"""
+# cycleInfo = {
+#     'scenarios': ['Baseline', 'Adverse', 'Severely Adverse'],
+#     'type': 'BHC',
+#     'cycle': 'CCAR',
+#     'year': 2024
+# }
+# result = MVdataTransform(cycleInfo, modelyticsMVfile, indepVarNames)
