@@ -1,4 +1,4 @@
-def plotme_Model_Exec(self, df):
+def plotme_Model_Exec(self, df_plot):
     self.figure.clf()
     ax = self.figure.add_subplot(111)
     ax.cla()
@@ -10,9 +10,9 @@ def plotme_Model_Exec(self, df):
     plt.style.use("seaborn-v0_8-ticks")
 
     dateColumnTypesList = ['float64']
-    datesDf = df.select_dtypes(include=dateColumnTypesList)
+    datesDf = df_plot.select_dtypes(include=dateColumnTypesList)
 
-    new_table = df.copy()
+    new_table = df_plot.copy()
     for index, row in new_table.iterrows():
         new_table.loc[index, 'Var_Name'] = new_table.loc[index, "id_label"] + "_" + new_table.loc[index, "Scenario"] + " " + new_table.loc[index, "Projection"] + " " + new_table.loc[index, "Variable_Mnemonic"]
 
@@ -27,41 +27,41 @@ def plotme_Model_Exec(self, df):
     flag_actual = True
     new_table2.dropna(subset=varlist2, how="all", inplace=True)
 
+    legend_elements = []
     for var1 in varlist2:
         df2 = new_table2.reindex(['date', var1], axis='columns')
 
         if (("SevAdv" in var1) or ("Severely" in var1)) and ("Actual" not in var1):
-            ax = df2.plot.line(ax=self.axes, x='date', y=str(var1), color='r', style=linestyle_list[sevadv_cntr])
+            ax = df2.plot.line(ax=self.axes, x='date', y=str(var1), color='r', style=linestyle_list[sevadv_cntr], label=var1)
             ax.yaxis.set_major_formatter(tick.FuncFormatter(self.reformat_large_tick_values))
             sevadv_cntr = sevadv_cntr + 1
             if sevadv_cntr >= len(linestyle_list):
                 sevadv_cntr = 0
 
         elif "Adv" in var1 and ("Actual" not in var1):
-            df2.plot.line(ax=self.axes, x='date', y=str(var1), color='b', style=linestyle_list[adv_cntr])
+            df2.plot.line(ax=self.axes, x='date', y=str(var1), color='b', style=linestyle_list[adv_cntr], label=var1)
             ax.yaxis.set_major_formatter(tick.FuncFormatter(self.reformat_large_tick_values))
             adv_cntr = adv_cntr + 1
             if adv_cntr >= len(linestyle_list):
                 adv_cntr = 0
 
         elif "Base" in var1 and ("Actual" not in var1):
-            ax = df2.plot.line(ax=self.axes, x='date', y=var1, color='g', style=linestyle_list[base_cntr])
+            ax = df2.plot.line(ax=self.axes, x='date', y=var1, color='g', style=linestyle_list[base_cntr], label=var1)
             ax.yaxis.set_major_formatter(tick.FuncFormatter(self.reformat_large_tick_values))
             base_cntr = base_cntr + 1
             if base_cntr >= len(linestyle_list):
                 base_cntr = 0
 
         elif flag_actual and ("New" in var1):
-            ax = df2.plot.line(ax=self.axes, x='date', y=var1, color='k', style=linestyle_list[0])
+            ax = df2.plot.line(ax=self.axes, x='date', y=var1, color='k', style=linestyle_list[0], label=var1)
             ax.yaxis.set_major_formatter(tick.FuncFormatter(self.reformat_large_tick_values))
             flag_actual = False
 
         elif ("Actual" in var1) and ("Exist" in var1):
-            ax = df2.plot.line(ax=self.axes, x='date', y=var1, color='k', style=linestyle_list[0])
+            ax = df2.plot.line(ax=self.axes, x='date', y=var1, color='k', style=linestyle_list[0], label=var1)
             ax.yaxis.set_major_formatter(tick.FuncFormatter(self.reformat_large_tick_values))
 
-    line_objects = self.axes.get_lines()
-    legend_labels = [line.get_label() for line in line_objects]
-    self.axes.legend(line_objects, legend_labels, loc='best')
+        legend_elements.append(ax.get_lines()[-1])
 
+    self.axes.legend(legend_elements, [line.get_label() for line in legend_elements], loc='best')
     self.draw()
