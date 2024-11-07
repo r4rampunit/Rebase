@@ -1,147 +1,67 @@
-import pandas as pd
-import datetime as dt
-import ast
-from dateutil import relativedelta as rd
+def plotme_Model_Exec(self, df):
+    self.figure.clf()
+    ax = self.figure.add_subplot(111)
+    ax.cla()
+    linestyle_list = ['-', '--', '-', '']
+    sevadv_cntr = 0
+    adv_cntr = 0
+    base_cntr = 0
 
-def Model_execution_PPNR(self, sql_db, models, run_info):
-    """
-    Execute PPNR models with improved variable handling
-    """
-    try:
-        # Reset index and initialize variables
-        models.reset_index(drop=True, inplace=True)
-        models_not_run = pd.DataFrame(columns=models.columns)
-        mdl_iter = models['Dependent_Variable_Name'].tolist()
-        
-        # Get list of MV and dependent variables
-        list_MV_vars = []
-        list_dep_vars = []
-        for mdl in range(len(mdl_iter)):
-            list_MV_vars += ast.literal_eval(models.iloc[mdl, models.columns.get_loc('Independent_Variable_Names')])
-            list_dep_vars.append(models.iloc[mdl, models.columns.get_loc('Dependent_Variable_Name')])
-        
-        # Default to FGDP_US if no MV vars
-        list_MV_vars = list(set(list_MV_vars)) if list_MV_vars else ['FGDP_US']
-        list_dep_vars = list(set(list_dep_vars))
-        
-        # Pull MV data from database
-        sql_db.open_connection()
-        start_date = '2000-01-01'
-        
-        # Prepare scenario list
-        scn_list = [
-            {
-                'Scenario': [scenario],
-                'Type': [run_info['type']],
-                'Purpose': [run_info['cycle']],
-                'Year': [int(run_info['year'])]
-            }
-            for scenario in run_info['scenarios']
-        ]
-        
-        # Get model data
-        new_mdldata = model()  # Assuming model() is defined elsewhere
-        mv_not_found = []
-        _, mv_not_found, deriv_hist = new_mdldata.return_DepIndep_data(
-            list_MV_vars, 
-            sql_db, 
-            start_date, 
-            run_info['Jumpoff'], 
-            scn_list, 
-            raw_data=pd.DataFrame([])
-        )
-        sql_db.close_connection()
-        
-        # Clean up variable names
-        deriv_hist.columns = (deriv_hist.columns
-            .str.replace("[$]", "")
-            .str.replace('30YMtg_Average', '_30YMtg_Average'))
-        
-        # Clean up not found variables
-        mv_not_found = list(set([sub.replace('pred', '').replace('$', '') for sub in mv_not_found]))
-        
-        # Update list_MV_vars
-        list_MV_vars = [
-            sub.replace('$', '').replace('30YMtg_Average', '_30YMtg_Average')
-            for sub in list_MV_vars if sub.replace('pred', '') not in mv_not_found
-        ]
-        
-        # Drop models with missing variables
-        models_to_run = models.copy()
-        for index, row in models.iterrows():
-            indep_vars = ast.literal_eval(row['Independent_Variable_Names'])
-            if set(mv_not_found) & set(indep_vars):
-                models_not_run = models_not_run.append(row)
-                models_not_run.iloc[-1, models_not_run.columns.get_loc('Reason')] = 'Independent variables not found'
-                models_to_run = models_to_run.drop([index])
-        
-        models_to_run.reset_index(drop=True, inplace=True)
-        models_not_run.reset_index(drop=True, inplace=True)
-        
-        # Clean Independent_Variable_Names
-        models_to_run['Independent_Variable_Names'] = (models_to_run['Independent_Variable_Names']
-            .str.replace('$', '')
-            .str.replace('30YMtg_Average', '_30YMtg_Average'))
-        
-        # Calculate projection end date
-        projection_enddate = (
-            dt.datetime.strptime(run_info['Jumpoff'], "%Y-%m-%d") + 
-            rd.relativedelta(months=run_info['projection_months']) + 
-            rd.relativedelta(day=31)
-        )
-        run_info['endProjectionsDate'] = projection_enddate.strftime("%Y-%m-%d")
-        
-        if models_to_run.empty:
-            # Handle empty models case
-            col_names = [
-                'Execution_Order', 'Execution Status', 'Timestamp', 'Cycle', 
-                'Type', 'Year', 'Scenario', 'Jumpoff', 'Portfolio', 'LOB', 
-                'GMIS_ID', 'Segment', 'Subsegment', 'Model Type', 'Projection',
-                'Variable_Mnemonic', 'Details', 'Frequency'
-            ]
-            
-            start_date = dt.date(2000, 1, 31)
-            end_date = dt.datetime.strptime(run_info['endProjectionsDate'], "%Y-%m-%d")
-            
-            months_diff = (
-                (rd.relativedelta(end_date, start_date).years * 12) + 
-                rd.relativedelta(end_date, start_date).months + 1
-            )
-            
-            col_dates = [
-                start_date + rd.relativedelta(months=n) + rd.relativedelta(day=31)
-                for n in range(months_diff)
-            ]
-            
-            col_names.extend(col_dates)
-            proji = pd.DataFrame(columns=col_names)
-        else:
-            # Transform data and score models
-            modelytics_MVdata = functions.MVdataTransform(
-                cycleInfo=run_info,
-                modelyticsMVfile=deriv_hist,
-                indepVarNames=list_MV_vars
-            )
-            
-            run_info['MVData'] = modelytics_MVdata
-            
-            # Transform dependent data
-            modelytics_depData = functions.depDataTransform(modelyticsDepDataFile=df)
-            modelytics_depData = modelytics_depData.loc[:, ~modelytics_depData.columns.duplicated()]
-            
-            # Score models
-            proji = functions.scoreFromExcel_PPNR(
-                self.modelscriptpath.text(),
-                models_to_run,
-                run_info,
-                modelytics_depData
-            )
-        
-        return models_to_run, models_not_run, proji
-        
-    except Exception as e:
-        print(f"Error in Model_execution_PPNR: {str(e)}")
-        print("Debug information:")
-        print(f"list_MV_vars: {list_MV_vars}")
-        print(f"deriv_hist columns: {deriv_hist.columns.tolist() if 'deriv_hist' in locals() else 'Not created'}")
-        raise
+    plt.style.use("seaborn-v0_8-ticks")
+
+    dateColumnTypesList = ['float64']
+    datesDf = df.select_dtypes(include=dateColumnTypesList)
+
+    new_table = df.copy()
+    for index, row in new_table.iterrows():
+        new_table.loc[index, 'Var_Name'] = new_table.loc[index, "id_label"] + "_" + new_table.loc[index, "Scenario"] + " " + new_table.loc[index, "Projection"] + " " + new_table.loc[index, "Variable_Mnemonic"]
+
+    varlist = ['Var_Name'] + datesDf.columns.tolist()
+    new_table2 = new_table.reindex(varlist, axis="columns")
+    varlist2 = new_table2.Var_Name.unique().tolist()
+    new_table2.set_index("Var_Name", inplace=True)
+    new_table2 = new_table2.T
+    new_table2 = new_table2.apply(pd.to_numeric)
+    new_table2.reset_index(inplace=True)
+    new_table2.rename(columns={"index": "date"}, inplace=True)
+    flag_actual = True
+    new_table2.dropna(subset=varlist2, how="all", inplace=True)
+
+    for var1 in varlist2:
+        df2 = new_table2.reindex(['date', var1], axis='columns')
+
+        if (("SevAdv" in var1) or ("Severely" in var1)) and ("Actual" not in var1):
+            ax = df2.plot.line(ax=self.axes, x='date', y=str(var1), color='r', style=linestyle_list[sevadv_cntr])
+            ax.yaxis.set_major_formatter(tick.FuncFormatter(self.reformat_large_tick_values))
+            sevadv_cntr = sevadv_cntr + 1
+            if sevadv_cntr >= len(linestyle_list):
+                sevadv_cntr = 0
+
+        elif "Adv" in var1 and ("Actual" not in var1):
+            df2.plot.line(ax=self.axes, x='date', y=str(var1), color='b', style=linestyle_list[adv_cntr])
+            ax.yaxis.set_major_formatter(tick.FuncFormatter(self.reformat_large_tick_values))
+            adv_cntr = adv_cntr + 1
+            if adv_cntr >= len(linestyle_list):
+                adv_cntr = 0
+
+        elif "Base" in var1 and ("Actual" not in var1):
+            ax = df2.plot.line(ax=self.axes, x='date', y=var1, color='g', style=linestyle_list[base_cntr])
+            ax.yaxis.set_major_formatter(tick.FuncFormatter(self.reformat_large_tick_values))
+            base_cntr = base_cntr + 1
+            if base_cntr >= len(linestyle_list):
+                base_cntr = 0
+
+        elif flag_actual and ("New" in var1):
+            ax = df2.plot.line(ax=self.axes, x='date', y=var1, color='k', style=linestyle_list[0])
+            ax.yaxis.set_major_formatter(tick.FuncFormatter(self.reformat_large_tick_values))
+            flag_actual = False
+
+        elif ("Actual" in var1) and ("Exist" in var1):
+            ax = df2.plot.line(ax=self.axes, x='date', y=var1, color='k', style=linestyle_list[0])
+            ax.yaxis.set_major_formatter(tick.FuncFormatter(self.reformat_large_tick_values))
+
+    line_objects = self.axes.get_lines()
+    legend_labels = [line.get_label() for line in line_objects]
+    self.axes.legend(line_objects, legend_labels, loc='best')
+
+    self.draw()
