@@ -1,15 +1,18 @@
+import pandas as pd
+import re
+
 def MVdataTransform(cycleInfo, modelyticsMVfile, indepVarNames):
-    MVData = []
-    data = modelyticsMVfile.copy()
-    data['date'] = data['date'].dt.date
-    data = data.set_index('date')
-
-    # Debug print to check inputs
-    print(f"Available columns: {data.columns.tolist()}")
-    print(f"Independent variables: {indepVarNames}")
-    print(f"Cycle info: {cycleInfo}")
-
-    # Helper function to get scenario value
+    """
+    Transform model variables data based on cycle information and scenarios.
+    
+    Args:
+        cycleInfo (dict): Dictionary containing cycle information including scenarios, type, and year
+        modelyticsMVfile (pd.DataFrame): Input DataFrame containing model variables
+        indepVarNames (list): List of independent variable names
+    
+    Returns:
+        list: List of transformed DataFrames for each scenario
+    """
     def get_scenario_val(scenario):
         scenario_mapping = {
             'Baseline': 'Base',
@@ -17,64 +20,72 @@ def MVdataTransform(cycleInfo, modelyticsMVfile, indepVarNames):
             'Severely Adverse': 'SevAdv'
         }
         return scenario_mapping.get(scenario, scenario)
-
+    
     try:
+        MVData = []
+        data = modelyticsMVfile.copy()
+        
+        # Convert date column to date type and set as index
+        data['date'] = pd.to_datetime(data['date']).dt.date
+        data = data.set_index('date')
+        
         # Add historical values to all forecasted variables
-        for aa in range(len(indepVarNames)):
-            for bb in range(len(cycleInfo['scenarios'])):
-                scenario_val = get_scenario_val(cycleInfo['scenarios'][bb])
+        for var_name in indepVarNames:
+            for scenario in cycleInfo['scenarios']:
+                scenario_val = get_scenario_val(scenario)
                 
-                # Construct column name
-                cc = f"{indepVarNames[aa]}_{cycleInfo['type']}_{scenario_val}_{cycleInfo['cycle']}_{cycleInfo['year']}"
+                # Construct column name with proper formatting
+                new_col = f"{var_name}_{cycleInfo['type']}_{scenario_val}_{cycleInfo['cycle']}_{cycleInfo['year']}"
                 
-                # Debug print
-                print(f"Processing column: {cc}")
-                
-                if cc not in data.columns:
-                    print(f"Warning: Column {cc} not found in DataFrame")
-                    # Create the column if it doesn't exist
-                    data[cc] = None
-                
-                # Fill NA values
-                if indepVarNames[aa] in data.columns:
-                    data[cc] = data[cc].fillna(data[indepVarNames[aa]])
+                # Handle the fillna operation safely
+                if var_name in data.columns:
+                    data[new_col] = data[new_col].fillna(data[var_name])
                 else:
-                    print(f"Warning: Source column {indepVarNames[aa]} not found")
-
+                    print(f"Warning: Variable {var_name} not found in data columns")
+        
         # Separate MVs into lists by scenarios
-        for dd in range(len(cycleInfo['scenarios'])):
-            scenario_val = get_scenario_val(cycleInfo['scenarios'][dd])
+        for scenario in cycleInfo['scenarios']:
+            scenario_val = get_scenario_val(scenario)
             
             # Create regex pattern for filtering
-            pattern = f"{cycleInfo['type']}_{scenario_val}_{cycleInfo['cycle']}_{cycleInfo['year']}$"
-            filtered_data = data.filter(regex=pattern)
+            pattern = f".*_{cycleInfo['type']}_{scenario_val}_{cycleInfo['cycle']}_{cycleInfo['year']}$"
             
-            # Debug print
-            print(f"Filtered columns for scenario {scenario_val}: {filtered_data.columns.tolist()}")
+            # Filter columns and append to MVData
+            scenario_data = data.filter(regex=pattern)
             
-            MVData.append(filtered_data)
-
-        # Process each scenario's data
-        for ee in range(len(MVData)):
-            scenario_val = get_scenario_val(cycleInfo['scenarios'][ee])
+            # Rename columns to remove scenario suffix
+            rename_dict = {}
+            for col in scenario_data.columns:
+                base_name = col.split('_')[0]  # Get the base variable name
+                if base_name in indepVarNames:
+                    rename_dict[col] = base_name
             
-            # Rename columns
-            for ff in range(len(indepVarNames)):
-                old_name = f"{indepVarNames[ff]}_{cycleInfo['type']}_{scenario_val}_{cycleInfo['cycle']}_{cycleInfo['year']}"
-                MVData[ee] = MVData[ee].rename(columns={old_name: indepVarNames[ff]})
+            scenario_data = scenario_data.rename(columns=rename_dict)
             
-            # Reset index and add month column
-            MVData[ee] = MVData[ee].reset_index()
-            MVData[ee] = MVData[ee].rename(columns={'index': 'date'})
-            MVData[ee]['month'] = pd.DatetimeIndex(MVData[ee]['date']).month
-            MVData[ee] = MVData[ee].set_index('date')
-
+            # Add month column and reset index
+            scenario_data = scenario_data.reset_index()
+            scenario_data['month'] = pd.to_datetime(scenario_data['date']).dt.month
+            scenario_data = scenario_data.set_index('date')
+            
+            MVData.append(scenario_data)
+        
         return MVData
-
+    
     except Exception as e:
         print(f"Error in MVdataTransform: {str(e)}")
-        print(f"Current state:")
-        print(f"- Processing independent variable: {indepVarNames[aa] if 'aa' in locals() else 'N/A'}")
-        print(f"- Current scenario: {scenario_val if 'scenario_val' in locals() else 'N/A'}")
-        print(f"- Attempting to process column: {cc if 'cc' in locals() else 'N/A'}")
+        print("Available columns:", data.columns.tolist())
+        print("Attempted scenario values:", [get_scenario_val(s) for s in cycleInfo['scenarios']])
         raise
+
+# Example usage:
+"""
+cycleInfo = {
+    'scenarios': ['Baseline', 'Adverse', 'Severely Adverse'],
+    'type': 'BHC',
+    'cycle': 'CCAR',
+    'year': 2024
+}
+modelyticsMVfile = pd.DataFrame(...)  # Your input DataFrame
+indepVarNames = ['FGOP_US_AD', ...]  # Your variable names
+result = MVdataTransform(cycleInfo, modelyticsMVfile, indepVarNames)
+"""
