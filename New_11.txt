@@ -27,41 +27,44 @@ def plotme_Model_Exec(self, df_plot):
     flag_actual = True
     new_table2.dropna(subset=varlist2, how="all", inplace=True)
 
-    legend_elements = []
+    lines = []
     for var1 in varlist2:
         df2 = new_table2.reindex(['date', var1], axis='columns')
 
         if (("SevAdv" in var1) or ("Severely" in var1)) and ("Actual" not in var1):
-            ax = df2.plot.line(ax=self.axes, x='date', y=str(var1), color='r', style=linestyle_list[sevadv_cntr], label=var1)
+            line, = ax.plot(df2['date'], df2[var1], color='r', linestyle=linestyle_list[sevadv_cntr], label=var1)
             ax.yaxis.set_major_formatter(tick.FuncFormatter(self.reformat_large_tick_values))
             sevadv_cntr = sevadv_cntr + 1
             if sevadv_cntr >= len(linestyle_list):
                 sevadv_cntr = 0
+            lines.append(line)
 
         elif "Adv" in var1 and ("Actual" not in var1):
-            df2.plot.line(ax=self.axes, x='date', y=str(var1), color='b', style=linestyle_list[adv_cntr], label=var1)
+            line, = ax.plot(df2['date'], df2[var1], color='b', linestyle=linestyle_list[adv_cntr], label=var1)
             ax.yaxis.set_major_formatter(tick.FuncFormatter(self.reformat_large_tick_values))
             adv_cntr = adv_cntr + 1
             if adv_cntr >= len(linestyle_list):
                 adv_cntr = 0
+            lines.append(line)
 
         elif "Base" in var1 and ("Actual" not in var1):
-            ax = df2.plot.line(ax=self.axes, x='date', y=var1, color='g', style=linestyle_list[base_cntr], label=var1)
+            line, = ax.plot(df2['date'], df2[var1], color='g', linestyle=linestyle_list[base_cntr], label=var1)
             ax.yaxis.set_major_formatter(tick.FuncFormatter(self.reformat_large_tick_values))
             base_cntr = base_cntr + 1
             if base_cntr >= len(linestyle_list):
                 base_cntr = 0
+            lines.append(line)
 
         elif flag_actual and ("New" in var1):
-            ax = df2.plot.line(ax=self.axes, x='date', y=var1, color='k', style=linestyle_list[0], label=var1)
+            line, = ax.plot(df2['date'], df2[var1], color='k', linestyle=linestyle_list[0], label=var1)
             ax.yaxis.set_major_formatter(tick.FuncFormatter(self.reformat_large_tick_values))
             flag_actual = False
+            lines.append(line)
 
         elif ("Actual" in var1) and ("Exist" in var1):
-            ax = df2.plot.line(ax=self.axes, x='date', y=var1, color='k', style=linestyle_list[0], label=var1)
+            line, = ax.plot(df2['date'], df2[var1], color='k', linestyle=linestyle_list[0], label=var1)
             ax.yaxis.set_major_formatter(tick.FuncFormatter(self.reformat_large_tick_values))
+            lines.append(line)
 
-        legend_elements.append(ax.get_lines()[-1])
-
-    self.axes.legend(legend_elements, [line.get_label() for line in legend_elements], loc='best')
+    self.axes.legend(lines, [line.get_label() for line in lines], loc='best')
     self.draw()
