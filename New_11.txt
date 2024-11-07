@@ -1,70 +1,29 @@
-def plotme_Model_Exec(self, df_plot):
-    self.figure.clf()
-    ax = self.figure.add_subplot(111)
-    ax.cla()
-    linestyle_list = ['-', '--', '-', '']
-    sevadv_cntr = 0
-    adv_cntr = 0
-    base_cntr = 0
+def _make_legend(self):
+    ax, leg = self._get_ax_legend(self.axes[0])
+    handles = []
+    labels = []
+    title = ""
 
-    plt.style.use("seaborn-v0_8-ticks")
+    if not self.subplots:
+        if leg is not None:
+            title = leg.get_title().get_text()
+            handles = [line.get_lines()[0] for line in leg.get_lines()]
+            labels = [line.get_label() for line in leg.get_lines()]
 
-    dateColumnTypesList = ['float64']
-    datesDf = df_plot.select_dtypes(include=dateColumnTypesList)
+    if self.legend:
+        if self.legend == "reverse":
+            self.legend_handles = list(reversed(self.legend_handles))  # type: ignore[assignment]
+            self.legend_labels = list(reversed(self.legend_labels))  # type: ignore[assignment]
 
-    new_table = df_plot.copy()
-    for index, row in new_table.iterrows():
-        new_table.loc[index, 'Var_Name'] = new_table.loc[index, "id_label"] + "_" + new_table.loc[index, "Scenario"] + " " + new_table.loc[index, "Projection"] + " " + new_table.loc[index, "Variable_Mnemonic"]
+        handles += self.legend_handles
+        labels += self.legend_labels
 
-    varlist = ['Var_Name'] + datesDf.columns.tolist()
-    new_table2 = new_table.reindex(varlist, axis="columns")
-    varlist2 = new_table2.Var_Name.unique().tolist()
-    new_table2.set_index("Var_Name", inplace=True)
-    new_table2 = new_table2.T
-    new_table2 = new_table2.apply(pd.to_numeric)
-    new_table2.reset_index(inplace=True)
-    new_table2.rename(columns={"index": "date"}, inplace=True)
-    flag_actual = True
-    new_table2.dropna(subset=varlist2, how="all", inplace=True)
+    if self.legend_title is not None:
+        title = self.legend_title
 
-    lines = []
-    for var1 in varlist2:
-        df2 = new_table2.reindex(['date', var1], axis='columns')
-
-        if (("SevAdv" in var1) or ("Severely" in var1)) and ("Actual" not in var1):
-            line, = ax.plot(df2['date'], df2[var1], color='r', linestyle=linestyle_list[sevadv_cntr], label=var1)
-            ax.yaxis.set_major_formatter(tick.FuncFormatter(self.reformat_large_tick_values))
-            sevadv_cntr = sevadv_cntr + 1
-            if sevadv_cntr >= len(linestyle_list):
-                sevadv_cntr = 0
-            lines.append(line)
-
-        elif "Adv" in var1 and ("Actual" not in var1):
-            line, = ax.plot(df2['date'], df2[var1], color='b', linestyle=linestyle_list[adv_cntr], label=var1)
-            ax.yaxis.set_major_formatter(tick.FuncFormatter(self.reformat_large_tick_values))
-            adv_cntr = adv_cntr + 1
-            if adv_cntr >= len(linestyle_list):
-                adv_cntr = 0
-            lines.append(line)
-
-        elif "Base" in var1 and ("Actual" not in var1):
-            line, = ax.plot(df2['date'], df2[var1], color='g', linestyle=linestyle_list[base_cntr], label=var1)
-            ax.yaxis.set_major_formatter(tick.FuncFormatter(self.reformat_large_tick_values))
-            base_cntr = base_cntr + 1
-            if base_cntr >= len(linestyle_list):
-                base_cntr = 0
-            lines.append(line)
-
-        elif flag_actual and ("New" in var1):
-            line, = ax.plot(df2['date'], df2[var1], color='k', linestyle=linestyle_list[0], label=var1)
-            ax.yaxis.set_major_formatter(tick.FuncFormatter(self.reformat_large_tick_values))
-            flag_actual = False
-            lines.append(line)
-
-        elif ("Actual" in var1) and ("Exist" in var1):
-            line, = ax.plot(df2['date'], df2[var1], color='k', linestyle=linestyle_list[0], label=var1)
-            ax.yaxis.set_major_formatter(tick.FuncFormatter(self.reformat_large_tick_values))
-            lines.append(line)
-
-    self.axes.legend(lines, [line.get_label() for line in lines], loc='best')
-    self.draw()
+    if len(handles) > 0:
+        ax.legend(handles, labels, loc="best", title=title)
+    elif self.subplots and self.legend:
+        for ax in self.axes:
+            if ax.get_visible():
+                ax.legend(loc="best")
