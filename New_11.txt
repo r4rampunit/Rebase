@@ -1,29 +1,59 @@
-def _make_legend(self):
-    ax, leg = self._get_ax_legend(self.axes[0])
-    handles = []
-    labels = []
-    title = ""
+import pandas as pd
+import sqlite3
+from datetime import datetime
 
-    if not self.subplots:
-        if leg is not None:
-            title = leg.get_title().get_text()
-            handles = [line.get_lines()[0] for line in leg.get_lines()]
-            labels = [line.get_label() for line in leg.get_lines()]
+def update_monthly_table(sqlite_path, excel_path):
+    # Read Excel file
+    df_excel = pd.read_excel(excel_path)
+    
+    # Convert Excel date column to datetime format and standardize the format
+    df_excel['Date'] = pd.to_datetime(df_excel['Date'])
+    df_excel['Date'] = df_excel['Date'].dt.strftime('%Y-%m-%d 00:00:00')
+    
+    # Create SQLite connection
+    conn = sqlite3.connect(sqlite_path)
+    
+    try:
+        # Read the existing Monthly table
+        df_sqlite = pd.read_sql_query("SELECT * FROM MonthlyTable", conn)
+        
+        # Convert SQLite date column to the same format as Excel
+        df_sqlite['Date'] = pd.to_datetime(df_sqlite['Date'])
+        df_sqlite['Date'] = df_sqlite['Date'].dt.strftime('%Y-%m-%d 00:00:00')
+        
+        # Create update query
+        update_query = """
+        UPDATE MonthlyTable 
+        SET FMOF14RQ_US = ? 
+        WHERE Date = ?
+        """
+        
+        # Create cursor
+        cursor = conn.cursor()
+        
+        # Counter for tracking updates
+        updates_count = 0
+        
+        # Iterate through Excel data and update matching records
+        for index, row in df_excel.iterrows():
+            if pd.notna(row['FMOF14RQ_US']):  # Only update if value is not NaN
+                cursor.execute(update_query, (row['FMOF14RQ_US'], row['Date']))
+                updates_count += cursor.rowcount
+        
+        # Commit the changes
+        conn.commit()
+        
+        print(f"Successfully updated {updates_count} records in the database.")
+        
+    except Exception as e:
+        print(f"An error occurred: {str(e)}")
+        conn.rollback()
+    
+    finally:
+        conn.close()
 
-    if self.legend:
-        if self.legend == "reverse":
-            self.legend_handles = list(reversed(self.legend_handles))  # type: ignore[assignment]
-            self.legend_labels = list(reversed(self.legend_labels))  # type: ignore[assignment]
+# Example usage
+sqlite_path = "path/to/your/database.sqlite"
+excel_path = "path/to/your/excel_file.xlsx"
 
-        handles += self.legend_handles
-        labels += self.legend_labels
-
-    if self.legend_title is not None:
-        title = self.legend_title
-
-    if len(handles) > 0:
-        ax.legend(handles, labels, loc="best", title=title)
-    elif self.subplots and self.legend:
-        for ax in self.axes:
-            if ax.get_visible():
-                ax.legend(loc="best")
+update_monthly_table(sqlite_path, excel_path)
