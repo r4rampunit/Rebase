@@ -1,107 +1,110 @@
-import pandas as pd
-import sqlite3
-from datetime import datetime
-import logging
-
-# Set up logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-def update_monthly_table(sqlite_path, excel_path):
-    logger.info("Starting database update process")
+def transformBackDepDataQQ(self, Dep_Data_Qtr, depVar, transform, toDate, extention):
+    """
+    Transform back dependent data with quarterly adjustments
     
+    Parameters:
+        Dep_Data_Qtr: DataFrame containing the dependent data
+        depVar: Name of the dependent variable
+        transform: Type of transformation to apply
+        toDate: Date to start transformation from
+        extention: Extension to add to column names
+    """
     try:
-        # Read Excel file
-        logger.info("Reading Excel file...")
-        df_excel = pd.read_excel(excel_path)
+        # Get location of the date
+        te = Dep_Data_Qtr.index.get_loc(toDate)
         
-        if 'Date' not in df_excel.columns or 'FMOF14RQ_US' not in df_excel.columns:
-            raise ValueError("Required columns 'Date' and 'FMOF14RQ_US' not found in Excel file")
+        # Reset index for easier manipulation
+        Dep_Data_Qtr = Dep_Data_Qtr.reset_index()
         
-        # Convert Excel Date column
-        df_excel['Date'] = pd.to_datetime(df_excel['Date'])
-        df_excel['Date'] = df_excel['Date'].dt.strftime('%Y-%m-%d 00:00:00')
+        # Copy initial values
+        Dep_Data_Qtr.loc[te, f"{depVar}_{extention}"] = Dep_Data_Qtr.loc[te, depVar]
         
-        # Create SQLite connection
-        logger.info("Connecting to SQLite database...")
-        conn = sqlite3.connect(sqlite_path)
-        
-        try:
-            # Verify table exists
-            cursor = conn.cursor()
-            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='MonthlyTable'")
-            if not cursor.fetchone():
-                raise ValueError("MonthlyTable does not exist in the database")
+        # Apply transformations based on type
+        if transform.upper() == "AQ":  # Quarterly Adjustment
+            for i in range(te + 1, Dep_Data_Qtr.shape[0]):
+                Dep_Data_Qtr.loc[i, f"{depVar}_{extention}"] = (
+                    Dep_Data_Qtr.loc[i-1, f"{depVar}_{extention}"] + 
+                    Dep_Data_Qtr.loc[i, f"{extention[1:]}"]
+                )
+                
+        elif transform.upper() == "HY":  # Half-Yearly Adjustment
+            for i in range(te + 1, Dep_Data_Qtr.shape[0]):
+                Dep_Data_Qtr.loc[i, f"{depVar}_{extention}"] = (
+                    Dep_Data_Qtr.loc[i-2, f"{depVar}_{extention}"] + 
+                    Dep_Data_Qtr.loc[i, f"{extention[1:]}"]
+                )
+                
+        elif transform.upper() == "AY":  # Yearly Adjustment
+            for i in range(te + 1, Dep_Data_Qtr.shape[0]):
+                Dep_Data_Qtr.loc[i, f"{depVar}_{extention}"] = (
+                    Dep_Data_Qtr.loc[i-4, f"{depVar}_{extention}"] + 
+                    Dep_Data_Qtr.loc[i, f"{extention[1:]}"]
+                )
+                
+        elif transform.upper() == "PQ":  # Quarterly Percentage
+            for i in range(te + 1, Dep_Data_Qtr.shape[0]):
+                Dep_Data_Qtr.loc[i, f"{depVar}_{extention}"] = (
+                    Dep_Data_Qtr.loc[i-1, f"{depVar}_{extention}"] * 
+                    (1 + Dep_Data_Qtr.loc[i, f"{extention[1:]}"])
+                )
+                
+        elif transform.upper() == "PH":  # Half-Yearly Percentage
+            for i in range(te + 1, Dep_Data_Qtr.shape[0]):
+                Dep_Data_Qtr.loc[i, f"{depVar}_{extention}"] = (
+                    Dep_Data_Qtr.loc[i-2, f"{depVar}_{extention}"] * 
+                    (1 + Dep_Data_Qtr.loc[i, f"{extention[1:]}"])
+                )
+                
+        elif transform.upper() == "PY":  # Yearly Percentage
+            for i in range(te + 1, Dep_Data_Qtr.shape[0]):
+                Dep_Data_Qtr.loc[i, f"{depVar}_{extention}"] = (
+                    Dep_Data_Qtr.loc[i-4, f"{depVar}_{extention}"] * 
+                    (1 + Dep_Data_Qtr.loc[i, f"{extention[1:]}"])
+                )
+                
+        elif transform.upper() == "LAQ":  # Log Adjusted Quarterly
+            for i in range(te + 1, Dep_Data_Qtr.shape[0]):
+                Dep_Data_Qtr.loc[i, f"{depVar}_{extention}"] = (
+                    Dep_Data_Qtr.loc[i-1, f"{depVar}_{extention}"] * 
+                    np.exp(Dep_Data_Qtr.loc[i, f"{extention[1:]}"])
+                )
+                
+        elif transform.upper() == "LHY":  # Log Adjusted Half-Yearly
+            for i in range(te + 1, Dep_Data_Qtr.shape[0]):
+                Dep_Data_Qtr.loc[i, f"{depVar}_{extention}"] = (
+                    Dep_Data_Qtr.loc[i-2, f"{depVar}_{extention}"] * 
+                    np.exp(Dep_Data_Qtr.loc[i, f"{extention[1:]}"])
+                )
+                
+        elif transform.upper() == "LAY":  # Log Adjusted Yearly
+            for i in range(te + 1, Dep_Data_Qtr.shape[0]):
+                Dep_Data_Qtr.loc[i, f"{depVar}_{extention}"] = (
+                    Dep_Data_Qtr.loc[i-4, f"{depVar}_{extention}"] * 
+                    np.exp(Dep_Data_Qtr.loc[i, f"{extention[1:]}"])
+                )
+                
+        elif transform.upper() == "UN":  # Unadjusted
+            for i in range(te + 1, Dep_Data_Qtr.shape[0]):
+                Dep_Data_Qtr.loc[i, f"{depVar}_{extention}"] = (
+                    np.exp(Dep_Data_Qtr.loc[i, f"{extention[1:]}"])
+                )
+                
+        elif transform.upper() in ['NT', '3QMA', '4QMA', '12A', '4QMA', '8QMA', '9QMA']:
+            for i in range(te + 1, Dep_Data_Qtr.shape[0]):
+                Dep_Data_Qtr.loc[i, f"{depVar}_{extention}"] = (
+                    Dep_Data_Qtr.loc[i, f"{extention[1:]}"]
+                )
+                
+        else:
+            print("\n\nError!\n\nIncorrectly defined transformation of dependent variable.\n\n")
+            Dep_Data_Qtr.loc[te:te + 1, f"{depVar}_{extention}"] = np.nan
             
-            # Read existing data - using lowercase 'date' column name for SQLite query
-            logger.info("Reading existing database records...")
-            df_sqlite = pd.read_sql_query("SELECT date, FMOF14RQ_US FROM MonthlyTable", conn)
-            
-            # Convert SQLite date column - note we're using lowercase 'date'
-            df_sqlite['date'] = pd.to_datetime(df_sqlite['date'])
-            df_sqlite['date'] = df_sqlite['date'].dt.strftime('%Y-%m-%d 00:00:00')
-            
-            # Create update query - using lowercase 'date' for SQLite
-            update_query = """
-            UPDATE MonthlyTable 
-            SET FMOF14RQ_US = ? 
-            WHERE date = ?
-            """
-            
-            # Counter for tracking updates
-            updates_count = 0
-            skipped_count = 0
-            
-            # Iterate through Excel data
-            logger.info("Updating database records...")
-            for index, row in df_excel.iterrows():
-                if pd.notna(row['FMOF14RQ_US']):
-                    try:
-                        cursor.execute(update_query, (float(row['FMOF14RQ_US']), row['Date']))
-                        updates_count += cursor.rowcount
-                        if cursor.rowcount == 0:
-                            logger.warning(f"No matching record found for date: {row['Date']}")
-                    except sqlite3.Error as e:
-                        logger.error(f"Error updating record for date {row['Date']}: {str(e)}")
-                else:
-                    skipped_count += 1
-            
-            # Commit the changes
-            conn.commit()
-            
-            logger.info(f"Update complete: {updates_count} records updated, {skipped_count} records skipped")
-            
-            # Verify updates
-            logger.info("Verifying updates...")
-            for index, row in df_excel.iterrows():
-                if pd.notna(row['FMOF14RQ_US']):
-                    cursor.execute(
-                        "SELECT FMOF14RQ_US FROM MonthlyTable WHERE date = ?", 
-                        (row['Date'],)
-                    )
-                    result = cursor.fetchone()
-                    if result and abs(result[0] - row['FMOF14RQ_US']) > 0.0001:
-                        logger.warning(f"Verification failed for date {row['Date']}")
-            
-        except Exception as e:
-            logger.error(f"Database error occurred: {str(e)}")
-            conn.rollback()
-            raise
-        
-        finally:
-            conn.close()
-            logger.info("Database connection closed")
-            
-    except Exception as e:
-        logger.error(f"Process failed: {str(e)}")
+    except KeyError as e:
+        print(f"Date {toDate} not found in index. Please check the date format and availability.")
         raise
-
-if __name__ == "__main__":
-    # Replace these paths with your actual paths
-    sqlite_path = "path/to/your/database.sqlite"
-    excel_path = "path/to/your/excel_file.xlsx"
-    
-    try:
-        update_monthly_table(sqlite_path, excel_path)
+        
     except Exception as e:
-        logger.error(f"Script execution failed: {str(e)}")
+        print(f"An error occurred: {str(e)}")
+        raise
+        
+    return Dep_Data_Qtr
