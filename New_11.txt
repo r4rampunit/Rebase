@@ -1,203 +1,48 @@
-def LINscoring(self):
-    try:
-        # Early validation of date data
-        if hasattr(self, 'start_date'):
-            if pd.isna(self.start_date):
-                # Use the next valid date if start_date is NaT
-                valid_dates = ds_1_copy.index.dropna()
-                if len(valid_dates) > 0:
-                    self.start_date = valid_dates[0]
-                else:
-                    raise ValueError("No valid dates found in the dataset")
-        
-        # Clean the DataFrame index before processing
-        ds_1_copy = self.ds_1.copy()
-        
-        # Remove any NaT from index or replace with next valid date
-        if pd.api.types.is_datetime64_any_dtype(ds_1_copy.index):
-            # Option 1: Remove rows with NaT in index
-            ds_1_copy = ds_1_copy[ds_1_copy.index.notna()]
+def MVdataTransform(cycleInfo, modelyticsMVfile, indepVarNames):
+    MVData = []
+    data = modelyticsMVfile.copy()
+    
+    # Convert date column to date type and set as index
+    data['date'] = pd.to_datetime(data['date']).dt.date
+    data = data.set_index('date')
+    
+    # Add historical values to all forecasted variables
+    for aa in range(len(indepVarNames)):
+        for bb in range(len(cycleInfo['Scenario'])):
+            # Scenario value mapping
+            scenario_val = ('Base' if (cycleInfo['Scenario'][bb] == 'Baseline') else 
+                            ('Adv' if (cycleInfo['Scenario'][bb] == 'Adverse') else 
+                            ('SevAdv' if (cycleInfo['Scenario'][bb] == 'Severely Adverse') else 
+                            cycleInfo['Scenario'][bb])))
             
-            # Option 2 (alternative): Forward fill NaT dates
-            # ds_1_copy.index = ds_1_copy.index.fillna(method='ffill')
-        
-        # Ensure index is datetime
-        if not pd.api.types.is_datetime64_any_dtype(ds_1_copy.index):
-            ds_1_copy.index = pd.to_datetime(ds_1_copy.index, errors='coerce')
-            ds_1_copy = ds_1_copy[ds_1_copy.index.notna()]
-        
-        # Now proceed with your existing LINscoring logic
-        self.projections = self.transformBackDepDataQQ(
-            ds_1_copy,
-            self.depVarName,
-            self.depVarTransform,
-            self.start_date,
-            'pred'
-        )
-        
-        return self.projections
-        
-    except Exception as e:
-        print(f"Error in LINscoring: {str(e)}")
-        # Return original data or handle error as needed
-        return self.ds_1
-
-
-
-
-
-def transformBackDepDataQQ(self, Dep_Data_Qtr, depVar, transform, toDate, extention):
-    """
-    Transform back dependent data with quarterly adjustments
-    
-    Parameters:
-        Dep_Data_Qtr: DataFrame containing the dependent data
-        depVar: Name of the dependent variable
-        transform: Type of transformation to apply
-        toDate: Date to start transformation from
-        extention: Extension to add to column names
-    """
-    # Debug prints
-    print(f"Input toDate: {toDate}, Type: {type(toDate)}")
-    print(f"Index dtype: {Dep_Data_Qtr.index.dtype}")
-    print(f"First few dates in index: {Dep_Data_Qtr.index[:5]}")
-    
-    # Check for NaT in toDate
-    if pd.isna(toDate):
-        raise ValueError("toDate is NaT (Not a Time). Please provide a valid date.")
-    
-    # Ensure toDate is datetime
-    try:
-        if not isinstance(toDate, pd.Timestamp):
-            toDate = pd.to_datetime(toDate)
-    except Exception as e:
-        print(f"Error converting toDate: {str(e)}")
-        raise
-    
-    # Ensure index is datetime
-    if not pd.api.types.is_datetime64_any_dtype(Dep_Data_Qtr.index):
-        try:
-            Dep_Data_Qtr.index = pd.to_datetime(Dep_Data_Qtr.index)
-        except Exception as e:
-            print(f"Error converting index to datetime: {str(e)}")
-            raise
-    
-    try:
-        # Get location of the date
-        te = Dep_Data_Qtr.index.get_loc(toDate)
-        
-        # Reset index for easier manipulation
-        Dep_Data_Qtr = Dep_Data_Qtr.reset_index()
-        
-        # Create the new column name
-        new_col = f"{depVar}_{extention}"
-        
-        # Initialize the new column if it doesn't exist
-        if new_col not in Dep_Data_Qtr.columns:
-            Dep_Data_Qtr[new_col] = np.nan
-        
-        # Copy initial values
-        Dep_Data_Qtr.loc[te, new_col] = Dep_Data_Qtr.loc[te, depVar]
-        
-        # Apply transformations based on type
-        transform = transform.upper()
-        
-        if transform == "AQ":  # Quarterly Adjustment
-            for i in range(te + 1, Dep_Data_Qtr.shape[0]):
-                Dep_Data_Qtr.loc[i, new_col] = (
-                    Dep_Data_Qtr.loc[i-1, new_col] + 
-                    Dep_Data_Qtr.loc[i, f"{extention[1:]}"]
-                )
-                
-        elif transform == "HY":  # Half-Yearly Adjustment
-            for i in range(te + 1, Dep_Data_Qtr.shape[0]):
-                if i >= 2:  # Ensure we don't access negative indices
-                    Dep_Data_Qtr.loc[i, new_col] = (
-                        Dep_Data_Qtr.loc[i-2, new_col] + 
-                        Dep_Data_Qtr.loc[i, f"{extention[1:]}"]
-                    )
-                
-        elif transform == "AY":  # Yearly Adjustment
-            for i in range(te + 1, Dep_Data_Qtr.shape[0]):
-                if i >= 4:  # Ensure we don't access negative indices
-                    Dep_Data_Qtr.loc[i, new_col] = (
-                        Dep_Data_Qtr.loc[i-4, new_col] + 
-                        Dep_Data_Qtr.loc[i, f"{extention[1:]}"]
-                    )
-                
-        elif transform == "PQ":  # Quarterly Percentage
-            for i in range(te + 1, Dep_Data_Qtr.shape[0]):
-                Dep_Data_Qtr.loc[i, new_col] = (
-                    Dep_Data_Qtr.loc[i-1, new_col] * 
-                    (1 + Dep_Data_Qtr.loc[i, f"{extention[1:]}"])
-                )
-                
-        elif transform == "PH":  # Half-Yearly Percentage
-            for i in range(te + 1, Dep_Data_Qtr.shape[0]):
-                if i >= 2:
-                    Dep_Data_Qtr.loc[i, new_col] = (
-                        Dep_Data_Qtr.loc[i-2, new_col] * 
-                        (1 + Dep_Data_Qtr.loc[i, f"{extention[1:]}"])
-                    )
-                
-        elif transform == "PY":  # Yearly Percentage
-            for i in range(te + 1, Dep_Data_Qtr.shape[0]):
-                if i >= 4:
-                    Dep_Data_Qtr.loc[i, new_col] = (
-                        Dep_Data_Qtr.loc[i-4, new_col] * 
-                        (1 + Dep_Data_Qtr.loc[i, f"{extention[1:]}"])
-                    )
-                
-        elif transform == "LAQ":  # Log Adjusted Quarterly
-            for i in range(te + 1, Dep_Data_Qtr.shape[0]):
-                Dep_Data_Qtr.loc[i, new_col] = (
-                    Dep_Data_Qtr.loc[i-1, new_col] * 
-                    np.exp(Dep_Data_Qtr.loc[i, f"{extention[1:]}"])
-                )
-                
-        elif transform == "LHY":  # Log Adjusted Half-Yearly
-            for i in range(te + 1, Dep_Data_Qtr.shape[0]):
-                if i >= 2:
-                    Dep_Data_Qtr.loc[i, new_col] = (
-                        Dep_Data_Qtr.loc[i-2, new_col] * 
-                        np.exp(Dep_Data_Qtr.loc[i, f"{extention[1:]}"])
-                    )
-                
-        elif transform == "LAY":  # Log Adjusted Yearly
-            for i in range(te + 1, Dep_Data_Qtr.shape[0]):
-                if i >= 4:
-                    Dep_Data_Qtr.loc[i, new_col] = (
-                        Dep_Data_Qtr.loc[i-4, new_col] * 
-                        np.exp(Dep_Data_Qtr.loc[i, f"{extention[1:]}"])
-                    )
-                
-        elif transform == "UN":  # Unadjusted
-            for i in range(te + 1, Dep_Data_Qtr.shape[0]):
-                Dep_Data_Qtr.loc[i, new_col] = (
-                    np.exp(Dep_Data_Qtr.loc[i, f"{extention[1:]}"])
-                )
-                
-        elif transform in ['NT', '3QMA', '4QMA', '12A', '4QMA', '8QMA', '9QMA']:
-            for i in range(te + 1, Dep_Data_Qtr.shape[0]):
-                Dep_Data_Qtr.loc[i, new_col] = (
-                    Dep_Data_Qtr.loc[i, f"{extention[1:]}"]
-                )
-                
-        else:
-            print(f"\n\nError!\n\nIncorrectly defined transformation: {transform}\n\n")
-            Dep_Data_Qtr.loc[te:te + 1, new_col] = np.nan
+            # Construct column name
+            cc = f"{indepVarNames[aa]}_{cycleInfo['Type'][0]}_{scenario_val}_{cycleInfo['Purpose'][0]}_{cycleInfo['Year'][0]}"
             
-    except KeyError as e:
-        print(f"Date {toDate} not found in index.")
-        print(f"Available dates: {Dep_Data_Qtr.index.tolist()[:5]}...")
-        raise
+            # Fill NA values with historical values
+            data[cc] = data[cc].fillna(data[indepVarNames[aa]])
+    
+    # Separate MVs into lists by scenarios
+    for dd in range(len(cycleInfo['Scenario'])):
+        # Scenario value mapping
+        scenario_val = ('Base' if (cycleInfo['Scenario'][dd] == 'Baseline') else 
+                        ('Adv' if (cycleInfo['Scenario'][dd] == 'Adverse') else 
+                        ('SevAdv' if (cycleInfo['Scenario'][dd] == 'Severely Adverse') else 
+                        cycleInfo['Scenario'][dd])))
         
-    except Exception as e:
-        print(f"An error occurred: {str(e)}")
-        print(f"Current state:")
-        print(f"toDate: {toDate}")
-        print(f"te: {te if 'te' in locals() else 'not set'}")
-        print(f"Columns: {Dep_Data_Qtr.columns.tolist()}")
-        raise
+        # Filter data for specific scenario
+        scenario_data = data.filter(regex=f'{cycleInfo["Type"][0]}_{scenario_val}_{cycleInfo["Purpose"][0]}_{cycleInfo["Year"][0]}$')
         
-    return Dep_Data_Qtr
+        # Rename columns
+        for ee in range(len(indepVarNames)):
+            old_col = f"{indepVarNames[ee]}_{cycleInfo['Type'][0]}_{scenario_val}_{cycleInfo['Purpose'][0]}_{cycleInfo['Year'][0]}"
+            scenario_data = scenario_data.rename(columns={old_col: indepVarNames[ee]})
+        
+        # Reset index and add month column
+        scenario_data = scenario_data.reset_index()
+        scenario_data = scenario_data.rename(columns={'index': 'date'})
+        scenario_data['month'] = pd.DatetimeIndex(scenario_data['date']).month
+        scenario_data = scenario_data.set_index('date')
+        
+        MVData.append(scenario_data)
+    
+    return MVData
