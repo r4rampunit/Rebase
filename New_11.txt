@@ -1,3 +1,51 @@
+def LINscoring(self):
+    try:
+        # Early validation of date data
+        if hasattr(self, 'start_date'):
+            if pd.isna(self.start_date):
+                # Use the next valid date if start_date is NaT
+                valid_dates = ds_1_copy.index.dropna()
+                if len(valid_dates) > 0:
+                    self.start_date = valid_dates[0]
+                else:
+                    raise ValueError("No valid dates found in the dataset")
+        
+        # Clean the DataFrame index before processing
+        ds_1_copy = self.ds_1.copy()
+        
+        # Remove any NaT from index or replace with next valid date
+        if pd.api.types.is_datetime64_any_dtype(ds_1_copy.index):
+            # Option 1: Remove rows with NaT in index
+            ds_1_copy = ds_1_copy[ds_1_copy.index.notna()]
+            
+            # Option 2 (alternative): Forward fill NaT dates
+            # ds_1_copy.index = ds_1_copy.index.fillna(method='ffill')
+        
+        # Ensure index is datetime
+        if not pd.api.types.is_datetime64_any_dtype(ds_1_copy.index):
+            ds_1_copy.index = pd.to_datetime(ds_1_copy.index, errors='coerce')
+            ds_1_copy = ds_1_copy[ds_1_copy.index.notna()]
+        
+        # Now proceed with your existing LINscoring logic
+        self.projections = self.transformBackDepDataQQ(
+            ds_1_copy,
+            self.depVarName,
+            self.depVarTransform,
+            self.start_date,
+            'pred'
+        )
+        
+        return self.projections
+        
+    except Exception as e:
+        print(f"Error in LINscoring: {str(e)}")
+        # Return original data or handle error as needed
+        return self.ds_1
+
+
+
+
+
 def transformBackDepDataQQ(self, Dep_Data_Qtr, depVar, transform, toDate, extention):
     """
     Transform back dependent data with quarterly adjustments
@@ -9,6 +57,31 @@ def transformBackDepDataQQ(self, Dep_Data_Qtr, depVar, transform, toDate, extent
         toDate: Date to start transformation from
         extention: Extension to add to column names
     """
+    # Debug prints
+    print(f"Input toDate: {toDate}, Type: {type(toDate)}")
+    print(f"Index dtype: {Dep_Data_Qtr.index.dtype}")
+    print(f"First few dates in index: {Dep_Data_Qtr.index[:5]}")
+    
+    # Check for NaT in toDate
+    if pd.isna(toDate):
+        raise ValueError("toDate is NaT (Not a Time). Please provide a valid date.")
+    
+    # Ensure toDate is datetime
+    try:
+        if not isinstance(toDate, pd.Timestamp):
+            toDate = pd.to_datetime(toDate)
+    except Exception as e:
+        print(f"Error converting toDate: {str(e)}")
+        raise
+    
+    # Ensure index is datetime
+    if not pd.api.types.is_datetime64_any_dtype(Dep_Data_Qtr.index):
+        try:
+            Dep_Data_Qtr.index = pd.to_datetime(Dep_Data_Qtr.index)
+        except Exception as e:
+            print(f"Error converting index to datetime: {str(e)}")
+            raise
+    
     try:
         # Get location of the date
         te = Dep_Data_Qtr.index.get_loc(toDate)
@@ -16,95 +89,115 @@ def transformBackDepDataQQ(self, Dep_Data_Qtr, depVar, transform, toDate, extent
         # Reset index for easier manipulation
         Dep_Data_Qtr = Dep_Data_Qtr.reset_index()
         
+        # Create the new column name
+        new_col = f"{depVar}_{extention}"
+        
+        # Initialize the new column if it doesn't exist
+        if new_col not in Dep_Data_Qtr.columns:
+            Dep_Data_Qtr[new_col] = np.nan
+        
         # Copy initial values
-        Dep_Data_Qtr.loc[te, f"{depVar}_{extention}"] = Dep_Data_Qtr.loc[te, depVar]
+        Dep_Data_Qtr.loc[te, new_col] = Dep_Data_Qtr.loc[te, depVar]
         
         # Apply transformations based on type
-        if transform.upper() == "AQ":  # Quarterly Adjustment
+        transform = transform.upper()
+        
+        if transform == "AQ":  # Quarterly Adjustment
             for i in range(te + 1, Dep_Data_Qtr.shape[0]):
-                Dep_Data_Qtr.loc[i, f"{depVar}_{extention}"] = (
-                    Dep_Data_Qtr.loc[i-1, f"{depVar}_{extention}"] + 
+                Dep_Data_Qtr.loc[i, new_col] = (
+                    Dep_Data_Qtr.loc[i-1, new_col] + 
                     Dep_Data_Qtr.loc[i, f"{extention[1:]}"]
                 )
                 
-        elif transform.upper() == "HY":  # Half-Yearly Adjustment
+        elif transform == "HY":  # Half-Yearly Adjustment
             for i in range(te + 1, Dep_Data_Qtr.shape[0]):
-                Dep_Data_Qtr.loc[i, f"{depVar}_{extention}"] = (
-                    Dep_Data_Qtr.loc[i-2, f"{depVar}_{extention}"] + 
-                    Dep_Data_Qtr.loc[i, f"{extention[1:]}"]
-                )
+                if i >= 2:  # Ensure we don't access negative indices
+                    Dep_Data_Qtr.loc[i, new_col] = (
+                        Dep_Data_Qtr.loc[i-2, new_col] + 
+                        Dep_Data_Qtr.loc[i, f"{extention[1:]}"]
+                    )
                 
-        elif transform.upper() == "AY":  # Yearly Adjustment
+        elif transform == "AY":  # Yearly Adjustment
             for i in range(te + 1, Dep_Data_Qtr.shape[0]):
-                Dep_Data_Qtr.loc[i, f"{depVar}_{extention}"] = (
-                    Dep_Data_Qtr.loc[i-4, f"{depVar}_{extention}"] + 
-                    Dep_Data_Qtr.loc[i, f"{extention[1:]}"]
-                )
+                if i >= 4:  # Ensure we don't access negative indices
+                    Dep_Data_Qtr.loc[i, new_col] = (
+                        Dep_Data_Qtr.loc[i-4, new_col] + 
+                        Dep_Data_Qtr.loc[i, f"{extention[1:]}"]
+                    )
                 
-        elif transform.upper() == "PQ":  # Quarterly Percentage
+        elif transform == "PQ":  # Quarterly Percentage
             for i in range(te + 1, Dep_Data_Qtr.shape[0]):
-                Dep_Data_Qtr.loc[i, f"{depVar}_{extention}"] = (
-                    Dep_Data_Qtr.loc[i-1, f"{depVar}_{extention}"] * 
+                Dep_Data_Qtr.loc[i, new_col] = (
+                    Dep_Data_Qtr.loc[i-1, new_col] * 
                     (1 + Dep_Data_Qtr.loc[i, f"{extention[1:]}"])
                 )
                 
-        elif transform.upper() == "PH":  # Half-Yearly Percentage
+        elif transform == "PH":  # Half-Yearly Percentage
             for i in range(te + 1, Dep_Data_Qtr.shape[0]):
-                Dep_Data_Qtr.loc[i, f"{depVar}_{extention}"] = (
-                    Dep_Data_Qtr.loc[i-2, f"{depVar}_{extention}"] * 
-                    (1 + Dep_Data_Qtr.loc[i, f"{extention[1:]}"])
-                )
+                if i >= 2:
+                    Dep_Data_Qtr.loc[i, new_col] = (
+                        Dep_Data_Qtr.loc[i-2, new_col] * 
+                        (1 + Dep_Data_Qtr.loc[i, f"{extention[1:]}"])
+                    )
                 
-        elif transform.upper() == "PY":  # Yearly Percentage
+        elif transform == "PY":  # Yearly Percentage
             for i in range(te + 1, Dep_Data_Qtr.shape[0]):
-                Dep_Data_Qtr.loc[i, f"{depVar}_{extention}"] = (
-                    Dep_Data_Qtr.loc[i-4, f"{depVar}_{extention}"] * 
-                    (1 + Dep_Data_Qtr.loc[i, f"{extention[1:]}"])
-                )
+                if i >= 4:
+                    Dep_Data_Qtr.loc[i, new_col] = (
+                        Dep_Data_Qtr.loc[i-4, new_col] * 
+                        (1 + Dep_Data_Qtr.loc[i, f"{extention[1:]}"])
+                    )
                 
-        elif transform.upper() == "LAQ":  # Log Adjusted Quarterly
+        elif transform == "LAQ":  # Log Adjusted Quarterly
             for i in range(te + 1, Dep_Data_Qtr.shape[0]):
-                Dep_Data_Qtr.loc[i, f"{depVar}_{extention}"] = (
-                    Dep_Data_Qtr.loc[i-1, f"{depVar}_{extention}"] * 
+                Dep_Data_Qtr.loc[i, new_col] = (
+                    Dep_Data_Qtr.loc[i-1, new_col] * 
                     np.exp(Dep_Data_Qtr.loc[i, f"{extention[1:]}"])
                 )
                 
-        elif transform.upper() == "LHY":  # Log Adjusted Half-Yearly
+        elif transform == "LHY":  # Log Adjusted Half-Yearly
             for i in range(te + 1, Dep_Data_Qtr.shape[0]):
-                Dep_Data_Qtr.loc[i, f"{depVar}_{extention}"] = (
-                    Dep_Data_Qtr.loc[i-2, f"{depVar}_{extention}"] * 
+                if i >= 2:
+                    Dep_Data_Qtr.loc[i, new_col] = (
+                        Dep_Data_Qtr.loc[i-2, new_col] * 
+                        np.exp(Dep_Data_Qtr.loc[i, f"{extention[1:]}"])
+                    )
+                
+        elif transform == "LAY":  # Log Adjusted Yearly
+            for i in range(te + 1, Dep_Data_Qtr.shape[0]):
+                if i >= 4:
+                    Dep_Data_Qtr.loc[i, new_col] = (
+                        Dep_Data_Qtr.loc[i-4, new_col] * 
+                        np.exp(Dep_Data_Qtr.loc[i, f"{extention[1:]}"])
+                    )
+                
+        elif transform == "UN":  # Unadjusted
+            for i in range(te + 1, Dep_Data_Qtr.shape[0]):
+                Dep_Data_Qtr.loc[i, new_col] = (
                     np.exp(Dep_Data_Qtr.loc[i, f"{extention[1:]}"])
                 )
                 
-        elif transform.upper() == "LAY":  # Log Adjusted Yearly
+        elif transform in ['NT', '3QMA', '4QMA', '12A', '4QMA', '8QMA', '9QMA']:
             for i in range(te + 1, Dep_Data_Qtr.shape[0]):
-                Dep_Data_Qtr.loc[i, f"{depVar}_{extention}"] = (
-                    Dep_Data_Qtr.loc[i-4, f"{depVar}_{extention}"] * 
-                    np.exp(Dep_Data_Qtr.loc[i, f"{extention[1:]}"])
-                )
-                
-        elif transform.upper() == "UN":  # Unadjusted
-            for i in range(te + 1, Dep_Data_Qtr.shape[0]):
-                Dep_Data_Qtr.loc[i, f"{depVar}_{extention}"] = (
-                    np.exp(Dep_Data_Qtr.loc[i, f"{extention[1:]}"])
-                )
-                
-        elif transform.upper() in ['NT', '3QMA', '4QMA', '12A', '4QMA', '8QMA', '9QMA']:
-            for i in range(te + 1, Dep_Data_Qtr.shape[0]):
-                Dep_Data_Qtr.loc[i, f"{depVar}_{extention}"] = (
+                Dep_Data_Qtr.loc[i, new_col] = (
                     Dep_Data_Qtr.loc[i, f"{extention[1:]}"]
                 )
                 
         else:
-            print("\n\nError!\n\nIncorrectly defined transformation of dependent variable.\n\n")
-            Dep_Data_Qtr.loc[te:te + 1, f"{depVar}_{extention}"] = np.nan
+            print(f"\n\nError!\n\nIncorrectly defined transformation: {transform}\n\n")
+            Dep_Data_Qtr.loc[te:te + 1, new_col] = np.nan
             
     except KeyError as e:
-        print(f"Date {toDate} not found in index. Please check the date format and availability.")
+        print(f"Date {toDate} not found in index.")
+        print(f"Available dates: {Dep_Data_Qtr.index.tolist()[:5]}...")
         raise
         
     except Exception as e:
         print(f"An error occurred: {str(e)}")
+        print(f"Current state:")
+        print(f"toDate: {toDate}")
+        print(f"te: {te if 'te' in locals() else 'not set'}")
+        print(f"Columns: {Dep_Data_Qtr.columns.tolist()}")
         raise
         
     return Dep_Data_Qtr
