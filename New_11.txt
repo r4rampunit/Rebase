@@ -1,48 +1,104 @@
-def MVdataTransform(cycleInfo, modelyticsMVfile, indepVarNames):
-    MVData = []
-    data = modelyticsMVfile.copy()
-    
-    # Convert date column to date type and set as index
-    data['date'] = pd.to_datetime(data['date']).dt.date
-    data = data.set_index('date')
-    
-    # Add historical values to all forecasted variables
-    for aa in range(len(indepVarNames)):
-        for bb in range(len(cycleInfo['Scenario'])):
-            # Scenario value mapping
-            scenario_val = ('Base' if (cycleInfo['Scenario'][bb] == 'Baseline') else 
-                            ('Adv' if (cycleInfo['Scenario'][bb] == 'Adverse') else 
-                            ('SevAdv' if (cycleInfo['Scenario'][bb] == 'Severely Adverse') else 
-                            cycleInfo['Scenario'][bb])))
-            
-            # Construct column name
-            cc = f"{indepVarNames[aa]}_{cycleInfo['Type'][0]}_{scenario_val}_{cycleInfo['Purpose'][0]}_{cycleInfo['Year'][0]}"
-            
-            # Fill NA values with historical values
-            data[cc] = data[cc].fillna(data[indepVarNames[aa]])
-    
-    # Separate MVs into lists by scenarios
-    for dd in range(len(cycleInfo['Scenario'])):
-        # Scenario value mapping
-        scenario_val = ('Base' if (cycleInfo['Scenario'][dd] == 'Baseline') else 
-                        ('Adv' if (cycleInfo['Scenario'][dd] == 'Adverse') else 
-                        ('SevAdv' if (cycleInfo['Scenario'][dd] == 'Severely Adverse') else 
-                        cycleInfo['Scenario'][dd])))
-        
-        # Filter data for specific scenario
-        scenario_data = data.filter(regex=f'{cycleInfo["Type"][0]}_{scenario_val}_{cycleInfo["Purpose"][0]}_{cycleInfo["Year"][0]}$')
-        
-        # Rename columns
-        for ee in range(len(indepVarNames)):
-            old_col = f"{indepVarNames[ee]}_{cycleInfo['Type'][0]}_{scenario_val}_{cycleInfo['Purpose'][0]}_{cycleInfo['Year'][0]}"
-            scenario_data = scenario_data.rename(columns={old_col: indepVarNames[ee]})
-        
-        # Reset index and add month column
-        scenario_data = scenario_data.reset_index()
-        scenario_data = scenario_data.rename(columns={'index': 'date'})
-        scenario_data['month'] = pd.DatetimeIndex(scenario_data['date']).month
-        scenario_data = scenario_data.set_index('date')
-        
-        MVData.append(scenario_data)
-    
-    return MVData
+from PyInstaller.utils.hooks import collect_data_files, collect_submodules
+import os
+
+block_cipher = None
+
+python_files = []
+code_dir = os.path.join(SPECPATH, 'Modelytics_Code_20220110')
+for file in os.listdir(code_dir):
+    if file.endswith('.py'):
+        python_files.append((os.path.join(code_dir, file), 'Modelytics_Code_20220110'))
+
+data_folders = [
+    'CCAR2020',
+    'CCAR2021',
+    'CCAR2022',
+    'CCAR2023',
+    'CCAR2024',
+    'db',
+    'images',
+    'Write to ppt'
+]
+
+added_files = []
+for folder in data_folders:
+    folder_path = os.path.join(SPECPATH, folder)
+    if os.path.exists(folder_path):
+        added_files.extend([(folder_path, folder)])
+
+hidden_imports = [
+    'pandas',
+    'numpy',
+    'matplotlib',
+    'matplotlib.backends.backend_qt5agg',
+    'PyQt5',
+    'PyQt5.QtCore',
+    'PyQt5.QtGui',
+    'PyQt5.QtWidgets',
+    'pyqtgraph',
+    'scipy',
+    'sklearn',
+    'sklearn.neighbors',
+    'statsmodels',
+    'seaborn',
+    'openpyxl',
+    'xlrd',
+    'lxml',
+    'dateutils',
+    'python-pptx',
+    'python-docx'
+]
+
+a = Analysis(
+    ['Modelytics_Code_20220110/Modelytics_UI_20210127.py'],
+    pathex=[SPECPATH],
+    binaries=[],
+    datas=added_files + python_files,
+    hiddenimports=hidden_imports,
+    hookspath=[],
+    hooksconfig={},
+    runtime_hooks=[],
+    excludes=[],
+    win_no_prefer_redirects=False,
+    win_private_assemblies=False,
+    cipher=block_cipher,
+    noarchive=False,
+)
+
+def remove_duplicates(list_of_tuples):
+    seen = set()
+    return [item for item in list_of_tuples if not (item in seen or seen.add(item))]
+
+a.datas = remove_duplicates(a.datas)
+a.binaries = remove_duplicates(a.binaries)
+
+pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+
+exe = EXE(
+    pyz,
+    a.scripts,
+    [],
+    exclude_binaries=True,
+    name='Modelytics',
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=True,
+    console=True,  # Set to True temporarily for debugging
+    disable_windowed_traceback=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
+    icon='path_to_your_icon.ico' if os.path.exists('path_to_your_icon.ico') else None,
+)
+
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    strip=False,
+    upx=True,
+    upx_exclude=[],
+    name='Modelytics',
+)
