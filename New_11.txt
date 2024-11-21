@@ -130,3 +130,34 @@ def addItems(self, texts, datalist=None):
             # Optional: log the error or print for debugging
             print(f"Error adding item {text}: {e}")
             continue
+
+
+
+
+def addItems(self, texts, datalist=None):
+    # Ensure texts is a list
+    texts = texts if isinstance(texts, list) else [texts]
+    
+    # Handle datalist
+    if datalist is None:
+        datalist = [None] * len(texts)
+    elif not isinstance(datalist, list):
+        datalist = [datalist]
+    
+    # Ensure datalist is at least as long as texts
+    if len(datalist) < len(texts):
+        datalist.extend([None] * (len(texts) - len(datalist)))
+    
+    for i, text in enumerate(texts):
+        try:
+            # Convert text to string safely
+            text = '' if text is None else str(text)
+            
+            # Get corresponding data
+            data = datalist[i] if i < len(datalist) else None
+            
+            # Add item with converted text and data
+            self.addItem(text, data)
+        except Exception as e:
+            print(f"Error adding item {text}: {e}")
+            continue
