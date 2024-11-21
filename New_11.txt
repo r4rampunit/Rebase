@@ -1,53 +1,41 @@
-from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 import os
+import sys
 
-block_cipher = None
+# Define the path to your images folder
+SPECPATH = os.path.dirname(os.path.abspath(SPEC))
+images_folder = os.path.join(SPECPATH, 'Modelytics_Code_20220110', 'images')
 
-python_files = []
-code_dir = os.path.join(SPECPATH, 'Modelytics_Code_20220110')
-for file in os.listdir(code_dir):
-    if file.endswith('.py'):
-        python_files.append((os.path.join(code_dir, file), 'Modelytics_Code_20220110'))
-
+# Collect data folders
 data_folders = [
-    'CCAR2020',
-    'CCAR2021',
-    'CCAR2022',
-    'CCAR2023',
-    'CCAR2024',
-    'db',
-    'images',
-    'Write to ppt'
+    'CCAR2020', 'CCAR2021', 'CCAR2022', 'CCAR2023', 'CCAR2024', 
+    'db', 'Modelytics_Code_20220110', 'Scenarios_Team', 'Write to ppt'
 ]
 
 added_files = []
+
+# Add existing data folders
 for folder in data_folders:
     folder_path = os.path.join(SPECPATH, folder)
     if os.path.exists(folder_path):
         added_files.extend([(folder_path, folder)])
 
-hidden_imports = [
-    'pandas',
-    'numpy',
-    'matplotlib',
-    'matplotlib.backends.backend_qt5agg',
-    'PyQt5',
-    'PyQt5.QtCore',
-    'PyQt5.QtGui',
-    'PyQt5.QtWidgets',
-    'pyqtgraph',
-    'scipy',
-    'sklearn',
-    'sklearn.neighbors',
-    'statsmodels',
-    'seaborn',
-    'openpyxl',
-    'xlrd',
-    'lxml',
-    'dateutils',
-    'python-pptx',
-    'python-docx'
-]
+# Specifically handle images folder
+if os.path.exists(images_folder):
+    added_files.append((images_folder, 'images'))
+
+# Helper function to get image path in bundled application
+def get_resource_path(relative_path):
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
+
+# In your Python code, use this function to load images
+# Example:
+# image_path = get_resource_path('images/HSBC_logo.jpg')
 
 a = Analysis(
     ['Modelytics_Code_20220110/Modelytics_UI_20210127.py'],
@@ -65,40 +53,80 @@ a = Analysis(
     noarchive=False,
 )
 
-def remove_duplicates(list_of_tuples):
-    seen = set()
-    return [item for item in list_of_tuples if not (item in seen or seen.add(item))]
 
-a.datas = remove_duplicates(a.datas)
-a.binaries = remove_duplicates(a.binaries)
 
-pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
-exe = EXE(
-    pyz,
-    a.scripts,
-    [],
-    exclude_binaries=True,
-    name='Modelytics',
-    debug=False,
-    bootloader_ignore_signals=False,
-    strip=False,
-    upx=True,
-    console=True,  # Set to True temporarily for debugging
-    disable_windowed_traceback=False,
-    target_arch=None,
-    codesign_identity=None,
-    entitlements_file=None,
-    icon='path_to_your_icon.ico' if os.path.exists('path_to_your_icon.ico') else None,
-)
+import os
+import sys
 
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
-    strip=False,
-    upx=True,
-    upx_exclude=[],
-    name='Modelytics',
-)
+def get_resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
+
+# Usage example
+def load_image(image_name):
+    image_path = get_resource_path(os.path.join('images', image_name))
+    return image_path
+
+# When loading an image
+logo_path = load_image('HSBC_logo.jpg')
+
+
+
+
+def addItem(self, text, data=None):
+    item = QtGui.QStandardItem()
+    
+    # Convert text to string, handling various input types
+    if text is None:
+        text = ''
+    elif not isinstance(text, str):
+        text = str(text)
+    
+    item.setText(text)
+    
+    # Handle data conversion
+    if data is not None:
+        if not isinstance(data, str):
+            data = str(data)
+        item.setData(data)
+    
+    item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsUserCheckable)
+    item.setData(Qt.Unchecked, Qt.CheckStateRole)
+    self.model().appendRow(item)
+
+def addItems(self, texts, datalist=None):
+    # Ensure texts is a list
+    if not isinstance(texts, list):
+        texts = list(texts)
+    
+    # Handle case where datalist is None or shorter than texts
+    if datalist is None:
+        datalist = [None] * len(texts)
+    elif len(datalist) < len(texts):
+        datalist.extend([None] * (len(texts) - len(datalist)))
+    
+    for i, text in enumerate(texts):
+        try:
+            # Convert text to string
+            if text is None:
+                text = ''
+            else:
+                text = str(text)
+            
+            # Get corresponding data, defaulting to None if not available
+            data = datalist[i] if i < len(datalist) else None
+            
+            # Add item with converted text and data
+            self.addItem(text, data)
+        
+        except Exception as e:
+            # Optional: log the error or print for debugging
+            print(f"Error adding item {text}: {e}")
+            continue
