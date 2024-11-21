@@ -161,3 +161,43 @@ def addItems(self, texts, datalist=None):
         except Exception as e:
             print(f"Error adding item {text}: {e}")
             continue
+
+
+def addItem(self, text, data=None):
+    try:
+        # Create the item
+        item = QtGui.QStandardItem()
+        
+        # Convert text to string, handling various input types
+        if text is None:
+            text = ''
+        elif not isinstance(text, str):
+            try:
+                text = str(text)
+            except Exception as e:
+                print(f"Error converting text to string: {e}")
+                text = ''
+        
+        # Set the text
+        item.setText(text)
+        
+        # Handle data conversion
+        if data is not None:
+            try:
+                if not isinstance(data, str):
+                    data = str(data)
+                item.setData(data)
+            except Exception as e:
+                print(f"Error setting item data: {e}")
+        
+        # Set item flags
+        item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsUserCheckable)
+        item.setData(Qt.Unchecked, Qt.CheckStateRole)
+        
+        # Append row to model
+        self.model().appendRow(item)
+    
+    except Exception as e:
+        print(f"Critical error in addItem: {e}")
+        # Optionally, you might want to raise the exception or handle it differently
+        raise
