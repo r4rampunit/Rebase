@@ -22,12 +22,12 @@ def process_zip_files(zip_folder_path, db_path):
 
     # Process each ZIP file in the folder
     for zip_filename in os.listdir(zip_folder_path):
-        if zip_filename.endswith('.zip'):
+        if zip_filename.endswith('.zip') or zip_filename.endswith('.ZIP'):
             zip_file_path = os.path.join(zip_folder_path, zip_filename)
             
             with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
-                # Find .txt file in ZIP (assuming same base name)
-                text_filename = zip_filename.replace('.zip', '.txt')
+                # Find .txt file in ZIP 
+                text_filename = zip_filename.replace('.zip', '.txt').replace('.ZIP', '.txt')
                 
                 if text_filename in zip_ref.namelist():
                     # Open and read the .txt file
@@ -53,9 +53,20 @@ def process_zip_files(zip_folder_path, db_path):
                             # Create table name
                             table_name = f'BHCF_Year{year}_Quarter_{quarter}'
                             
-                            # Create and populate table
-                            df.to_sql(table_name, conn, if_exists='replace', index=False, 
-                                      dtype={'code': 'TEXT'})
+                            # Drop table if exists to avoid duplicates
+                            cursor.execute(f'DROP TABLE IF EXISTS "{table_name}"')
+                            
+                            # Create table with explicit schema
+                            cursor.execute(f'''
+                                CREATE TABLE "{table_name}" (
+                                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                    code TEXT
+                                )
+                            ''')
+                            
+                            # Insert data directly
+                            insert_query = f'INSERT INTO "{table_name}" (code) VALUES (?)'
+                            cursor.executemany(insert_query, [(code,) for code in df['code']])
                             
                             # Record table information
                             cursor.execute('''
