@@ -2,79 +2,236 @@ import os
 import zipfile
 import sqlite3
 import pandas as pd
+import io
+import math
+
+folder_path = 'C:\\Users\\New'
+
+raw_db_path = 'FRY9C_Raw.sqlite'
+mirror_db_path = 'FRY9C_Mirror.sqlite'
+transformed_db_path = 'FRY9C_Transformed.sqlite'
+
+def split_dataframe_by_columns(df, max_columns=1900):
+    """
+    Split a DataFrame into multiple DataFrames if it exceeds max_columns.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        max_columns (int): Maximum number of columns per DataFrame
+    
+    Returns:
+        list: List of DataFrames, each with <= max_columns
+    """
+    # Ensure column names are unique and not too long
+    df.columns = [str(col)[:50] for col in df.columns]
+    
+    # If DataFrame is within column limit, return as is
+    if len(df.columns) <= max_columns:
+        return [df]
+    
+    # Calculate number of splits needed
+    num_splits = math.ceil(len(df.columns) / max_columns)
+    
+    # Split DataFrames
+    split_dfs = []
+    for i in range(num_splits):
+        start_col = i * max_columns
+        end_col = min((i + 1) * max_columns, len(df.columns))
+        
+        # Select columns for this split
+        split_df = df.iloc[:, start_col:end_col]
+        split_dfs.append(split_df)
+    
+    return split_dfs
+
+def load_raw_tables(folder_path, raw_db_path):
+    """
+    Load data from ZIP files into the Raw SQLite database, handling large numbers of columns.
+    """
+    # Connect to the Raw database
+    raw_conn = sqlite3.connect(raw_db_path)
+    raw_cursor = raw_conn.cursor()
+    
+    # Iterate through ZIP files in the folder
+    for filename in os.listdir(folder_path):
+        if filename.endswith('.zip') or filename.endswith('.ZIP'):
+            zip_file_path = os.path.join(folder_path, filename)
+            
+            # Extract year and quarter from filename
+            year = filename[4:8]
+            quarter_code = filename[-8:-4]
+            
+            # Determine the quarter
+            quarter_map = {
+                '0331': '1',
+                '0630': '2',
+                '0930': '3',
+                '1231': '4'
+            }
+            quarter = quarter_map.get(quarter_code, 'Unknown')
+            
+            # Base table name
+            base_table_name = f'BHCF_Year{year}_Quarter_{quarter}'
+            
+            # Process the ZIP file
+            with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
+                # Find the text file in the ZIP
+                text_files = [f for f in zip_ref.namelist() if f.endswith('.txt')]
+                
+                if text_files:
+                    text_filename = text_files[0]
+                    with zip_ref.open(text_filename) as text_file:
+                        # Read file contents with correct encoding
+                        file_contents = text_file.read().decode('ISO-8859-1')
+                        
+                        # Read CSV with improved dtype handling
+                        df = pd.read_csv(
+                            io.StringIO(file_contents), 
+                            sep='^', 
+                            on_bad_lines='skip',
+                            low_memory=False,
+                        )
+                        
+                        # Split DataFrame if it has too many columns
+                        split_dfs = split_dataframe_by_columns(df)
+                        
+                        # Process each split DataFrame
+                        for idx, split_df in enumerate(split_dfs, 1):
+                            # Create table name with split indicator
+                            table_name = f'{base_table_name}_Part{idx}'
+                            
+                            # Create table with explicit schema
+                            column_definitions = ", ".join([f'"{col}" TEXT' for col in split_df.columns])
+                            raw_cursor.execute(f'DROP TABLE IF EXISTS "{table_name}"')
+                            raw_cursor.execute(f'CREATE TABLE "{table_name}" ({column_definitions})')
+                            raw_conn.commit()
+                            
+                            # Insert data
+                            placeholders = ", ".join(["?" for _ in split_df.columns])
+                            insert_query = f'INSERT INTO "{table_name}" VALUES ({placeholders})'
+                            
+                            raw_cursor.executemany(
+                                insert_query, 
+                                split_df.values.tolist()
+                            )
+                            raw_conn.commit()
+                            
+                            print(f"Populated table: {table_name}")
+    
+    # Close the Raw database connection
+    raw_conn.close()
+
+
+
+
+
+
+
+
+
+import os
+import zipfile
+import sqlite3
+import pandas as pd
+import io
+import numpy as np
 
 # Folder location where your .zip files are stored
-folder_path = '/path/to/your/zip/files'
+folder_path = 'C:\\Users\\New'
 
 # Database paths
 raw_db_path = 'FRY9C_Raw.sqlite'
 mirror_db_path = 'FRY9C_Mirror.sqlite'
 transformed_db_path = 'FRY9C_Transformed.sqlite'
 
-# Connect to the Raw, Mirror, and Transformed databases
-raw_conn = sqlite3.connect(raw_db_path)
-mirror_conn = sqlite3.connect(mirror_db_path)
-transformed_conn = sqlite3.connect(transformed_db_path)
+def load_raw_tables(folder_path, raw_db_path):
+    """
+    Load data from ZIP files into the Raw SQLite database.
+    """
+    # Connect to the Raw database
+    raw_conn = sqlite3.connect(raw_db_path)
+    raw_cursor = raw_conn.cursor()
 
-# Function to extract and load each .zip file into the Raw database
-def load_raw_tables(folder_path, raw_conn):
+    # Iterate through ZIP files in the folder
     for filename in os.listdir(folder_path):
-        if filename.endswith('.zip'):
-            year = filename[4:8]  # Extract year
-            quarter_code = filename[-8:-4]  # Extract quarter (0331, 0630, etc.)
+        if filename.endswith('.zip') or filename.endswith('.ZIP'):
+            zip_file_path = os.path.join(folder_path, filename)
 
-            # Determine the quarter based on the last 4 digits
-            quarter = {
+            # Extract year and quarter from filename
+            year = filename[4:8]
+            quarter_code = filename[-8:-4]
+
+            # Determine the quarter
+            quarter_map = {
                 '0331': '1',
                 '0630': '2',
                 '0930': '3',
                 '1231': '4'
-            }.get(quarter_code, 'Unknown')
+            }
+            quarter = quarter_map.get(quarter_code, 'Unknown')
 
-            table_name = f'BHCF_Year{year}_Quarter_{quarter}'
+            # Create table name
+            table_name = f'BHCF_Year{year}Quarter{quarter}'
 
-            # Extract the .zip file and read the data (assuming CSV inside)
-            with zipfile.ZipFile(os.path.join(folder_path, filename), 'r') as zip_ref:
-                for inner_file in zip_ref.namelist():
-                    if inner_file.endswith('.csv'):  # Modify based on actual file format
-                        with zip_ref.open(inner_file) as f:
-                            df = pd.read_csv(f)
-                            # Create a table in the Raw database
-                            df.to_sql(table_name, raw_conn, if_exists='replace', index=False)
-                            print(f"Populated table: {table_name} in Raw database")
+            # Process the ZIP file
+            with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
+                # Find the text file in the ZIP
+                text_files = [f for f in zip_ref.namelist() if f.endswith('.txt')]
 
-# Load the Raw database with tables
-load_raw_tables(folder_path, raw_conn)
+                if text_files:
+                    text_filename = text_files[0]
+                    with zip_ref.open(text_filename) as text_file:
+                        # Read file contents with correct encoding
+                        file_contents = text_file.read().decode('ISO-8859-1')
 
-# Function to create empty tables in the Mirror and Transformed databases based on the structure of the Raw database
-def create_empty_mirror_and_transformed_tables(raw_conn, mirror_conn, transformed_conn):
-    cursor = raw_conn.cursor()
-    cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
-    raw_tables = cursor.fetchall()
+                        # Read CSV with improved dtype handling
+                        df = pd.read_csv(
+                            io.StringIO(file_contents), 
+                            sep='^', 
+                            on_bad_lines='skip',
+                            low_memory=False,
+                        )
 
-    for table_name in raw_tables:
-        table_name = table_name[0]
-        # Create empty table in Mirror database
-        mirror_conn.execute(f"CREATE TABLE IF NOT EXISTS {table_name} AS SELECT * FROM {table_name} WHERE 1=0;")
-        # Create empty table in Transformed database
-        transformed_conn.execute(f"CREATE TABLE IF NOT EXISTS {table_name} AS SELECT * FROM {table_name} WHERE 1=0;")
+                        # Truncate column names if too long
+                        df.columns = [col[:50] for col in df.columns]
 
-        print(f"Created empty table: {table_name} in Mirror and Transformed databases")
+                        # Limit number of columns
+                        max_columns = 2500
+                        if len(df.columns) > max_columns:
+                            df = df.iloc[:, :max_columns]
 
-    # Commit changes to both databases
-    mirror_conn.commit()
-    transformed_conn.commit()
+                        # Create table with explicit schema
+                        column_definitions = ", ".join([f'"{col}" TEXT' for col in df.columns])
+                        raw_cursor.execute(f'DROP TABLE IF EXISTS "{table_name}"')
+                        raw_cursor.execute(f'CREATE TABLE "{table_name}" ({column_definitions})')
+                        raw_conn.commit()
 
-# Create empty tables in Mirror and Transformed databases
-create_empty_mirror_and_transformed_tables(raw_conn, mirror_conn, transformed_conn)
+                        # Insert data
+                        placeholders = ", ".join(["?" for _ in df.columns])
+                        insert_query = f'INSERT INTO "{table_name}" VALUES ({placeholders})'
 
-# Close the database connections
-raw_conn.close()
-mirror_conn.close()
-transformed_conn.close()
+                        raw_cursor.executemany(
+                            insert_query, 
+                            df.values.tolist()
+                        )
+                        raw_conn.commit()
 
+                        print(f"Populated table: {table_name}")
 
+    # Close the Raw database connection
+    raw_conn.close()
 
+# Main execution
+if name == "main":
+    # Load data into Raw database
+    load_raw_tables(folder_path, raw_db_path)
+
+    # Create empty tables in Mirror and Transformed databases
+
+# Main execution
+if __name__ == "__main__":
+    # Load data into Raw database
+    load_raw_tables(folder_path, raw_db_path)
 
 
 
@@ -85,22 +242,44 @@ transformed_conn.close()
 import sqlite3
 import pandas as pd
 
-# Path to the Raw SQLite database
+# Path to the Raw database
 raw_db_path = 'FRY9C_Raw.sqlite'
 
-# Connect to the Raw database
-conn = sqlite3.connect(raw_db_path)
+def test_raw_database():
+    """
+    Test and display information about tables in the Raw database
+    """
+    # Connect to the Raw database
+    conn = sqlite3.connect(raw_db_path)
+    
+    # Get list of tables
+    cursor = conn.cursor()
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+    tables = cursor.fetchall()
+    
+    print(f"Total tables in Raw database: {len(tables)}")
+    
+    # Test each table
+    for table in tables:
+        table_name = table[0]
+        
+        # Get table row count
+        row_count = pd.read_sql_query(f"SELECT COUNT(*) FROM {table_name}", conn).iloc[0,0]
+        
+        # Get column names
+        column_names = pd.read_sql_query(f"PRAGMA table_info({table_name})", conn)['name'].tolist()
+        
+        print(f"\nTable: {table_name}")
+        print(f"Row count: {row_count}")
+        print("Columns:", column_names)
+        
+        # Display first few rows if table is not empty
+        if row_count > 0:
+            sample_data = pd.read_sql_query(f"SELECT * FROM {table_name}", conn)
+            print("\nSample Data:")
+            print(sample_data)
+        
+    conn.close()
 
-# Fetch the name of the first table in the Raw database
-query = "SELECT name FROM sqlite_master WHERE type='table' LIMIT 1;"
-first_table = pd.read_sql_query(query, conn).iloc[0, 0]
-
-# Read the data from the first table into a Pandas DataFrame
-df = pd.read_sql_query(f"SELECT * FROM {first_table};", conn)
-
-# Close the connection
-conn.close()
-
-# Display the DataFrame
-print(f"Data from {first_table}:")
-print(df.head())
+# Run the testing function
+test_raw_database()
