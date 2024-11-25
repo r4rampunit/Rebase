@@ -1,15 +1,16 @@
 import os
+import zipfile
 import sqlite3
 import re
 import pandas as pd
 import io
 
-def create_database_layers(folder_path, db_path):
-    # Connect to SQLite database (will create if not exists)
+def process_zip_files(zip_folder_path, db_path):
+    # Connect to SQLite database
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
-    # Create Raw Layer
+    # Create Raw Layer Info Table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS raw_layer_info (
             table_name TEXT PRIMARY KEY,
@@ -19,54 +20,51 @@ def create_database_layers(folder_path, db_path):
         )
     ''')
 
-    # Process files in the folder
-    for filename in os.listdir(folder_path):
-        # Check if filename matches the pattern BHCF20000331.txt
-        match = re.match(r'BHCF(\d{4})(\d{4})\.txt', filename)
-        if match:
-            year, quarter_code = match.groups()
+    # Process each ZIP file in the folder
+    for zip_filename in os.listdir(zip_folder_path):
+        if zip_filename.endswith('.zip'):
+            zip_file_path = os.path.join(zip_folder_path, zip_filename)
             
-            # Determine quarter based on quarter code
-            quarter_map = {
-                '0331': '1',
-                '0630': '2', 
-                '0930': '3',
-                '1231': '4'
-            }
-            quarter = quarter_map.get(quarter_code, 'Unknown')
-            
-            # Create table name for raw layer
-            table_name = f'BHCF_Year{year}_Quarter_{quarter}'
-            
-            # Read file contents
-            with open(os.path.join(folder_path, filename), 'r', encoding='ISO-8859-1') as file:
-                content = file.read().strip()
+            with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
+                # Find .txt file in ZIP (assuming same base name)
+                text_filename = zip_filename.replace('.zip', '.txt')
                 
-                # Create DataFrame
-                df = pd.read_csv(io.StringIO(content), sep='^', header=None, names=['code'], on_bad_lines='skip')
-                
-                # Remove empty rows
-                df = df[df['code'].notna()]
-            
-            # Create table for this file
-            cursor.execute(f'''
-                CREATE TABLE IF NOT EXISTS "{table_name}" (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    code TEXT
-                )
-            ''')
-            
-            # Insert codes into table
-            df.to_sql(table_name, conn, if_exists='replace', index=False, 
-                      dtype={'code': 'TEXT'})
-            
-            # Record table information in raw_layer_info
-            cursor.execute('''
-                INSERT OR REPLACE INTO raw_layer_info 
-                (table_name, year, quarter, row_count) VALUES (?, ?, ?, ?)
-            ''', (table_name, year, quarter, len(df)))
+                if text_filename in zip_ref.namelist():
+                    # Open and read the .txt file
+                    with zip_ref.open(text_filename) as text_file:
+                        # Read with ISO-8859-1 encoding
+                        file_contents = text_file.read().decode('ISO-8859-1')
+                        
+                        # Create DataFrame
+                        df = pd.read_csv(io.StringIO(file_contents), sep='^', header=None, names=['code'], on_bad_lines='skip')
+                        df = df[df['code'].notna()]
+                        
+                        # Extract year and quarter from filename
+                        match = re.match(r'BHCF(\d{4})(\d{4})\.txt', text_filename)
+                        if match:
+                            year, quarter_code = match.groups()
+                            
+                            quarter_map = {
+                                '0331': '1', '0630': '2', 
+                                '0930': '3', '1231': '4'
+                            }
+                            quarter = quarter_map.get(quarter_code, 'Unknown')
+                            
+                            # Create table name
+                            table_name = f'BHCF_Year{year}_Quarter_{quarter}'
+                            
+                            # Create and populate table
+                            df.to_sql(table_name, conn, if_exists='replace', index=False, 
+                                      dtype={'code': 'TEXT'})
+                            
+                            # Record table information
+                            cursor.execute('''
+                                INSERT OR REPLACE INTO raw_layer_info 
+                                (table_name, year, quarter, row_count) 
+                                VALUES (?, ?, ?, ?)
+                            ''', (table_name, year, quarter, len(df)))
 
-    # Create empty Mirror Layer tables
+    # Create layer info tables
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS mirror_layer_info (
             table_name TEXT PRIMARY KEY,
@@ -74,7 +72,6 @@ def create_database_layers(folder_path, db_path):
         )
     ''')
 
-    # Create empty Transformed Layer tables
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS transformed_layer_info (
             table_name TEXT PRIMARY KEY,
@@ -82,73 +79,38 @@ def create_database_layers(folder_path, db_path):
         )
     ''')
 
-    # Commit changes and close connection
+    # Commit and close
     conn.commit()
     conn.close()
 
-    print("Database layers created successfully!")
+    print("Database processed successfully!")
 
 def read_raw_layer_tables(db_path):
-    # Connect to the SQLite database
     conn = sqlite3.connect(db_path)
     
-    # Read the raw_layer_info to get table names
-    raw_layer_tables = pd.read_sql_query("SELECT table_name, year, quarter, row_count FROM raw_layer_info", conn)
+    # Read raw layer tables info
+    raw_layer_tables = pd.read_sql_query(
+        "SELECT table_name, year, quarter, row_count FROM raw_layer_info", 
+        conn
+    )
     print("Raw Layer Tables:")
     print(raw_layer_tables)
     print("\n")
     
-    # Iterate through tables and print their contents
+    # Print contents of each table
     for _, row in raw_layer_tables.iterrows():
         table_name = row['table_name']
-        
-        # Read the table contents
         df = pd.read_sql_query(f'SELECT * FROM "{table_name}"', conn)
         
         print(f"Table: {table_name}")
         print(f"Year: {row['year']}, Quarter: {row['quarter']}, Rows: {row['row_count']}")
-        print(df.head())  # Print first few rows
+        print(df.head())
         print("\n" + "="*50 + "\n")
     
-    # Close the connection
-    conn.close()
-
-# Example usage
-folder_path = '/path/to/your/txt/files'
-db_path = 'FRY9C_Database.sqlite'
-create_database_layers(folder_path, db_path)
-read_raw_layer_tables(db_path)
-
-
-
-import sqlite3
-import pandas as pd
-
-def read_raw_layer_tables(db_path):
-    # Connect to the SQLite database
-    conn = sqlite3.connect(db_path)
-    
-    # Read the raw_layer_info to get table names
-    raw_layer_tables = pd.read_sql_query("SELECT table_name, year, quarter FROM raw_layer_info", conn)
-    print("Raw Layer Tables:")
-    print(raw_layer_tables)
-    print("\n")
-    
-    # Iterate through tables and print their contents
-    for _, row in raw_layer_tables.iterrows():
-        table_name = row['table_name']
-        
-        # Read the table contents
-        df = pd.read_sql_query(f'SELECT * FROM "{table_name}"', conn)
-        
-        print(f"Table: {table_name}")
-        print(f"Year: {row['year']}, Quarter: {row['quarter']}")
-        print(df)
-        print("\n" + "="*50 + "\n")
-    
-    # Close the connection
     conn.close()
 
 # Usage
+zip_folder_path = '/path/to/your/zip/files'
 db_path = 'FRY9C_Database.sqlite'
+process_zip_files(zip_folder_path, db_path)
 read_raw_layer_tables(db_path)
