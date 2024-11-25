@@ -6,19 +6,18 @@ import pandas as pd
 # Folder location where your .zip files are stored
 folder_path = '/path/to/your/zip/files'
 
-# Create an SQLite database
-db_path = 'your_database.db'
-conn = sqlite3.connect(db_path)
-cursor = conn.cursor()
+# Database paths
+raw_db_path = 'FRY9C_Raw.sqlite'
+mirror_db_path = 'FRY9C_Mirror.sqlite'
+transformed_db_path = 'FRY9C_Transformed.sqlite'
 
-# Create layers in the SQLite database
-cursor.execute("CREATE SCHEMA IF NOT EXISTS Raw;")
-cursor.execute("CREATE SCHEMA IF NOT EXISTS Mirror;")
-cursor.execute("CREATE SCHEMA IF NOT EXISTS Transformed;")
-conn.commit()
+# Connect to the Raw, Mirror, and Transformed databases
+raw_conn = sqlite3.connect(raw_db_path)
+mirror_conn = sqlite3.connect(mirror_db_path)
+transformed_conn = sqlite3.connect(transformed_db_path)
 
-# Function to extract and load each .zip file
-def load_raw_tables(folder_path):
+# Function to extract and load each .zip file into the Raw database
+def load_raw_tables(folder_path, raw_conn):
     for filename in os.listdir(folder_path):
         if filename.endswith('.zip'):
             year = filename[4:8]  # Extract year
@@ -40,41 +39,39 @@ def load_raw_tables(folder_path):
                     if inner_file.endswith('.csv'):  # Modify based on actual file format
                         with zip_ref.open(inner_file) as f:
                             df = pd.read_csv(f)
-                            # Create a table in the 'Raw' layer
-                            df.to_sql(f'Raw.{table_name}', conn, if_exists='replace', index=False)
-                            print(f"Populated table: {table_name} in Raw layer")
+                            # Create a table in the Raw database
+                            df.to_sql(table_name, raw_conn, if_exists='replace', index=False)
+                            print(f"Populated table: {table_name} in Raw database")
 
-# Load the Raw layer with tables
-load_raw_tables(folder_path)
+# Load the Raw database with tables
+load_raw_tables(folder_path, raw_conn)
 
-# Create empty tables for Mirror and Transformed layers (based on the structure of Raw)
-def create_empty_mirror_and_transformed_tables():
-    for table_name in cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'Raw.%'"):
-        mirror_table = table_name[0].replace('Raw.', 'Mirror.')
-        transformed_table = table_name[0].replace('Raw.', 'Transformed.')
+# Function to create empty tables in the Mirror and Transformed databases based on the structure of the Raw database
+def create_empty_mirror_and_transformed_tables(raw_conn, mirror_conn, transformed_conn):
+    cursor = raw_conn.cursor()
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+    raw_tables = cursor.fetchall()
 
-        # Create an empty table in the Mirror layer
-        cursor.execute(f"CREATE TABLE IF NOT EXISTS {mirror_table} AS SELECT * FROM {table_name[0]} WHERE 1=0;")
-        
-        # Create an empty table in the Transformed layer
-        cursor.execute(f"CREATE TABLE IF NOT EXISTS {transformed_table} AS SELECT * FROM {table_name[0]} WHERE 1=0;")
+    for table_name in raw_tables:
+        table_name = table_name[0]
+        # Create empty table in Mirror database
+        mirror_conn.execute(f"CREATE TABLE IF NOT EXISTS {table_name} AS SELECT * FROM {table_name} WHERE 1=0;")
+        # Create empty table in Transformed database
+        transformed_conn.execute(f"CREATE TABLE IF NOT EXISTS {table_name} AS SELECT * FROM {table_name} WHERE 1=0;")
 
-        print(f"Created empty table: {mirror_table} and {transformed_table}")
+        print(f"Created empty table: {table_name} in Mirror and Transformed databases")
 
-    conn.commit()
+    # Commit changes to both databases
+    mirror_conn.commit()
+    transformed_conn.commit()
 
-# Create empty Mirror and Transformed tables
-create_empty_mirror_and_transformed_tables()
+# Create empty tables in Mirror and Transformed databases
+create_empty_mirror_and_transformed_tables(raw_conn, mirror_conn, transformed_conn)
 
-# Close the database connection
-conn.close()
-
-
-
-
-
-
-
+# Close the database connections
+raw_conn.close()
+mirror_conn.close()
+transformed_conn.close()
 
 
 
@@ -88,14 +85,14 @@ conn.close()
 import sqlite3
 import pandas as pd
 
-# Path to the SQLite database
-db_path = 'your_database.db'
+# Path to the Raw SQLite database
+raw_db_path = 'FRY9C_Raw.sqlite'
 
-# Connect to the database
-conn = sqlite3.connect(db_path)
+# Connect to the Raw database
+conn = sqlite3.connect(raw_db_path)
 
-# Fetch the name of the first table in the Raw layer
-query = "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'Raw.%' LIMIT 1;"
+# Fetch the name of the first table in the Raw database
+query = "SELECT name FROM sqlite_master WHERE type='table' LIMIT 1;"
 first_table = pd.read_sql_query(query, conn).iloc[0, 0]
 
 # Read the data from the first table into a Pandas DataFrame
@@ -107,9 +104,3 @@ conn.close()
 # Display the DataFrame
 print(f"Data from {first_table}:")
 print(df.head())
-
-
-
-
-
-
