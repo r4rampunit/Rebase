@@ -1,1 +1,50 @@
+import pandas as pd
+import sqlite3
 
+def update_monthly_table(self_location, t_location):
+    try:
+        # Connect to SQLite database
+        conn = sqlite3.connect(self_location)
+        cursor = conn.cursor()
+
+        # Read Excel file
+        df = pd.read_excel(t_location, sheet_name='Sheet1')  # Adjust sheet name if different
+
+        # Ensure date columns are in datetime format
+        df['Date'] = pd.to_datetime(df['Date'])
+        
+        # Read existing dates from the database
+        existing_dates_query = "SELECT Date FROM Monthly_Table"
+        existing_dates = pd.read_sql_query(existing_dates_query, conn)
+        existing_dates['Date'] = pd.to_datetime(existing_dates['Date'])
+
+        # Merge dataframes to update only matching dates
+        update_df = df.merge(existing_dates, on='Date', how='inner')
+
+        # Prepare update statement
+        update_query = """
+        UPDATE Monthly_Table 
+        SET HSS_deposit_Mtd_avg = ? 
+        WHERE Date = ?
+        """
+
+        # Perform updates
+        for _, row in update_df.iterrows():
+            cursor.execute(update_query, (row['HSS_deposit_Mtd_avg'], row['Date']))
+
+        # Commit changes
+        conn.commit()
+        print(f"Successfully updated {len(update_df)} rows")
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        conn.rollback()
+
+    finally:
+        # Close the connection
+        conn.close()
+
+# Example usage
+self_location = r'path/to/your/database.sqlite'
+t_location = r'path/to/your/excel/file.xlsx'
+update_monthly_table(self_location, t_location)
