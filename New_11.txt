@@ -1,1 +1,59 @@
+# Assuming these are defined earlier in your code
+# from datetime import timedelta
+# from dateutil.relativedelta import relativedelta
+# import numpy as np
+# import pandas as pd
 
+# Ensure robust handling of different scenarios
+def safe_minimum(*args):
+    # Remove None and NaN values
+    valid_args = [arg for arg in args if pd.notna(arg) and arg is not None]
+    
+    # If no valid arguments, return NaN
+    if not valid_args:
+        return np.nan
+    
+    # Return the minimum of valid arguments
+    return min(valid_args)
+
+# Base Scenario Handling
+if self.cycleInfo['scenarios'][scen] == 'Base':
+    ds_1.loc[J0DateD + timedelta(days=1):endProjectionsDateD, 'pred'] = (
+        AOPproj.loc[J0DateD + timedelta(days=1):endProjectionsDateD, depvarMnemonic]
+    )
+else:
+    # For non-Base scenarios
+    ds_1.loc[J0DateD + timedelta(days=1):endProjectionsDateD, 'pred'] = ds_1.loc[
+        J0DateD + timedelta(days=1):endProjectionsDateD
+    ].apply(
+        lambda x: safe_minimum(
+            ds_1.loc[J0DateD, self.depVarName],
+            AOPproj.loc[J0DateD + timedelta(days=1):endProjectionsDateD, depvarMnemonic].values,
+            Q4_Avg
+        )
+    )
+
+# Alternative approach if the above doesn't work
+# Calculate Q4 Average
+Q4_Avg = ds_1.loc[J0DateD - relativedelta(months=11) + relativedelta(day=31):J0DateD, self.depVarName].mean()
+
+# Handling potential issues with minimum calculation
+def safe_column_minimum(series1, series2, scalar_value):
+    # Ensure all inputs are valid
+    if series1 is None or series2 is None:
+        return np.nan
+    
+    # Convert to numpy arrays to avoid dtype issues
+    s1 = np.array(series1)
+    s2 = np.array(series2)
+    
+    # Perform element-wise minimum with scalar value
+    return np.minimum(np.minimum(s1, s2), scalar_value)
+
+# Non-Base Scenario Alternative
+if self.cycleInfo['scenarios'][scen] != 'Base':
+    ds_1.loc[J0DateD + timedelta(days=1):endProjectionsDateD, 'pred'] = safe_column_minimum(
+        ds_1.loc[J0DateD, self.depVarName],
+        AOPproj.loc[J0DateD + timedelta(days=1):endProjectionsDateD, depvarMnemonic],
+        Q4_Avg
+    )
