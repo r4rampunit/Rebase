@@ -1,58 +1,64 @@
-import numpy as np
+import sqlite3
 import pandas as pd
 
-# Alternative minimum calculation method
-def safe_minimum_calculation(ds_1, J0DateD, self_depVarName, AOPproj, J0DateD_delta, endProjectionsDateD, depvarMnemonic, Q4_Avg):
-    try:
-        # Extract the base value
-        base_value = ds_1.loc[J0DateD, self_depVarName]
-        
-        # Extract the projection values
-        proj_values = AOPproj.loc[J0DateD + timedelta(days=1):endProjectionsDateD, depvarMnemonic]
-        
-        # Convert to numeric, replacing non-numeric values with NaN
-        base_value = pd.to_numeric(base_value, errors='coerce')
-        proj_values = pd.to_numeric(proj_values, errors='coerce')
-        Q4_Avg = pd.to_numeric(Q4_Avg, errors='coerce')
-        
-        # Create a result Series with the same index as proj_values
-        result = proj_values.copy()
-        
-        # Apply minimum calculation element-wise
-        for idx in result.index:
-            result.loc[idx] = min(
-                filter(pd.notna, [
-                    base_value, 
-                    proj_values.loc[idx], 
-                    Q4_Avg
-                ])
-            )
-        
-        return result
+def get_table_columns(db_path):
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
     
-    except Exception as e:
-        print(f"Error in minimum calculation: {e}")
-        # Return original projection values as fallback
-        return AOPproj.loc[J0DateD + timedelta(days=1):endProjectionsDateD, depvarMnemonic]
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+    tables = cursor.fetchall()
+    
+    table_columns = {}
+    for table in tables:
+        table_name = table[0]
+        cursor.execute(f"PRAGMA table_info({table_name})")
+        columns = [column[1] for column in cursor.fetchall()]
+        table_columns[table_name] = columns
+    
+    conn.close()
+    return table_columns
 
-# In your main code
-# Calculate Q4 Average
-Q4_Avg = ds_1.loc[J0DateD - relativedelta(months=11) + relativedelta(day=31):J0DateD, self.depVarName].mean()
+def compare_schemas(db1_path, db2_path):
+    db1_schema = get_table_columns(db1_path)
+    db2_schema = get_table_columns(db2_path)
+    
+    columns_only_in_db1 = {}
+    columns_only_in_db2 = {}
+    
+    for table1, cols1 in db1_schema.items():
+        if table1 in db2_schema:
+            cols2 = db2_schema[table1]
+            unique_cols = [col for col in cols1 if col not in cols2]
+            if unique_cols:
+                columns_only_in_db1[table1] = unique_cols
+    
+    for table2, cols2 in db2_schema.items():
+        if table2 in db1_schema:
+            cols1 = db1_schema[table2]
+            unique_cols = [col for col in cols2 if col not in cols1]
+            if unique_cols:
+                columns_only_in_db2[table2] = unique_cols
+    
+    df1 = pd.DataFrame.from_dict(columns_only_in_db1, orient='index')
+    df1.index.name = 'Table Name'
+    df1.columns = [f'Columns Unique to Database 1 (Column {i+1})' for i in range(len(df1.columns))]
+    
+    df2 = pd.DataFrame.from_dict(columns_only_in_db2, orient='index')
+    df2.index.name = 'Table Name'
+    df2.columns = [f'Columns Unique to Database 2 (Column {i+1})' for i in range(len(df2.columns))]
+    
+    return df1, df2
 
-# Base Scenario Handling
-if self.cycleInfo['scenarios'][scen] == 'Base':
-    ds_1.loc[J0DateD + timedelta(days=1):endProjectionsDateD, 'pred'] = (
-        AOPproj.loc[J0DateD + timedelta(days=1):endProjectionsDateD, depvarMnemonic]
-    )
-else:
-    # For non-Base scenarios
-    ds_1.loc[J0DateD + timedelta(days=1):endProjectionsDateD, 'pred'] = safe_minimum_calculation(
-        ds_1, 
-        J0DateD, 
-        self.depVarName, 
-        AOPproj, 
-        timedelta(days=1), 
-        endProjectionsDateD, 
-        depvarMnemonic, 
-        Q4_Avg
-    )
+result_df1, result_df2 = compare_schemas(self_loc_1, self_loc_2)
+
+print("Columns in Database 1 but not in Database 2:")
+print(result_df1)
+print("\nColumns in Database 2 but not in Database 1:")
+print(result_df2)
+
+
+
+
+
+
+
