@@ -1,64 +1,39 @@
-import sqlite3
-import pandas as pd
-
-def get_table_columns(db_path):
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
+def plot_multiple(self, df, variable, title):
+    ax = self.figure.add_subplot(111)
+    ax.cla()
+    linestyle_list = ['-', '--', '-.', ':']
+    sevadv_cntr = adv_cntr = base_cntr = 0
+    lines = []
+    legend_list = []
     
-    cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
-    tables = cursor.fetchall()
+    try:
+        plt.style.use("seaborn-v0_8-ticks")
+    except:
+        plt.style.use("default")
     
-    table_columns = {}
-    for table in tables:
-        table_name = table[0]
-        cursor.execute(f"PRAGMA table_info({table_name})")
-        columns = [column[1] for column in cursor.fetchall()]
-        table_columns[table_name] = columns
+    df.columns = df.columns.str.replace('PlotVar_', '')
     
-    conn.close()
-    return table_columns
-
-def compare_schemas(db1_path, db2_path):
-    db1_schema = get_table_columns(db1_path)
-    db2_schema = get_table_columns(db2_path)
+    for i in range(len(variable)):
+        df2 = df[['date', str(variable[i]).replace('PlotVar_', '')]]
+        year = variable[i][variable[i].find("20"):variable[i].find("20") + 4]
+        col_name = str(variable[i]).replace('PlotVar_', '')
+        
+        if "SevAdv" in variable[i]:
+            line = df2.plot.line(ax=ax, x='date', y=col_name, label=f"Severely Adverse {year}",
+                               color='r', style=linestyle_list[sevadv_cntr % len(linestyle_list)])
+            sevadv_cntr += 1
+        elif "Adv" in variable[i]:
+            line = df2.plot.line(ax=ax, x='date', y=col_name, label=f"Adverse {year}",
+                               color='b', style=linestyle_list[adv_cntr % len(linestyle_list)])
+            adv_cntr += 1
+        elif "Base" in variable[i]:
+            line = df2.plot.line(ax=ax, x='date', y=col_name, label=f"Baseline {year}",
+                               color='g', style=linestyle_list[base_cntr % len(linestyle_list)])
+            base_cntr += 1
+        else:
+            line = df2.plot.line(ax=ax, x='date', y=col_name, label="History",
+                               color='k', style=linestyle_list[0])
     
-    columns_only_in_db1 = {}
-    columns_only_in_db2 = {}
-    
-    for table1, cols1 in db1_schema.items():
-        if table1 in db2_schema:
-            cols2 = db2_schema[table1]
-            unique_cols = [col for col in cols1 if col not in cols2]
-            if unique_cols:
-                columns_only_in_db1[table1] = unique_cols
-    
-    for table2, cols2 in db2_schema.items():
-        if table2 in db1_schema:
-            cols1 = db1_schema[table2]
-            unique_cols = [col for col in cols2 if col not in cols1]
-            if unique_cols:
-                columns_only_in_db2[table2] = unique_cols
-    
-    df1 = pd.DataFrame.from_dict(columns_only_in_db1, orient='index')
-    df1.index.name = 'Table Name'
-    df1.columns = [f'Columns Unique to Database 1 (Column {i+1})' for i in range(len(df1.columns))]
-    
-    df2 = pd.DataFrame.from_dict(columns_only_in_db2, orient='index')
-    df2.index.name = 'Table Name'
-    df2.columns = [f'Columns Unique to Database 2 (Column {i+1})' for i in range(len(df2.columns))]
-    
-    return df1, df2
-
-result_df1, result_df2 = compare_schemas(self_loc_1, self_loc_2)
-
-print("Columns in Database 1 but not in Database 2:")
-print(result_df1)
-print("\nColumns in Database 2 but not in Database 1:")
-print(result_df2)
-
-
-
-
-
-
-
+    ax.set_title(f"Plot {title}")
+    ax.legend()
+    self.draw()
