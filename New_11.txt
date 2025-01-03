@@ -1,38 +1,27 @@
 def plot_multiple(self, df, variable, title):
     ax = self.figure.add_subplot(111)
     ax.cla()
-    linestyle_list = ['-', '--', '-.', ':']
-    sevadv_cntr = adv_cntr = base_cntr = 0
-    lines = []
-    legend_list = []
-    
-    try:
-        plt.style.use("seaborn-v0_8-ticks")
-    except:
-        plt.style.use("default")
+    linestyles = ['-', '--', '-.', ':']
+    counters = {'SevAdv': 0, 'Adv': 0, 'Base': 0}
+    colors = {'SevAdv': 'r', 'Adv': 'b', 'Base': 'g'}
     
     df.columns = df.columns.str.replace('PlotVar_', '')
     
-    for i in range(len(variable)):
-        df2 = df[['date', str(variable[i]).replace('PlotVar_', '')]]
-        year = variable[i][variable[i].find("20"):variable[i].find("20") + 4]
-        col_name = str(variable[i]).replace('PlotVar_', '')
+    for var in variable:
+        col_name = str(var).replace('PlotVar_', '')
+        df2 = df[['date', col_name]]
+        year = var[var.find("20"):var.find("20") + 4]
         
-        if "SevAdv" in variable[i]:
-            line = df2.plot.line(ax=ax, x='date', y=col_name, label=f"Severely Adverse {year}",
-                               color='r', style=linestyle_list[sevadv_cntr % len(linestyle_list)])
-            sevadv_cntr += 1
-        elif "Adv" in variable[i]:
-            line = df2.plot.line(ax=ax, x='date', y=col_name, label=f"Adverse {year}",
-                               color='b', style=linestyle_list[adv_cntr % len(linestyle_list)])
-            adv_cntr += 1
-        elif "Base" in variable[i]:
-            line = df2.plot.line(ax=ax, x='date', y=col_name, label=f"Baseline {year}",
-                               color='g', style=linestyle_list[base_cntr % len(linestyle_list)])
-            base_cntr += 1
+        for scenario in ['SevAdv', 'Adv', 'Base']:
+            if scenario in var:
+                ax.plot(df2['date'], df2[col_name], 
+                       color=colors[scenario],
+                       linestyle=linestyles[counters[scenario] % len(linestyles)],
+                       label=f"{scenario} {year}")
+                counters[scenario] += 1
+                break
         else:
-            line = df2.plot.line(ax=ax, x='date', y=col_name, label="History",
-                               color='k', style=linestyle_list[0])
+            ax.plot(df2['date'], df2[col_name], 'k-', label='History')
     
     ax.set_title(f"Plot {title}")
     ax.legend()
