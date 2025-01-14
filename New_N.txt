@@ -1,0 +1,108 @@
+import pandas as pd
+
+def tableInfo(self, depvarMnemonic, TOData_Mnemonic):
+    ret_ds = {}
+    term_loan_list = ['RC CONVERTIBLE TL', 'TERM LOAN']
+    
+    # List of TO files to process
+    tofname_list = [
+        'PPNR_Dec23 TO Limits by Cohort_01252024.xlsx',
+        'PPNR_Sep23 TO Limits by Cohort_01252024_AY.xlsx',
+        'PPNR_Jun23 TO Limits by Cohort_01252024_AY.xlsx',
+        'PPNR_Mar23 TO Limits by Cohort_06052023_AY_HSS.xlsx'
+    ]
+    
+    # Calculate TL_Util across all files
+    TL_Util = 0
+    for TOFname in tofname_list:
+        TOdata = pd.read_excel(self.modelscriptpath + '//' + TOFname, 'Combined Detail')
+        
+        # Calculate loan balance and limit amounts for term loans
+        loan_balance = TOdata.loc[
+            (TOdata['COHORT_V2'] == TOData_Mnemonic) & 
+            (TOdata['CP_IND_ALM'] != 1) & 
+            (TOdata['FACILITY TYPE DESCRIPTION'].isin(term_loan_list))
+        ]['LOAN_BAL_AMT'].sum()
+        
+        limit_amount = TOdata.loc[
+            (TOdata['COHORT_V2'] == TOData_Mnemonic) & 
+            (TOdata['CP_IND_ALM'] != 1) & 
+            (TOdata['FACILITY TYPE DESCRIPTION'].isin(term_loan_list))
+        ]['LIMIT_AMT'].sum()
+        
+        # Add to TL_Util if limit amount exists
+        if limit_amount != 0:
+            TL_Util += (loan_balance / limit_amount)
+    
+    # Calculate average TL_Util
+    TL_Util = TL_Util / len(tofname_list)
+    ret_ds['TL_Util'] = TL_Util
+    
+    # Process the latest TO file for other metrics
+    latest_TOfile = tofname_list[0]  # December 2023 file
+    TOdata = pd.read_excel(self.modelscriptpath + '//' + latest_TOfile, 'Combined Detail')
+    
+    # Total amounts
+    ret_ds[depvarMnemonic + '_E_TOT'] = TOdata.loc[TOdata['COHORT_V2'] == TOData_Mnemonic]['LIMIT_AMT'].sum()
+    ret_ds[depvarMnemonic + '_B_TOT'] = TOdata.loc[TOdata['COHORT_V2'] == TOData_Mnemonic]['LOAN_BAL_AMT'].sum()
+    ret_ds[depvarMnemonic + '_CONT_TOT'] = TOdata.loc[TOdata['COHORT_V2'] == TOData_Mnemonic]['CONTINGENT_BAL_AMT'].sum()
+    
+    # CP amounts
+    ret_ds[depvarMnemonic + '_E_CP'] = TOdata.loc[
+        (TOdata['COHORT_V2'] == TOData_Mnemonic) & 
+        (TOdata['CP_IND_ALM'] == 1)
+    ]['LIMIT_AMT'].sum()
+    
+    ret_ds[depvarMnemonic + '_B_CP'] = TOdata.loc[
+        (TOdata['COHORT_V2'] == TOData_Mnemonic) & 
+        (TOdata['CP_IND_ALM'] == 1)
+    ]['LOAN_BAL_AMT'].sum()
+    
+    ret_ds[depvarMnemonic + '_CONT_CP'] = TOdata.loc[
+        (TOdata['COHORT_V2'] == TOData_Mnemonic) & 
+        (TOdata['CP_IND_ALM'] == 1)
+    ]['CONTINGENT_BAL_AMT'].sum()
+    
+    # No CP Term Loan amounts
+    ret_ds[depvarMnemonic + '_E_NOCPTL'] = TOdata.loc[
+        (TOdata['COHORT_V2'] == TOData_Mnemonic) & 
+        (TOdata['CP_IND_ALM'] != 1) & 
+        (TOdata['FACILITY TYPE DESCRIPTION'].isin(term_loan_list))
+    ]['LIMIT_AMT'].sum()
+    
+    ret_ds[depvarMnemonic + '_B_NOCPTL'] = TOdata.loc[
+        (TOdata['COHORT_V2'] == TOData_Mnemonic) & 
+        (TOdata['CP_IND_ALM'] != 1) & 
+        (TOdata['FACILITY TYPE DESCRIPTION'].isin(term_loan_list))
+    ]['LOAN_BAL_AMT'].sum()
+    
+    ret_ds[depvarMnemonic + '_CONT_NOCPTL'] = TOdata.loc[
+        (TOdata['COHORT_V2'] == TOData_Mnemonic) & 
+        (TOdata['CP_IND_ALM'] != 1) & 
+        (TOdata['FACILITY TYPE DESCRIPTION'].isin(term_loan_list))
+    ]['CONTINGENT_BAL_AMT'].sum()
+    
+    # No CP No Term Loan amounts
+    ret_ds[depvarMnemonic + '_E_NOCPNOTL'] = TOdata.loc[
+        (TOdata['COHORT_V2'] == TOData_Mnemonic) & 
+        (TOdata['CP_IND_ALM'] != 1) & 
+        (~TOdata['FACILITY TYPE DESCRIPTION'].isin(term_loan_list))
+    ]['LIMIT_AMT'].sum()
+    
+    ret_ds[depvarMnemonic + '_B_NOCPNOTL'] = TOdata.loc[
+        (TOdata['COHORT_V2'] == TOData_Mnemonic) & 
+        (TOdata['CP_IND_ALM'] != 1) & 
+        (~TOdata['FACILITY TYPE DESCRIPTION'].isin(term_loan_list))
+    ]['LOAN_BAL_AMT'].sum()
+    
+    ret_ds[depvarMnemonic + '_CONT_NOCPNOTL'] = TOdata.loc[
+        (TOdata['COHORT_V2'] == TOData_Mnemonic) & 
+        (TOdata['CP_IND_ALM'] != 1) & 
+        (~TOdata['FACILITY TYPE DESCRIPTION'].isin(term_loan_list))
+    ]['CONTINGENT_BAL_AMT'].sum()
+    
+    return ret_ds
+
+# Example usage:
+# result = tableInfo(self, "depvar", "TOData_Mnemonic")
+# print(result)
