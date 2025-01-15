@@ -1,81 +1,212 @@
+import pandas as pd
 import sqlite3
-from datetime import datetime, date
 
-# First, create the 2025 table and copy data as before
-create_table_query = """
-CREATE TABLE IF NOT EXISTS CCAR_D_BHC_2025_Model AS 
-SELECT * FROM CCAR_D_BHC_2024_Model 
-WHERE 0
-"""
-
-insert_query = """
-INSERT INTO CCAR_D_BHC_2025_Model 
-SELECT * FROM CCAR_D_BHC_2024_Model 
-LIMIT 1
-"""
-
-# Update year and jumpoff
-update_query = """
-UPDATE CCAR_D_BHC_2025_Model 
-SET year = 2025,
-    jumpoff = date(jumpoff, '+1 year')
-"""
-
-# Add new columns and set their values
-def add_new_columns(cursor):
-    # Generate dates from 2026-04-30 to 2027-03-31
-    dates = []
-    start_date = date(2026, 4, 30)
-    while start_date <= date(2027, 3, 31):
-        column_name = start_date.strftime('%Y-%m-%d')
-        dates.append(column_name)
-        if start_date.month == 12:
-            start_date = date(start_date.year + 1, 1, 31)
-        else:
-            # Handle month endings
-            if start_date.month in [3, 5, 7, 8, 10]:
-                start_date = date(start_date.year, start_date.month + 1, 30)
-            elif start_date.month == 2:
-                start_date = date(start_date.year, start_date.month + 1, 31)
-            else:
-                start_date = date(start_date.year, start_date.month + 1, 31)
-
-    # Add columns and set values
-    for date_str in dates:
-        # Add column
-        alter_query = f"""
-        ALTER TABLE CCAR_D_BHC_2025_Model 
-        ADD COLUMN "{date_str}" REAL
-        """
-        cursor.execute(alter_query)
+def sync_ppnr_tables(self, excel_path):
+    try:
+        # Read Excel sheets
+        monthly_df = pd.read_excel(excel_path, sheet_name='Monthly')
+        quarterly_df = pd.read_excel(excel_path, sheet_name='Quarterly')
         
-        # Set value to 400000
-        update_value_query = f"""
-        UPDATE CCAR_D_BHC_2025_Model 
-        SET "{date_str}" = 400000
-        """
-        cursor.execute(update_value_query)
+        # Connect to database
+        conn = sqlite3.connect(self.sql_loc)
+        cursor = conn.cursor()
+        
+        # Function to get table columns
+        def get_table_columns(table_name):
+            cursor.execute(f"PRAGMA table_info({table_name})")
+            return [col[1] for col in cursor.fetchall()]
+        
+        # Get table columns
+        monthly_cols = get_table_columns('PPNR_Monthly_Table')
+        quarterly_cols = get_table_columns('PPNR_Quarterly_Table')
+        
+        # Filter Excel DataFrames to only include columns that exist in DB tables
+        monthly_df = monthly_df[monthly_df.columns.intersection(monthly_cols)]
+        quarterly_df = quarterly_df[quarterly_df.columns.intersection(quarterly_cols)]
+        
+        # Process Monthly Table
+        for _, row in monthly_df.iterrows():
+            date_value = row['date']  # Assuming 'date' is the column name
+            
+            # Check if date exists
+            cursor.execute("""
+                SELECT COUNT(*) FROM PPNR_Monthly_Table 
+                WHERE date = ?
+            """, (date_value,))
+            
+            date_exists = cursor.fetchone()[0] > 0
+            
+            if date_exists:
+                # Update existing record
+                update_cols = [col for col in monthly_df.columns if col != 'date']
+                set_clause = ", ".join([f"{col} = ?" for col in update_cols])
+                values = [row[col] for col in update_cols]
+                values.append(date_value)  # For WHERE clause
+                
+                cursor.execute(f"""
+                    UPDATE PPNR_Monthly_Table 
+                    SET {set_clause}
+                    WHERE date = ?
+                """, values)
+            else:
+                # Insert new record
+                cols = ", ".join(monthly_df.columns)
+                placeholders = ", ".join(["?" for _ in monthly_df.columns])
+                values = [row[col] for col in monthly_df.columns]
+                
+                cursor.execute(f"""
+                    INSERT INTO PPNR_Monthly_Table ({cols})
+                    VALUES ({placeholders})
+                """, values)
+        
+        # Process Quarterly Table
+        for _, row in quarterly_df.iterrows():
+            date_value = row['date']  # Assuming 'date' is the column name
+            
+            # Check if date exists
+            cursor.execute("""
+                SELECT COUNT(*) FROM PPNR_Quarterly_Table 
+                WHERE date = ?
+            """, (date_value,))
+            
+            date_exists = cursor.fetchone()[0] > 0
+            
+            if date_exists:
+                # Update existing record
+                update_cols = [col for col in quarterly_df.columns if col != 'date']
+                set_clause = ", ".join([f"{col} = ?" for col in update_cols])
+                values = [row[col] for col in update_cols]
+                values.append(date_value)  # For WHERE clause
+                
+                cursor.execute(f"""
+                    UPDATE PPNR_Quarterly_Table 
+                    SET {set_clause}
+                    WHERE date = ?
+                """, values)
+            else:
+                # Insert new record
+                cols = ", ".join(quarterly_df.columns)
+                placeholders = ", ".join(["?" for _ in quarterly_df.columns])
+                values = [row[col] for col in quarterly_df.columns]
+                
+                cursor.execute(f"""
+                    INSERT INTO PPNR_Quarterly_Table ({cols})
+                    VALUES ({placeholders})
+                """, values)
+        
+        # Commit changes
+        conn.commit()
+        print("PPNR tables updated successfully!")
+        
+    except Exception as e:
+        print(f"An error occurred: {str(e)}")
+        conn.rollback()
+        
+    finally:
+        if conn:
+            conn.close()
 
-try:
-    # Connect to database
-    conn = sqlite3.connect(self.sql_db)
-    cursor = conn.cursor()
+# Example usage:
+# sync_ppnr_tables(self, 'path_to_your_excel_file.xlsx')
+
+
+
+
+
+
+
+
+
+import sqlite3
+from pathlib import Path
+
+def copy_tables(source_db_path, dest_db_path):
+    """
+    Copy tables from source SQLite database to destination SQLite database.
     
-    # Execute initial queries
-    cursor.execute(create_table_query)
-    cursor.execute(insert_query)
-    cursor.execute(update_query)
+    Args:
+        source_db_path (str): Path to source database
+        dest_db_path (str): Path to destination database
+    """
+    try:
+        # Ensure both database files exist
+        if not Path(source_db_path).exists():
+            raise FileNotFoundError(f"Source database not found: {source_db_path}")
+        if not Path(dest_db_path).exists():
+            raise FileNotFoundError(f"Destination database not found: {dest_db_path}")
+
+        # Connect to both databases
+        source_conn = sqlite3.connect(source_db_path)
+        dest_conn = sqlite3.connect(dest_db_path)
+        
+        # Tables to copy
+        tables = ['CCAR_D_BHC_2024_Model', 'CCAR_BHC_2024_Model']
+        
+        # Copy each table
+        for table in tables:
+            print(f"\nProcessing table: {table}")
+            
+            try:
+                # Get the schema from source table
+                cursor = source_conn.execute(f"SELECT sql FROM sqlite_master WHERE type='table' AND name=?", (table,))
+                schema = cursor.fetchone()
+                
+                if not schema:
+                    print(f"Warning: Table {table} not found in source database")
+                    continue
+                
+                # Drop existing table in destination if it exists
+                dest_conn.execute(f"DROP TABLE IF EXISTS {table}")
+                
+                # Create new table in destination
+                dest_conn.execute(schema[0])
+                
+                # Copy data
+                source_data = source_conn.execute(f"SELECT * FROM {table}")
+                data = source_data.fetchall()
+                
+                if data:
+                    # Get column names
+                    columns = [description[0] for description in source_data.description]
+                    placeholders = ','.join(['?' for _ in columns])
+                    
+                    # Insert data
+                    dest_conn.executemany(
+                        f"INSERT INTO {table} ({','.join(columns)}) VALUES ({placeholders})",
+                        data
+                    )
+                
+                # Commit changes
+                dest_conn.commit()
+                
+                # Verify row counts
+                source_count = source_conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+                dest_count = dest_conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+                
+                print(f"Table: {table}")
+                print(f"Source rows: {source_count}")
+                print(f"Destination rows: {dest_count}")
+                print(f"Verification: {'SUCCESS' if source_count == dest_count else 'FAILED'}")
+                
+            except sqlite3.Error as e:
+                print(f"Error processing table {table}: {str(e)}")
+                
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        
+    finally:
+        # Close connections
+        try:
+            source_conn.close()
+            dest_conn.close()
+        except:
+            pass
+
+if __name__ == "__main__":
+    # Specify your database paths
+    source_db = "self_ref_db"
+    dest_db = "self_uploading_db"
     
-    # Add new columns with values
-    add_new_columns(cursor)
-    
-    # Commit changes
-    conn.commit()
-    print("Table updated successfully with new columns!")
-    
-except Exception as e:
-    print(f"An error occurred: {str(e)}")
-    
-finally:
-    if conn:
-        conn.close()
+    print(f"Starting table copy from {source_db} to {dest_db}")
+    copy_tables(source_db, dest_db)
+    print("\nProcess completed")
