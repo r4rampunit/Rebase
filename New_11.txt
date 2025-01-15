@@ -1,0 +1,44 @@
+import sqlite3
+
+# Create the new table query
+create_table_query = f"""
+CREATE TABLE IF NOT EXISTS CCAR_D_BHC_2025_Model AS 
+SELECT * FROM CCAR_D_BHC_2024_Model 
+WHERE 0
+"""
+
+# Insert first row and update year query 
+insert_query = f"""
+INSERT INTO CCAR_D_BHC_2025_Model 
+SELECT * FROM CCAR_D_BHC_2024_Model 
+LIMIT 1
+"""
+
+# Update year and jumpoff date
+update_query = f"""
+UPDATE CCAR_D_BHC_2025_Model 
+SET year = 2025,
+   jumpoff = date(jumpoff, '+1 year')
+"""
+
+try:
+   # Connect to the database
+   conn = sqlite3.connect(self.sql_db)
+   cursor = conn.cursor()
+   
+   # Execute queries
+   cursor.execute(create_table_query)
+   cursor.execute(insert_query)
+   cursor.execute(update_query)
+   
+   # Commit changes
+   conn.commit()
+   print("New table created successfully with updated year and jumpoff date!")
+   
+except Exception as e:
+   print(f"An error occurred: {str(e)}")
+   
+finally:
+   # Close the connection
+   if conn:
+       conn.close()
