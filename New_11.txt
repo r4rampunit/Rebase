@@ -1,0 +1,81 @@
+import sqlite3
+from datetime import datetime, date
+
+# First, create the 2025 table and copy data as before
+create_table_query = """
+CREATE TABLE IF NOT EXISTS CCAR_D_BHC_2025_Model AS 
+SELECT * FROM CCAR_D_BHC_2024_Model 
+WHERE 0
+"""
+
+insert_query = """
+INSERT INTO CCAR_D_BHC_2025_Model 
+SELECT * FROM CCAR_D_BHC_2024_Model 
+LIMIT 1
+"""
+
+# Update year and jumpoff
+update_query = """
+UPDATE CCAR_D_BHC_2025_Model 
+SET year = 2025,
+    jumpoff = date(jumpoff, '+1 year')
+"""
+
+# Add new columns and set their values
+def add_new_columns(cursor):
+    # Generate dates from 2026-04-30 to 2027-03-31
+    dates = []
+    start_date = date(2026, 4, 30)
+    while start_date <= date(2027, 3, 31):
+        column_name = start_date.strftime('%Y-%m-%d')
+        dates.append(column_name)
+        if start_date.month == 12:
+            start_date = date(start_date.year + 1, 1, 31)
+        else:
+            # Handle month endings
+            if start_date.month in [3, 5, 7, 8, 10]:
+                start_date = date(start_date.year, start_date.month + 1, 30)
+            elif start_date.month == 2:
+                start_date = date(start_date.year, start_date.month + 1, 31)
+            else:
+                start_date = date(start_date.year, start_date.month + 1, 31)
+
+    # Add columns and set values
+    for date_str in dates:
+        # Add column
+        alter_query = f"""
+        ALTER TABLE CCAR_D_BHC_2025_Model 
+        ADD COLUMN "{date_str}" REAL
+        """
+        cursor.execute(alter_query)
+        
+        # Set value to 400000
+        update_value_query = f"""
+        UPDATE CCAR_D_BHC_2025_Model 
+        SET "{date_str}" = 400000
+        """
+        cursor.execute(update_value_query)
+
+try:
+    # Connect to database
+    conn = sqlite3.connect(self.sql_db)
+    cursor = conn.cursor()
+    
+    # Execute initial queries
+    cursor.execute(create_table_query)
+    cursor.execute(insert_query)
+    cursor.execute(update_query)
+    
+    # Add new columns with values
+    add_new_columns(cursor)
+    
+    # Commit changes
+    conn.commit()
+    print("Table updated successfully with new columns!")
+    
+except Exception as e:
+    print(f"An error occurred: {str(e)}")
+    
+finally:
+    if conn:
+        conn.close()
