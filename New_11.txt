@@ -1,212 +1,215 @@
+import sqlite3
 import pandas as pd
-import sqlite3
-
-def sync_ppnr_tables(self, excel_path):
-    try:
-        # Read Excel sheets
-        monthly_df = pd.read_excel(excel_path, sheet_name='Monthly')
-        quarterly_df = pd.read_excel(excel_path, sheet_name='Quarterly')
-        
-        # Connect to database
-        conn = sqlite3.connect(self.sql_loc)
-        cursor = conn.cursor()
-        
-        # Function to get table columns
-        def get_table_columns(table_name):
-            cursor.execute(f"PRAGMA table_info({table_name})")
-            return [col[1] for col in cursor.fetchall()]
-        
-        # Get table columns
-        monthly_cols = get_table_columns('PPNR_Monthly_Table')
-        quarterly_cols = get_table_columns('PPNR_Quarterly_Table')
-        
-        # Filter Excel DataFrames to only include columns that exist in DB tables
-        monthly_df = monthly_df[monthly_df.columns.intersection(monthly_cols)]
-        quarterly_df = quarterly_df[quarterly_df.columns.intersection(quarterly_cols)]
-        
-        # Process Monthly Table
-        for _, row in monthly_df.iterrows():
-            date_value = row['date']  # Assuming 'date' is the column name
-            
-            # Check if date exists
-            cursor.execute("""
-                SELECT COUNT(*) FROM PPNR_Monthly_Table 
-                WHERE date = ?
-            """, (date_value,))
-            
-            date_exists = cursor.fetchone()[0] > 0
-            
-            if date_exists:
-                # Update existing record
-                update_cols = [col for col in monthly_df.columns if col != 'date']
-                set_clause = ", ".join([f"{col} = ?" for col in update_cols])
-                values = [row[col] for col in update_cols]
-                values.append(date_value)  # For WHERE clause
-                
-                cursor.execute(f"""
-                    UPDATE PPNR_Monthly_Table 
-                    SET {set_clause}
-                    WHERE date = ?
-                """, values)
-            else:
-                # Insert new record
-                cols = ", ".join(monthly_df.columns)
-                placeholders = ", ".join(["?" for _ in monthly_df.columns])
-                values = [row[col] for col in monthly_df.columns]
-                
-                cursor.execute(f"""
-                    INSERT INTO PPNR_Monthly_Table ({cols})
-                    VALUES ({placeholders})
-                """, values)
-        
-        # Process Quarterly Table
-        for _, row in quarterly_df.iterrows():
-            date_value = row['date']  # Assuming 'date' is the column name
-            
-            # Check if date exists
-            cursor.execute("""
-                SELECT COUNT(*) FROM PPNR_Quarterly_Table 
-                WHERE date = ?
-            """, (date_value,))
-            
-            date_exists = cursor.fetchone()[0] > 0
-            
-            if date_exists:
-                # Update existing record
-                update_cols = [col for col in quarterly_df.columns if col != 'date']
-                set_clause = ", ".join([f"{col} = ?" for col in update_cols])
-                values = [row[col] for col in update_cols]
-                values.append(date_value)  # For WHERE clause
-                
-                cursor.execute(f"""
-                    UPDATE PPNR_Quarterly_Table 
-                    SET {set_clause}
-                    WHERE date = ?
-                """, values)
-            else:
-                # Insert new record
-                cols = ", ".join(quarterly_df.columns)
-                placeholders = ", ".join(["?" for _ in quarterly_df.columns])
-                values = [row[col] for col in quarterly_df.columns]
-                
-                cursor.execute(f"""
-                    INSERT INTO PPNR_Quarterly_Table ({cols})
-                    VALUES ({placeholders})
-                """, values)
-        
-        # Commit changes
-        conn.commit()
-        print("PPNR tables updated successfully!")
-        
-    except Exception as e:
-        print(f"An error occurred: {str(e)}")
-        conn.rollback()
-        
-    finally:
-        if conn:
-            conn.close()
-
-# Example usage:
-# sync_ppnr_tables(self, 'path_to_your_excel_file.xlsx')
-
-
-
-
-
-
-
-
-
-import sqlite3
 from pathlib import Path
+import re
+import logging
+from datetime import datetime
+from collections import Counter
+from typing import Dict, Set, List
 
-def copy_tables(source_db_path, dest_db_path):
-    """
-    Copy tables from source SQLite database to destination SQLite database.
+# Set up logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler(f'db_transformation_{datetime.now().strftime("%Y%m%d_%H%M%S")}.log'),
+        logging.StreamHandler()
+    ]
+)
+
+def get_dynamic_priority_terms(descriptions: List[str]) -> Set[str]:
+
+    skip_words = {
+        'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 
+        'for', 'of', 'with', 'by', 'from', 'up', 'about', 'into', 
+        'over', 'after', 'fully', 'consolidated', 'non', 'us', 'domicile'
+    }
     
-    Args:
-        source_db_path (str): Path to source database
-        dest_db_path (str): Path to destination database
-    """
-    try:
-        # Ensure both database files exist
-        if not Path(source_db_path).exists():
-            raise FileNotFoundError(f"Source database not found: {source_db_path}")
-        if not Path(dest_db_path).exists():
-            raise FileNotFoundError(f"Destination database not found: {dest_db_path}")
+    word_freq = Counter()
+    end_word_freq = Counter()
+    
+    for desc in descriptions:
+        desc = re.sub(r'\([^)]*\)', '', desc.lower())
+        words = re.sub(r'[^a-z0-9\s]', ' ', desc).split()
+        
+        words = [w for w in words 
+                if w not in skip_words 
+                and not any(char.isdigit() for char in w)]
+        
+        word_freq.update(words)
+        
+        if words:
+            end_word_freq.update([words[-1]])
+    
+    total_freq = Counter()
+    for word, freq in word_freq.items():
+        total_freq[word] = freq
+        if word in end_word_freq:
+            total_freq[word] += end_word_freq[word] * 2
+    
+    avg_freq = sum(total_freq.values()) / len(total_freq)
+    priority_terms = {word for word, freq in total_freq.items() 
+                     if freq > avg_freq}
+    
+    return priority_terms
 
-        # Connect to both databases
-        source_conn = sqlite3.connect(source_db_path)
-        dest_conn = sqlite3.connect(dest_db_path)
+def clean_description_to_column_name(description: str, priority_terms: Set[str]) -> str:
+
+    name = description.lower()
+    
+    name = re.sub(r'\([^)]*\)', '', name)
+    
+    parts = name.split('-')
+    
+    last_part = parts[-1].strip() if parts else ''
+    main_desc = ' '.join(parts[:-1]).strip() if len(parts) > 1 else name
+    
+    skip_words = {
+        'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 
+        'for', 'of', 'with', 'by', 'from', 'up', 'about', 'into', 
+        'over', 'after', 'fully', 'consolidated', 'non', 'us', 'domicile'
+    }
+    
+    def process_text(text):
+        words = re.sub(r'[^a-z0-9\s]', ' ', text.lower()).split()
+        seen = set()
+        return [w for w in words 
+                if not any(char.isdigit() for char in w)
+                and w not in skip_words
+                and not (w in seen or seen.add(w))]
+    
+    main_words = process_text(main_desc)
+    last_words = process_text(last_part)
+    
+    all_words = []
+    
+    priority_matches = [w for w in main_words + last_words if w in priority_terms]
+    all_words.extend(priority_matches[:2])
+    
+    if last_words and last_words[-1] not in all_words:
+        all_words.append(last_words[-1])
+    
+    while len(all_words) < 3 and main_words:
+        word = main_words.pop(0)
+        if word not in all_words:
+            all_words.append(word)
+    
+    column_name = '_'.join(all_words)
+    column_name = re.sub(r'[^a-z0-9_]', '', column_name)
+    
+    return column_name if column_name[0].isalpha() else f'col_{column_name}'
+
+
+
+def validate_mapping_file(mapping_df):
+
+    required_columns = {'MDRM', 'Line Item Description'}
+    missing_columns = required_columns - set(mapping_df.columns)
+    
+    if missing_columns:
+        raise ValueError(f"Missing required columns in mapping file: {missing_columns}")
+    
+    if mapping_df.empty:
+        raise ValueError("Mapping file is empty")
+    
+    return True
+
+
+
+def create_column_mapping(mapping_df: pd.DataFrame) -> Dict[str, str]:
+
+    all_descriptions = mapping_df['Line Item Description'].dropna().tolist()
+    priority_terms = get_dynamic_priority_terms(all_descriptions)
+    
+    logging.info(f"Identified {len(priority_terms)} priority terms from {len(all_descriptions)} descriptions")
+    
+    mapping_dict = {}
+    duplicates = set()
+    
+    for _, row in mapping_df.iterrows():
+        mdrm = row['MDRM']
+        description = row['Line Item Description']
         
-        # Tables to copy
-        tables = ['CCAR_D_BHC_2024_Model', 'CCAR_BHC_2024_Model']
-        
-        # Copy each table
-        for table in tables:
-            print(f"\nProcessing table: {table}")
+        if pd.isna(mdrm) or pd.isna(description):
+            logging.warning(f"Skipping row with missing data: MDRM={mdrm}, Description={description}")
+            continue
             
-            try:
-                # Get the schema from source table
-                cursor = source_conn.execute(f"SELECT sql FROM sqlite_master WHERE type='table' AND name=?", (table,))
-                schema = cursor.fetchone()
-                
-                if not schema:
-                    print(f"Warning: Table {table} not found in source database")
-                    continue
-                
-                # Drop existing table in destination if it exists
-                dest_conn.execute(f"DROP TABLE IF EXISTS {table}")
-                
-                # Create new table in destination
-                dest_conn.execute(schema[0])
-                
-                # Copy data
-                source_data = source_conn.execute(f"SELECT * FROM {table}")
-                data = source_data.fetchall()
-                
-                if data:
-                    # Get column names
-                    columns = [description[0] for description in source_data.description]
-                    placeholders = ','.join(['?' for _ in columns])
-                    
-                    # Insert data
-                    dest_conn.executemany(
-                        f"INSERT INTO {table} ({','.join(columns)}) VALUES ({placeholders})",
-                        data
-                    )
-                
-                # Commit changes
-                dest_conn.commit()
-                
-                # Verify row counts
-                source_count = source_conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
-                dest_count = dest_conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
-                
-                print(f"Table: {table}")
-                print(f"Source rows: {source_count}")
-                print(f"Destination rows: {dest_count}")
-                print(f"Verification: {'SUCCESS' if source_count == dest_count else 'FAILED'}")
-                
-            except sqlite3.Error as e:
-                print(f"Error processing table {table}: {str(e)}")
-                
-    except Exception as e:
-        print(f"Error: {str(e)}")
+        new_name = clean_description_to_column_name(description, priority_terms)
         
-    finally:
-        # Close connections
-        try:
-            source_conn.close()
-            dest_conn.close()
-        except:
-            pass
+        base_name = new_name
+        counter = 1
+        while new_name in mapping_dict.values():
+            new_name = f"{base_name}_{counter}"
+            counter += 1
+            duplicates.add(base_name)
+        
+        mapping_dict[mdrm] = new_name
+    
+    if duplicates:
+        logging.info(f"Handled duplicate names for: {duplicates}")
+    
+    return mapping_dict
+
+
+
+
+def process_database(source_db_path, target_db_path, mapping_dict):
+
+    with sqlite3.connect(source_db_path) as source_conn, \
+         sqlite3.connect(target_db_path) as target_conn:
+        
+        cursor = source_conn.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+        tables = [row[0] for row in cursor.fetchall()]
+        
+        for table_name in tables:
+            try:
+                cursor.execute(f"PRAGMA table_info({table_name});")
+                columns = [row[1] for row in cursor.fetchall()]
+                
+                new_columns = {col: mapping_dict.get(col, col) for col in columns}
+                
+                df = pd.read_sql_query(f"SELECT * FROM {table_name}", source_conn)
+                df = df.rename(columns=new_columns)
+                
+                df.to_sql(table_name, target_conn, index=False, if_exists='replace')
+                
+                changes = {col: new_col for col, new_col in new_columns.items() if col != new_col}
+                if changes:
+                    logging.info(f"Table {table_name} - Renamed columns: {changes}")
+                else:
+                    logging.info(f"Table {table_name} - No columns renamed")
+                
+            except Exception as e:
+                logging.error(f"Error processing table {table_name}: {str(e)}")
+                raise
+
+def main():
+    try:
+        source_db = Path("self_loc/raw.sqlite")
+        target_db = Path("self_loc/mirror.sqlite")
+        mapping_file = Path("path_to_your_excel_file.xlsx")
+        if not source_db.exists():
+            raise FileNotFoundError(f"Source database not found: {source_db}")
+        
+        if not mapping_file.exists():
+            raise FileNotFoundError(f"Mapping file not found: {mapping_file}")
+        
+        logging.info("Reading mapping file...")
+        mapping_df = pd.read_excel(mapping_file)
+        validate_mapping_file(mapping_df)
+        
+        logging.info("Creating column mapping...")
+        mapping_dict = create_column_mapping(mapping_df)
+        
+        logging.info("Starting database transformation...")
+        process_database(str(source_db), str(target_db), mapping_dict)
+        
+        logging.info("Database transformation completed successfully!")
+        
+    except Exception as e:
+        logging.error(f"Error during database transformation: {str(e)}")
+        raise
 
 if __name__ == "__main__":
-    # Specify your database paths
-    source_db = "self_ref_db"
-    dest_db = "self_uploading_db"
-    
-    print(f"Starting table copy from {source_db} to {dest_db}")
-    copy_tables(source_db, dest_db)
-    print("\nProcess completed")
+    main()
