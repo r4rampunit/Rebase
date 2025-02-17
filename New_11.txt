@@ -1,181 +1,56 @@
 import os
 import pandas as pd
 from concurrent.futures import ThreadPoolExecutor
-from functools import lru_cache
-from django.core.cache import cache
+import dask.dataframe as dd
+from functools import partial
 import numpy as np
-from django.shortcuts import render
-from django.views.decorators.csrf import csrf_exempt
 
-FOLDER_PATH = '/path/to/your/folder'  # Replace with your actual folder path
-MAX_WORKERS = 4  # Adjust based on your CPU cores
-CHUNK_SIZE = 5000  # Adjust based on your memory constraints
-
-# List of columns you actually need - replace with your actual column names
-REQUIRED_COLUMNS = [
-    'column1',
-    'column2',
-    # Add only the columns you actually use
-]
-
-@lru_cache(maxsize=32)
-def get_folders():
-    return [f.name for f in os.scandir(FOLDER_PATH) if f.is_dir()]
-
-@lru_cache(maxsize=32)
-def get_subfolders(folder_name):
-    folder_path = os.path.join(FOLDER_PATH, folder_name)
-    return [f.name for f in os.scandir(folder_path) if f.is_dir()]
-
-def read_excel_file(file_path):
-    """Read Excel file with optimizations"""
-    cache_key = f'excel_file_{os.path.basename(file_path)}_{os.path.getmtime(file_path)}'
-    cached_df = cache.get(cache_key)
-    
-    if cached_df is not None:
-        return pd.read_pickle(cached_df)
-    
+def read_single_excel(file_path):
+    """Optimized function to read a single Excel file"""
     try:
-        # Read Excel in chunks with only required columns
-        chunks = []
-        for chunk in pd.read_excel(
+        # Read with optimized settings
+        df = pd.read_excel(
             file_path,
             engine='openpyxl',
-            usecols=REQUIRED_COLUMNS,
-            chunksize=CHUNK_SIZE,
+            dtype_backend='pyarrow',  # Use PyArrow backend for better performance
+            engine_kwargs={'options': {'string_storage': 'pyarrow'}},
             dtype={
-                # Specify datatypes for faster reading and less memory usage
-                'numeric_column': 'float32',
-                'integer_column': 'int32',
-                'category_column': 'category',
-                'date_column': 'datetime64[ns]'
+                # Define common column types - adjust based on your data
+                'float_columns': 'float32',
+                'int_columns': 'int32',
+                'date_columns': 'datetime64[ns]',
+                'text_columns': 'category'
             }
-        ):
-            # Optimize memory usage for each chunk
-            for col in chunk.select_dtypes(include=['object']):
-                if chunk[col].nunique() / len(chunk) < 0.5:
-                    chunk[col] = chunk[col].astype('category')
-            chunks.append(chunk)
-        
-        df = pd.concat(chunks, ignore_index=True)
-        
-        # Cache the result
-        cache_path = f'/tmp/{cache_key}.pkl'
-        df.to_pickle(cache_path)
-        cache.set(cache_key, cache_path, timeout=3600)  # Cache for 1 hour
-        
-        return df
+        )
+        return os.path.basename(file_path), df
     except Exception as e:
-        print(f"Error reading {file_path}: {e}")
-        return pd.DataFrame()
-
-def process_dataframe(df):
-    """Process single dataframe to extract required views"""
-    # Add your processing logic here
-    # This is a placeholder - replace with your actual processing
-    processed = {
-        'lic_hbap_first_run': df[df['run_type'] == 'first_run'].copy() if 'run_type' in df.columns else pd.DataFrame(),
-        'lic_hbap_last_run': df[df['run_type'] == 'last_run'].copy() if 'run_type' in df.columns else pd.DataFrame(),
-        # Add other views as needed
-    }
-    return processed
+        print(f"Error reading {file_path}: {str(e)}")
+        return os.path.basename(file_path), pd.DataFrame()
 
 def read_excel_files(folder_name, subfolder_name):
-    """Read and process Excel files with caching"""
-    cache_key = f'processed_data_{folder_name}_{subfolder_name}'
-    cached_data = cache.get(cache_key)
-    
-    if cached_data is not None:
-        return {k: pd.read_pickle(v) for k, v in cached_data.items()}
-    
+    """Read multiple Excel files in parallel with optimizations"""
     folder_path = os.path.join(FOLDER_PATH, folder_name, subfolder_name)
-    excel_files = [f for f in os.listdir(folder_path) if f.endswith('.xlsx')]
+    excel_files = [f for f in os.listdir(folder_path) if f.endswith(('.xlsx', '.xls'))]
     
-    # Process files in parallel
+    # Create list of file paths
+    file_paths = [os.path.join(folder_path, excel_file) for excel_file in excel_files]
+    
+    # Initialize dictionary for dataframes
     dataframes = {}
-    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-        future_to_file = {
-            executor.submit(read_excel_file, os.path.join(folder_path, excel_file)): excel_file 
-            for excel_file in excel_files
-        }
+    
+    # Use ThreadPoolExecutor with optimal number of workers
+    with ThreadPoolExecutor(max_workers=6) as executor:  # 6 workers for 12 files
+        # Submit all file reading tasks
+        future_to_file = {executor.submit(read_single_excel, file_path): file_path 
+                         for file_path in file_paths}
         
+        # Collect results as they complete
         for future in future_to_file:
-            file_name = future_to_file[future]
             try:
-                df = future.result()
+                filename, df = future.result()
                 if not df.empty:
-                    processed = process_dataframe(df)
-                    dataframes.update(processed)
+                    dataframes[filename] = df
             except Exception as e:
-                print(f"Error processing {file_name}: {e}")
+                print(f"Error processing {future_to_file[future]}: {str(e)}")
     
-    # Cache the processed results
-    cached_paths = {}
-    for key, df in dataframes.items():
-        cache_path = f'/tmp/processed_{key}.pkl'
-        df.to_pickle(cache_path)
-        cached_paths[key] = cache_path
-    
-    cache.set(cache_key, cached_paths, timeout=3600)
     return dataframes
-
-def dashboard(request):
-    folders = get_folders()
-    selected_folder = request.GET.get("folder", None)
-    selected_subfolder = request.GET.get("subfolder", None)
-    subfolders = get_subfolders(selected_folder) if selected_folder else []
-    
-    dataframes = {}
-    if selected_folder and selected_subfolder:
-        dataframes = read_excel_files(selected_folder, selected_subfolder)
-    
-    context = {
-        "folders": folders,
-        "subfolders": subfolders,
-        "selected_folder": selected_folder,
-        "selected_subfolder": selected_subfolder,
-        "dataframes": dataframes
-    }
-    return render(request, 'mi_templates/dashboard.html', context)
-
-@csrf_exempt
-def mi_chart(request):
-    selected_folder = request.GET.get("folder", None)
-    selected_subfolder = request.GET.get("subfolder", None)
-    
-    dataframes = {}
-    if selected_folder and selected_subfolder:
-        dataframes = read_excel_files(selected_folder, selected_subfolder)
-    
-    # Extract required dataframes
-    lic_hbap_first_run = dataframes.get('lic_hbap_first_run', pd.DataFrame())
-    lic_hbap_last_run = dataframes.get('lic_hbap_last_run', pd.DataFrame())
-    # Add other dataframe extractions as needed
-    
-    row_names = [
-        'Gross Balance ($ MM)', 'Net Balance ($ MM)', 'Net Balance Proportion S1',
-        'Net Balance Proportion S2', 'Net Balance Proportion S3', 'ECL ($ MM)',
-        'ECL Original ($ MM)', 'ECL Rate', 'Loss at WD ($ MM)', 'Loss at WD Original ($ MM)',
-        'LIC ($ MM)', 'LIC Original ($ MM)', 'LIC Overlay ($ MM)', 'LIC Rate',
-        'Coverage ratio', 'PD', 'LGD', 'EAD ($ MM)', 'RWA ($ MM)', 'RWA Original ($ MM)',
-        'RWA Overlay ($ MM)', 'RWA Density', 'EL ($ MM)', 'EL Overlay ($ MM)', 'EL Density'
-    ]
-    
-    column_names = ['T1', 'T2', 'T3', 'T4', 'T5', 'T6']
-    table_df = pd.DataFrame(index=row_names, columns=column_names)
-    table_html = table_df.to_html(classes="table table-striped table-bordered", index=True)
-    
-    dropdown_options = {
-        'Organisational_unit_level_1': 11,
-        'Organisational_unit_level_2': 12,
-        'Organisational_unit_level_3': 13,
-        'Country_of_Exposure': 14,
-        'Asset class': 15,
-        'Product Type': 16,
-        'Basel Approach': 17,
-        'ST_scenario': 18,
-        'table_html': table_html,
-        'dataframes': dataframes  # Include processed dataframes in context
-    }
-    
-    return render(request, 'mi_templates/mi_chart.html', dropdown_options)
