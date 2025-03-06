@@ -1,3 +1,150 @@
+import os
+import pandas as pd
+import sqlite3
+from concurrent.futures import ProcessPoolExecutor
+import pyarrow as pa
+import pyarrow.parquet as pq
+from django.conf import settings
+from functools import partial
+
+# Constants
+FOLDER_PATH = settings.FOLDER_PATH  # Define this in your Django settings
+DB_PATH = os.path.join(settings.BASE_DIR, 'db.sqlite3')
+PARQUET_FOLDER = os.path.join(settings.BASE_DIR, 'parquet_files')
+
+# Create parquet folder if it doesn't exist
+os.makedirs(PARQUET_FOLDER, exist_ok=True)
+
+def get_folders():
+    return [f.name for f in os.scandir(FOLDER_PATH) if f.is_dir()]
+
+def get_subfolders(folder_name):
+    folder_path = os.path.join(FOLDER_PATH, folder_name)
+    return [f.name for f in os.scandir(folder_path) if f.is_dir()]
+
+def process_excel_file(args):
+    """Process a single Excel file and save as parquet"""
+    file_path, sheet_name, variable_name = args
+    try:
+        df = pd.read_excel(file_path, sheet_name=sheet_name)
+        parquet_path = os.path.join(PARQUET_FOLDER, f"{variable_name}.parquet")
+        df.to_parquet(parquet_path, engine='pyarrow', compression='snappy')
+        return variable_name, parquet_path
+    except Exception as e:
+        return variable_name, str(e)
+
+def read_excel_files(folder_name, subfolder_name):
+    """Optimized function to read Excel files in parallel and store as parquet"""
+    folder_path = os.path.join(FOLDER_PATH, folder_name, subfolder_name)
+    
+    # Define the Excel files and their corresponding variable names and sheets
+    excel_config = {
+        'lic_hbap_first_run': ("LPACT_OL_YTD_QTR_Final", "first_run_lic_hbap"),
+        'lic_hbap_last_run': ("LPACT_OL_YTD_QTR_Final", "last_run_lic_hbap"),
+        'lpact_hbap_data': ("PD series", "pd_series_hbap"),
+        'lic_non_hbap_first_run': ("LPACT_OL_YTD_QTR_Final", "first_run_lic_non_hbap"),
+        'lic_non_hbap_last_run': ("LPACT_OL_YTD_QTR_Final", "last_run_lic_non_hbap"),
+        'lpact_non_hbap_data': ("PD series", "pd_series_non_hbap"),
+        'rwa_hbap_first_run': ("Temp_RRM_Final_OL", "first_run_rwa_hbap"),
+        'rwa_hbap_last_run': ("Temp_RRM_Final_OL", "last_run_rwa_hbap"),
+        'rwa_non_hbap_first_run': ("Temp_RRM_Final_OL", "first_run_rwa_non_hbap"),
+        'rwa_non_hbap_last_run': ("Temp_RRM_Final_OL", "last_run_rwa_non_hbap"),
+        'lic_views_previous': ("LIC_raw1", "previous_lic"),
+        'rwa_views_previous': ("RWA_raw1", "previous_rwa")
+    }
+    
+    # Prepare arguments for parallel processing
+    process_args = []
+    for excel_file in os.listdir(folder_path):
+        if excel_file.endswith('.xlsx'):
+            file_path = os.path.join(folder_path, excel_file)
+            for var_name, (sheet_name, parquet_name) in excel_config.items():
+                process_args.append((file_path, sheet_name, parquet_name))
+
+    # Process files in parallel
+    results = {}
+    with ProcessPoolExecutor() as executor:
+        for var_name, path_or_error in executor.map(process_excel_file, process_args):
+            if not isinstance(path_or_error, str) or not path_or_error.startswith('Error'):
+                results[var_name] = path_or_error
+
+    return results
+
+def load_parquet_files(parquet_paths):
+    """Load all parquet files into DataFrames"""
+    dataframes = {}
+    for var_name, path in parquet_paths.items():
+        try:
+            dataframes[var_name] = pd.read_parquet(path)
+        except Exception as e:
+            print(f"Error loading {var_name}: {str(e)}")
+    return dataframes
+
+def dashboard(request):
+    folders = get_folders()
+    selected_folder = request.GET.get("folder", None)
+    selected_subfolder = request.GET.get("subfolder", None)
+    subfolders = get_subfolders(selected_folder) if selected_folder else []
+    dataframes = {}
+
+    if selected_folder and selected_subfolder:
+        parquet_paths = read_excel_files(selected_folder, selected_subfolder)
+        dataframes = load_parquet_files(parquet_paths)
+
+    context = {
+        "folders": folders,
+        "subfolders": subfolders,
+        "selected_folder": selected_folder,
+        "selected_subfolder": selected_subfolder,
+        "dataframes": dataframes
+    }
+    return render(request, 'mi_templates/dashboard.html', context)
+
+@csrf_exempt
+def mi_chart(request):
+    row_names = [
+        'Gross Balance ($ MM)', 'Net Balance ($ MM)', 'Net Balance Proportion S1',
+        # ... rest of your row_names
+    ]
+    column_names = ['T', 'T1', 'T2', 'T3', 'T4', 'T5']
+    
+    selected_folder = request.GET.get("folder", None)
+    selected_subfolder = request.GET.get("subfolder", None)
+    
+    if selected_folder and selected_subfolder:
+        parquet_paths = read_excel_files(selected_folder, selected_subfolder)
+        dataframes = load_parquet_files(parquet_paths)
+        
+        # Now you have all your dataframes with the correct variable names
+        lic_hbap_first_run = dataframes.get('first_run_lic_hbap')
+        lic_hbap_last_run = dataframes.get('last_run_lic_hbap')
+        # ... and so on for other dataframes
+        
+        # Create your table DataFrame
+        table_df = pd.DataFrame(index=row_names)
+        table_html = table_df.to_html(classes="table table-striped table-bordered", index=True)
+        
+        dropdown_options = {
+            'Organisational_unit_level_1': [],  # Fill these with your data
+            'Organisational_unit_level_2': [],
+            # ... rest of your dropdown options
+            'table_html': table_html
+        }
+        
+        return render(request, 'mi_templates/mi_chart.html', dropdown_options)
+    
+    return render(request, 'mi_templates/mi_chart.html', {})
+
+
+
+
+
+
+
+
+
+
+
 @csrf_exempt
 def mi_chart(request):
     # Initial setup for row and column names
