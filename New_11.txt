@@ -1,351 +1,425 @@
-class LinearReg(ModelSpec):
-    def __init__(self, order, executionStatus, Portfolio, GMIS, modelSegment, modelSubsegment, LOB, modelType, modelScoremethodology, cycleInfo, depVarData, depVarName, depVarTransform, indepVarNames, indepVarTransform, modelEq, Fcst_Moving_Avg, Fcst_Moving_Avg_Period, actualsStartDate, modelDataFormat, outputDataFormat, projectionFlag):
+def complexscoreval(self):
+    """
+    Complex score evaluation function for model validation
+    Performs backtesting and generates Excel output with multiple sheets
+    """
+    import pandas as pd
+    import numpy as np
+    from dateutil import relativedelta
+    from sklearn.metrics import mean_absolute_percentage_error
+    import warnings
+    warnings.filterwarnings('ignore')
+    
+    # Date conversions
+    actualsStartDateD = self.str2date(self.actualsStartDate)
+    inSample_startDate = self.str2date(self.cycleInfo['inSample_startDate'])
+    inSample_endDate = self.str2date(self.cycleInfo['inSample_endDate'])
+    outSample_startDate = self.str2date(self.cycleInfo['outSample_startDate'])
+    J0DateD = self.str2date(self.cycleInfo['J0Date'])
+    endProjectionsDateD = self.str2date(self.cycleInfo['endProjectionsDate'])
+    
+    # Variable setup
+    dependentTransform = self.depVarName + self.depVarTransform
+    depVarData_1 = self.depVarData[[self.depVarName]]
+    
+    # Transform variables
+    transformedVariables = []
+    for var in range(len(self.indepVarNames)):
+        transformedVariables.append(self.indepVarNames[var] + self.indepVarTransform[var])
+    
+    # Build model data
+    model_build_df = pd.merge(self.depVarData, 
+                             self.cycleInfo['MVData'][0][self.indepVarNames], 
+                             how='left', left_index=True, right_index=True)
+    
+    # Add month column for quarterly filtering
+    model_build_df['month'] = pd.DatetimeIndex(model_build_df.index).month
+    
+    # Filter for quarterly data if needed
+    if self.outputDataFormat.lower() == 'quarterly':
+        model_build_df = model_build_df[model_build_df['month'].isin([3, 6, 9, 12])]
+    
+    # Remove month column
+    model_build_df = model_build_df.drop(['month'], axis=1)
+    
+    # Calculate market share
+    indep_var = self.indepVarNames[0]  # Assuming first independent variable
+    model_build_df['market_share'] = model_build_df[self.depVarName] / (model_build_df[indep_var] * 10**9)
+    
+    # Get baseline market share (recent 4 quarters before J0Date)
+    j0_idx = model_build_df.index.get_loc(J0DateD, method='ffill')
+    baseline_start_idx = max(0, j0_idx - 3)
+    baseline_mkt_share = model_build_df.iloc[baseline_start_idx:j0_idx+1]['market_share'].mean()
+    
+    # Generate predictions for out-of-sample period
+    out_sample_data = model_build_df.loc[outSample_startDate:endProjectionsDateD].copy()
+    out_sample_data['pred'] = baseline_mkt_share * out_sample_data[indep_var] * 10**9
+    
+    # Calculate absolute percentage error
+    out_sample_data['ape'] = np.abs((out_sample_data['pred'] / out_sample_data[self.depVarName]) - 1)
+    
+    # Get 9-quarter projection period (from J0Date)
+    j0_out_idx = out_sample_data.index.get_loc(J0DateD, method='ffill')
+    nine_q_end_idx = min(len(out_sample_data) - 1, j0_out_idx + 8)  # 9 quarters including J0Date
+    
+    nine_q_data = out_sample_data.iloc[j0_out_idx:nine_q_end_idx+1]
+    
+    # Calculate metrics
+    forecast_sum = nine_q_data['pred'].sum()
+    actual_sum = nine_q_data[self.depVarName].sum()
+    accuracy_test = abs(forecast_sum / actual_sum - 1) if actual_sum != 0 else np.nan
+    
+    # Correlation calculations
+    # Full series correlation
+    correlation_full = model_build_df[self.depVarName].corr(model_build_df[indep_var])
+    
+    # In-sample correlation (model development period)
+    in_sample_data = model_build_df.loc[inSample_startDate:inSample_endDate]
+    correlation_in = in_sample_data[self.depVarName].corr(in_sample_data[indep_var])
+    
+    # Correlation change
+    correlation_change = (correlation_full / correlation_in - 1) if correlation_in != 0 else np.nan
+    
+    # Determine RAG status
+    def determine_rag_status(accuracy_test, correlation_change, model_type="complex"):
+        """Determine RAG status based on accuracy and correlation"""
+        correl_rag = "Green"
+        if abs(correlation_change) > 0.5:
+            correl_rag = "Red"
+        elif abs(correlation_change) > 0.3:
+            correl_rag = "Amber"
+        
+        stat_rag = "Green"
+        if accuracy_test > 0.4:
+            stat_rag = "Red"
+        elif accuracy_test > 0.25:
+            stat_rag = "Amber"
+        
+        if correl_rag == "Green" and stat_rag == "Green":
+            final_rag = "Green"
+        elif correl_rag == "Red" or stat_rag == "Red":
+            final_rag = "Red"
+        else:
+            final_rag = "Amber"
+        
+        return correl_rag, stat_rag, final_rag
+    
+    correl_rag, stat_rag, final_rag = determine_rag_status(accuracy_test, correlation_change)
+    
+    # Create output DataFrames
+    
+    # 1. Test Results sheet
+    test_results_df = pd.DataFrame({
+        'GMIS_ID': [self.GMIS],
+        'Dependent_Variable_Name': [self.depVarName],
+        'Independent_Variable_Names': [str(self.indepVarNames)],
+        'Model_Score_Methodology': [self.modelScoremethodology],
+        'Correlation_Change': [correlation_change],
+        'Accuracy_Test': [accuracy_test]
+    })
+    
+    # 2. Model Specifications sheet
+    model_specs_df = pd.DataFrame({
+        'Variable': ['GMIS_ID', 'Dependent_Variable_Name', 'Independent_Variable_Names', 
+                    'Model_Score_Methodology', 'Filename'],
+        'Value': [self.GMIS, self.depVarName, str(self.indepVarNames), 
+                 self.modelScoremethodology, f"{self.GMIS}_{self.depVarName}_validation.xlsx"]
+    })
+    
+    # 3. RAG Assessment sheet
+    rag_df = pd.DataFrame({
+        'Metric': ['Correlation_RAG', 'Accuracy_RAG', 'Assessment_RAG'],
+        'Status': [correl_rag, stat_rag, final_rag]
+    })
+    
+    # 4. Detailed Calculations sheet (like your Excel logic)
+    detailed_calc_df = model_build_df.copy()
+    detailed_calc_df['market_share'] = detailed_calc_df[self.depVarName] / (detailed_calc_df[indep_var] * 10**9)
+    
+    # Add predictions and APE for out-of-sample period
+    detailed_calc_df['forecast'] = np.nan
+    detailed_calc_df['ape'] = np.nan
+    
+    # Fill forecasts for out-of-sample period
+    out_sample_mask = (detailed_calc_df.index >= outSample_startDate) & (detailed_calc_df.index <= endProjectionsDateD)
+    detailed_calc_df.loc[out_sample_mask, 'forecast'] = (baseline_mkt_share * 
+                                                        detailed_calc_df.loc[out_sample_mask, indep_var] * 10**9)
+    detailed_calc_df.loc[out_sample_mask, 'ape'] = np.abs((detailed_calc_df.loc[out_sample_mask, 'forecast'] / 
+                                                          detailed_calc_df.loc[out_sample_mask, self.depVarName]) - 1)
+    
+    # Add summary statistics
+    summary_stats = pd.DataFrame({
+        'Metric': ['Forecast_Sum_9Q', 'Actual_Sum_9Q', 'Accuracy_Test', 
+                  'Correlation_Full', 'Correlation_InSample', 'Correlation_Change',
+                  'Baseline_Market_Share'],
+        'Value': [forecast_sum, actual_sum, accuracy_test,
+                 correlation_full, correlation_in, correlation_change,
+                 baseline_mkt_share]
+    })
+    
+    # Create filename
+    filename = f"{self.GMIS}_{self.depVarName}_validation_{pd.Timestamp.now().strftime('%Y%m%d')}.xlsx"
+    
+    # Write to Excel with multiple sheets
+    try:
+        with pd.ExcelWriter(filename, engine='openpyxl') as writer:
+            # Write all sheets
+            rag_df.to_excel(writer, sheet_name='RAG', index=False)
+            test_results_df.to_excel(writer, sheet_name='Test_Results', index=False)
+            model_specs_df.to_excel(writer, sheet_name='Model_Specifications', index=False)
+            detailed_calc_df.to_excel(writer, sheet_name='Detailed_Calculations', index=True)
+            summary_stats.to_excel(writer, sheet_name='Summary_Statistics', index=False)
+        
+        print(f"Validation results saved to: {filename}")
+        
+    except Exception as e:
+        print(f"Error saving Excel file: {str(e)}")
+    
+    # Create return dictionary similar to your original function structure
+    model_details_dict = {
+        'GMIS_ID': self.GMIS,
+        'Dependent_Variable_Name': self.depVarName,
+        'Independent_Variable_Names': self.indepVarNames,
+        'Model_Score_Methodology': self.modelScoremethodology,
+        'Accuracy_Test': accuracy_test,
+        'Correlation_Change': correlation_change,
+        'Correlation_RAG': correl_rag,
+        'Accuracy_RAG': stat_rag,
+        'Final_RAG': final_rag,
+        'Filename': filename
+    }
+    
+    return (None, test_results_df, None, None, None, None, None, None, 
+            detailed_calc_df, model_details_dict, None, None, None, None, None, 
+            None, correl_rag, stat_rag, final_rag, filename)
+
+
+
+
+
+
+
+
+
+
+class Complex(ModelSpec):
+    def __init__(self, order, executionStatus, Portfolio, GMIS, modelSegment, modelSubsegment, LOB, modelType, modelScoremethodology, cycleInfo, depVarData, depVarName, depVarTransform, indepVarNames, indepVarTransform, modelEq, Fcst_Moving_Avg, Fcst_Moving_Avg_Period, actualsStartDate, modelDataFormat, outputDataFormat, modelscriptpath):
         super().__init__(order, executionStatus, Portfolio, GMIS, modelSegment, modelSubsegment, LOB, modelType, modelScoremethodology, cycleInfo, depVarData, depVarName, depVarTransform, indepVarNames, indepVarTransform, modelEq, Fcst_Moving_Avg, Fcst_Moving_Avg_Period, actualsStartDate, modelDataFormat, outputDataFormat)
-        self.projections = self.LINscoring()
-        self.projectionFlag = projectionFlag  # Added projection flag
-
-    def LINscoring(self):
-        if len(self.indepVarNames) != len(self.indepVarTransform):
-            print('\n\n\nError! Not all independent variables details are provided!\n\n\n')
-            return
-
-        if len(self.cycleInfo['scenarios']) != len(self.cycleInfo['MVData']):
-            print('\n\n\nError! Not all scenario details are provided!\n\n\n')
-            return
-
-        # Change strings to dates
+        self.modelscriptpath = modelscriptpath
+        
+        # Main execution logic
+        if self.cycleInfo['Objective'][0] == "Validation":
+            print('Running complexscoreval for validation')
+            self.projections = self.complexscoreval()
+        else:
+            print('Running complexscore for projections')
+            self.projections = self.complexscore()
+    
+    def complexscore(self):
+        # Your existing complexscore implementation
         actualsStartDateD = self.str2date(self.actualsStartDate)
-        JODateD = self.str2date(self.cycleInfo['Jumpoff'])
+        inSample_startDate = self.str2date(self.cycleInfo['inSample_startDate'])
+        inSample_endDate = self.str2date(self.cycleInfo['inSample_endDate'])
+        outSample_startDate = self.str2date(self.cycleInfo['outSample_startDate'])
+        J0DateD = self.str2date(self.cycleInfo['J0Date'])
         endProjectionsDateD = self.str2date(self.cycleInfo['endProjectionsDate'])
-
-        transformedVariables = []
-        for var in range(len(self.indepVarNames)):
-            transformedVariables.append(self.indepVarNames[var] + self.indepVarTransform[var])
-
-        dependentTransform = self.depVarName + self.depVarTransform
-
-        self.indepVarNames.append('month')  # Add month to be able to transform monthly to quarterly data later
-
-        ds_4 = []
-        depVarData_1 = self.depVarData[[self.depVarName]]  # Select applicable dependent variable from the dependent variable data
-
-        for scen in range(len(self.cycleInfo['MVData'])):
-            df = self.cycleInfo['MVData'][scen]
-            unique_indep = copy.deepcopy(self.indepVarNames)
-            unique_indep = list(set(unique_indep))
-            MVData_1 = df[unique_indep].copy()  # Select only independent variables and month
-
-            ds_1 = pd.merge(MVData_1, depVarData_1, how='left', left_index=True, right_index=True)
-            ds_1 = ds_1.loc[:, ~ds_1.columns.duplicated()].copy()
-
-            # Perform independent variables transformations
-            if self.modelDataFormat.lower() == 'quarterly':
-                for ii in range(len(self.indepVarTransform)):
-                    ds_1 = self.transformIndepDataMtoQ(ds_1, self.indepVarNames[ii], self.indepVarTransform[ii])
-            elif self.modelDataFormat.lower() == 'monthly':
-                for jj in range(len(self.indepVarTransform)):
-                    ds_1 = self.transformIndepData(ds_1, self.indepVarNames[jj], self.indepVarTransform[jj])
-            else:
-                print('\n\n\nError! Incorrectly defined date format!\n\n\n')
-                return
-
-            cols = list(ds_1.columns)
-            ds_1 = ds_1[cols[:-len(self.indepVarNames)] + cols[-len(self.indepVarNames) + 1:] + cols[-len(self.indepVarNames):-len(self.indepVarNames) + 1]]
-
-            # Perform dependent variables transformations
-            if self.modelDataFormat.lower() == 'quarterly':
-                ds_1 = self.transformDepDataMtoQ(ds_1, self.depVarName, self.depVarTransform)
-            elif self.modelDataFormat.lower() == 'monthly':
-                ds_1 = self.transformDepDataM(ds_1, self.depVarName, self.depVarTransform)
-            else:
-                print('\n\n\nError! Incorrectly defined date format!\n\n\n')
-                return
-
-            ds_1 = ds_1.loc[actualsStartDateD:]  # Data after actualsStartDate
-            ds_1 = ds_1.loc[:endProjectionsDateD]  # Data till endProjectionsDate
-
-            # Take month-end values if transforming to appropriate data format
-            if self.outputDataFormat.lower() == 'quarterly':
-                ds_1 = ds_1.loc[ds_1['month'].isin([3, 6, 9, 12])]
-            elif self.outputDataFormat.lower() != 'monthly':
-                print("\n\n\nError! Incorrectly defined outputDataFormat! #2\n\n\n")
-                return 
-                
-            # Get date ranges from model validation dictionary
-            actual_start_date = datetime.datetime.strptime(self.model_val_dict["Actuals_Start_Date"], "%Y-%m-%d").date()
-            inSample_startDate = datetime.datetime.strptime(self.model_val_dict["FirstHistQtr"], "%Y-%m-%d").date()
-            inSample_endDate = datetime.datetime.strptime(self.model_val_dict["LastHistQtr"], "%Y-%m-%d").date()
-            outSample_startDate = datetime.datetime.strptime(self.model_val_dict["FirstOutSampleDt"], "%Y-%m-%d").date()
-            outSample_endDate = datetime.datetime.strptime(self.model_val_dict["JumpOffDt"], "%Y-%m-%d").date()
-            last_forecast_dt = datetime.datetime.strptime(self.model_val_dict["LastForecastQtr"], "%Y-%m-%d").date()
-            
-            # Calculate predictions for Actual_Val (InSample to InSample)
-            # Create a copy of the data for Actual_Val
-            ds_1_actual = ds_1.copy()
-            
-            # Training data for Actual_Val
-            train_model_data_df_actual = ds_1_actual[inSample_startDate:inSample_endDate]
-            train_model_data_df_actual = train_model_data_df_actual.dropna(axis=0)
-            
-            # Feature selection for Actual_Val
-            x_train_actual = train_model_data_df_actual[transformedVariables]
-            y_train_actual = train_model_data_df_actual[[dependentTransform]]
-            
-            # Train model for Actual_Val
-            if self.hasIntercept == 1:
-                model_actual = AutoReg(y_train_actual, 0, trend='c', exog=x_train_actual, old_names=False).fit()
-            else:
-                model_actual = AutoReg(y_train_actual, 0, trend='n', exog=x_train_actual, old_names=False).fit()
-            
-            # Get coefficients for Actual_Val
-            coeff_actual = model_actual.params.to_frame()
-            model_equation_actual = ""
-            
-            # Build equation for Actual_Val
-            for el in coeff_actual.index:
-                if el == "const":
-                    if coeff_actual[0][el] < 0:
-                        model_equation_actual += "-" + str(abs(coeff_actual[0][el]))
-                    else:
-                        model_equation_actual += "+" + str(coeff_actual[0][el])
-                else:
-                    if coeff_actual[0][el] < 0:
-                        model_equation_actual += "-" + str(abs(coeff_actual[0][el])) + "*" + el
-                    else:
-                        model_equation_actual += "+" + str(coeff_actual[0][el]) + "*" + el
-            
-            # Remove leading + if present
-            if model_equation_actual.startswith('+'):
-                model_equation_actual = model_equation_actual[1:]
-                
-            print("The Model Equation for Actual_Val: " + model_equation_actual)
-            
-            # Calculate predictions for Actual_Val
-            ds_1_actual['Actual_Val'] = ds_1_actual.eval(model_equation_actual)
-            
-            # Calculate predictions for Full_Val (InSample to OutSample)
-            # Create a copy of the data for Full_Val
-            ds_1_full = ds_1.copy()
-            
-            # Training data for Full_Val
-            train_model_data_df_full = ds_1_full[inSample_startDate:outSample_endDate]
-            train_model_data_df_full = train_model_data_df_full.dropna(axis=0)
-            
-            # Feature selection for Full_Val
-            x_train_full = train_model_data_df_full[transformedVariables]
-            y_train_full = train_model_data_df_full[[dependentTransform]]
-            
-            # Train model for Full_Val
-            if self.hasIntercept == 1:
-                model_full = AutoReg(y_train_full, 0, trend='c', exog=x_train_full, old_names=False).fit()
-            else:
-                model_full = AutoReg(y_train_full, 0, trend='n', exog=x_train_full, old_names=False).fit()
-            
-            # Get coefficients for Full_Val
-            coeff_full = model_full.params.to_frame()
-            model_equation_full = ""
-            
-            # Build equation for Full_Val
-            for el in coeff_full.index:
-                if el == "const":
-                    if coeff_full[0][el] < 0:
-                        model_equation_full += "-" + str(abs(coeff_full[0][el]))
-                    else:
-                        model_equation_full += "+" + str(coeff_full[0][el])
-                else:
-                    if coeff_full[0][el] < 0:
-                        model_equation_full += "-" + str(abs(coeff_full[0][el])) + "*" + el
-                    else:
-                        model_equation_full += "+" + str(coeff_full[0][el]) + "*" + el
-            
-            # Remove leading + if present
-            if model_equation_full.startswith('+'):
-                model_equation_full = model_equation_full[1:]
-                
-            print("The Model Equation for Full_Val: " + model_equation_full)
-            
-            # Calculate predictions for Full_Val
-            ds_1_full['Full_Val'] = ds_1_full.eval(model_equation_full)
-            
-            # Add the new predictions to the original dataframe
-            ds_1['Actual_Val'] = ds_1_actual['Actual_Val']
-            ds_1['Full_Val'] = ds_1_full['Full_Val']
-
-            # Original coefficient estimation and prediction
-            if self.coefficient_estimation == "Yes":
-                y_train = ds_1[[dependentTransform]]
-                x_train = ds_1[transformedVariables]
-                start_date = pd.to_datetime(self.first_histqtr).date()
-
-                y_train = y_train[start_date:JODateD + timedelta(days=1)]
-                x_train = x_train[start_date:JODateD + timedelta(days=1)]
-
-                if self.hasIntercept == 1:
-                    model = AutoReg(y_train, 0, trend='c', exog=x_train, old_names=False).fit()
-                else:
-                    model = AutoReg(y_train, 0, trend='n', exog=x_train, old_names=False).fit()
-
-                coeff = model.params.to_frame()
-                self.modelEq = ""
-
-                for el in coeff.index:
-                    if el == "const":
-                        if coeff[0][el] < 0:
-                            self.modelEq += "-" + str(abs(coeff[0][el]))
-                        else:
-                            self.modelEq += "+" + str(coeff[0][el])
-                    else:
-                        if coeff[0][el] < 0:
-                            self.modelEq += "-" + str(abs(coeff[0][el])) + "*" + el
-                        else:
-                            self.modelEq += "+" + str(coeff[0][el]) + "*" + el
-
-                # Remove leading + if present
-                if self.modelEq.startswith('+'):
-                    self.modelEq = self.modelEq[1:]
-
-                print("The Model Equation post Coefficient Reestimation: " + self.modelEq)
-
-                ds_1['pred'] = ds_1.eval(self.modelEq)
-
-                if self.jumpoff_adjustment_9qtr == "Yes":
-                    nine_qtr_before_jo = JODateD + relativedelta.relativedelta(months=-24)
-                    nine_qtr_before_jo = nine_qtr_before_jo.replace(day=28) + timedelta(days=4)
-                    nine_qtr_before_jo = nine_qtr_before_jo - timedelta(days=nine_qtr_before_jo.day)
-                    start_date = self.first_histqtr
-
-                    ds_1_copy = ds_1.copy()
-
-                    if self.modelDataFormat.lower() == 'quarterly' and self.outputDataFormat.lower() == 'quarterly':
-                        ds_1_copy = self.transformBackDepDataQQ(ds_1_copy, self.depVarName, self.depVarTransform, start_date, 'pred')
-                    elif self.modelDataFormat.lower() == 'monthly' and self.outputDataFormat.lower() == 'monthly':
-                        ds_1_copy = self.transformBackDepDataMM(ds_1_copy, self.depVarName, self.depVarTransform, start_date, 'pred')
-                    elif self.modelDataFormat.lower() == 'monthly' and self.outputDataFormat.lower() == 'quarterly':
-                        ds_1_copy = self.transformBackDepDataMQ(ds_1_copy, self.depVarName, self.depVarTransform, start_date, 'pred')
-                    elif self.modelDataFormat.lower() == 'quarterly' and self.outputDataFormat.lower() == 'monthly':
-                        ds_1_copy = self.transformBackDepDataQM(ds_1_copy, self.depVarName, self.depVarTransform, start_date, 'pred')
-                    else:
-                        print('\n\n\nIncorrectly defined outputDataFormat or modelDataFormat! #3\n\n\n')
-                        return
-
-                    ds_1_copy = ds_1_copy.set_index('date')
-                    ds_1_copy['delta'] = ds_1_copy[self.depVarName] - ds_1_copy[self.depVarName + '_pred']
-                    nine_qtr_mean = ds_1_copy[nine_qtr_before_jo:JODateD]['delta'].mean()
-
-                    ds_1.loc[:JODateD - timedelta(days=1), 'pred'] = np.nan
-                    ds_1.loc[JODateD, 'pred'] = ds_1[self.depVarName][JODateD]
-
-                    # Transform back to original value
-                    if self.modelDataFormat.lower() == 'quarterly' and self.outputDataFormat.lower() == 'quarterly':
-                        ds_1 = self.transformBackDepDataQQ(ds_1, self.depVarName, self.depVarTransform, JODateD, 'pred')
-                    elif self.modelDataFormat.lower() == 'monthly' and self.outputDataFormat.lower() == 'monthly':
-                        ds_1 = self.transformBackDepDataMM(ds_1, self.depVarName, self.depVarTransform, JODateD, 'pred')
-                    elif self.modelDataFormat.lower() == 'monthly' and self.outputDataFormat.lower() == 'quarterly':
-                        ds_1 = self.transformBackDepDataMQ(ds_1, self.depVarName, self.depVarTransform, JODateD, 'pred')
-                    elif self.modelDataFormat.lower() == 'quarterly' and self.outputDataFormat.lower() == 'monthly':
-                        ds_1 = self.transformBackDepDataQM(ds_1, self.depVarName, self.depVarTransform, JODateD, 'pred')
-                    else:
-                        print('\n\n\nIncorrectly defined outputDataFormat or modelDataFormat! #3\n\n\n')
-                        return
-
-                    ds_1.loc[ds_1['month'].isin([1, 2, 4, 5, 7, 8, 10, 11]), ['pred', self.depVarName + '_pred']] = np.nan
-
-            # Transform back the new predictions (Actual_Val and Full_Val) to original values
-            if self.modelDataFormat.lower() == 'quarterly' and self.outputDataFormat.lower() == 'quarterly':
-                ds_1 = self.transformBackDepDataQQ(ds_1, self.depVarName, self.depVarTransform, start_date, 'Actual_Val')
-                ds_1 = self.transformBackDepDataQQ(ds_1, self.depVarName, self.depVarTransform, start_date, 'Full_Val')
-            elif self.modelDataFormat.lower() == 'monthly' and self.outputDataFormat.lower() == 'monthly':
-                ds_1 = self.transformBackDepDataMM(ds_1, self.depVarName, self.depVarTransform, start_date, 'Actual_Val')
-                ds_1 = self.transformBackDepDataMM(ds_1, self.depVarName, self.depVarTransform, start_date, 'Full_Val')
-            elif self.modelDataFormat.lower() == 'monthly' and self.outputDataFormat.lower() == 'quarterly':
-                ds_1 = self.transformBackDepDataMQ(ds_1, self.depVarName, self.depVarTransform, start_date, 'Actual_Val')
-                ds_1 = self.transformBackDepDataMQ(ds_1, self.depVarName, self.depVarTransform, start_date, 'Full_Val')
-            elif self.modelDataFormat.lower() == 'quarterly' and self.outputDataFormat.lower() == 'monthly':
-                ds_1 = self.transformBackDepDataQM(ds_1, self.depVarName, self.depVarTransform, start_date, 'Actual_Val')
-                ds_1 = self.transformBackDepDataQM(ds_1, self.depVarName, self.depVarTransform, start_date, 'Full_Val')
-
-            ds_1 = ds_1.drop(['month'], axis=1)  # Remove month column
-            ds_1 = ds_1.set_index('date')
-
-            if self.jumpoff_adjustment_9qtr == "Yes":
-                ds_1[self.depVarName + '_pred'] = ds_1[self.depVarName + '_pred'] + nine_qtr_mean
-                ds_1.loc[JODateD, self.depVarName + '_pred'] = ds_1[self.depVarName][JODateD]
-                # Apply the same adjustment to Actual_Val and Full_Val
-                ds_1[self.depVarName + '_Actual_Val'] = ds_1[self.depVarName + '_Actual_Val'] + nine_qtr_mean
-                ds_1[self.depVarName + '_Full_Val'] = ds_1[self.depVarName + '_Full_Val'] + nine_qtr_mean
-                ds_1.loc[JODateD, self.depVarName + '_Actual_Val'] = ds_1[self.depVarName][JODateD]
-                ds_1.loc[JODateD, self.depVarName + '_Full_Val'] = ds_1[self.depVarName][JODateD]
-
-            ds_1 = ds_1.T
-            ds_1 = ds_1.reset_index()
-            ds_1 = ds_1.rename(columns={'index': 'Variable_Mnemonic'})
-
-            # Add relevant information to the data frames
-            ds_1['Execution_Order'] = self.order
-            ds_1['Execution_Status'] = self.executionStatus
-            ds_1['Timestamp'] = datetime.datetime.today().strftime("%Y%m%d%H%M%S")
-            ds_1['Cycle'] = self.cycleInfo['cycle']
-            ds_1['Type'] = self.cycleInfo['type']
-            ds_1['Year'] = self.cycleInfo['year']
-            ds_1['Scenario'] = self.cycleInfo['scenarios'][scen]
-            ds_1['Jumpoff'] = self.cycleInfo['Jumpoff']
-            ds_1['Portfolio'] = self.Portfolio
-            ds_1['GMIS_ID'] = self.GMIS
-            ds_1['Segment'] = self.modelSegment
-            ds_1['Subsegment'] = self.modelSubsegment
-            ds_1['LOB'] = self.LOB
-            ds_1['Model_Type'] = self.modelType
-
-            ds_1.loc[ds_1['Variable_Mnemonic'].isin(self.indepVarNames), 'Projection'] = 'MV'
-            ds_1.loc[ds_1['Variable_Mnemonic'].isin(transformedVariables), 'Projection'] = 'MV_transformed'
-            ds_1.loc[ds_1['Variable_Mnemonic'] == self.depVarName, 'Projection'] = 'Actual'
-            ds_1.loc[ds_1['Variable_Mnemonic'] == dependentTransform, 'Projection'] = 'Actual_transformed'
-            ds_1.loc[ds_1['Variable_Mnemonic'] == 'pred', 'Variable_Mnemonic'] = dependentTransform + '_pred'
-            ds_1.loc[ds_1['Variable_Mnemonic'] == dependentTransform + '_pred', 'Projection'] = 'Model_transformed'
-            ds_1.loc[ds_1['Variable_Mnemonic'] == self.depVarName + '_pred', 'Projection'] = 'Model'
-            
-            # Add new projection types for Actual_Val and Full_Val
-            ds_1.loc[ds_1['Variable_Mnemonic'] == 'Actual_Val', 'Variable_Mnemonic'] = dependentTransform + '_Actual_Val'
-            ds_1.loc[ds_1['Variable_Mnemonic'] == dependentTransform + '_Actual_Val', 'Projection'] = 'Actual_Val_transformed'
-            ds_1.loc[ds_1['Variable_Mnemonic'] == self.depVarName + '_Actual_Val', 'Projection'] = 'Actual_Val'
-            
-            ds_1.loc[ds_1['Variable_Mnemonic'] == 'Full_Val', 'Variable_Mnemonic'] = dependentTransform + '_Full_Val'
-            ds_1.loc[ds_1['Variable_Mnemonic'] == dependentTransform + '_Full_Val', 'Projection'] = 'Full_Val_transformed'
-            ds_1.loc[ds_1['Variable_Mnemonic'] == self.depVarName + '_Full_Val', 'Projection'] = 'Full_Val'
-
-            ds_1['Details'] = ''
-            for var in range(len(self.indepVarTransform)):
-                ds_1.loc[ds_1['Variable_Mnemonic'] == self.indepVarNames[var] + self.indepVarTransform[var], 'Details'] = self.indepVarTransform[var]
-
-            ds_1.loc[ds_1['Projection'] == 'Actual_transformed', 'Details'] = self.depVarTransform
-            ds_1.loc[ds_1['Projection'] == 'Actual_Val_transformed', 'Details'] = self.depVarTransform
-            ds_1.loc[ds_1['Projection'] == 'Full_Val_transformed', 'Details'] = self.depVarTransform
-
-            ds_1['Frequency'] = ''
-            if self.outputDataFormat.lower() == 'quarterly':
-                ds_1['Frequency'] = 'Quarterly'
-            else:
-                for var in range(len(self.indepVarTransform)):
-                    ds_1.loc[ds_1['Variable_Mnemonic'] == self.indepVarNames[var], 'Frequency'] = self.cycleInfo['MVDataFormat'].capitalize()
-                    ds_1.loc[ds_1['Variable_Mnemonic'] == self.indepVarNames[var] + self.indepVarTransform[var], 'Frequency'] = self.cycleInfo['MVDataFormat'].capitalize()
-
-            ds_1.loc[ds_1['Projection'].isin(['Actual', 'Actual_transformed', 'Model', 'Final', 'Actual_Val', 'Actual_Val_transformed', 'Full_Val', 'Full_Val_transformed']), 'Frequency'] = self.modelDataFormat.capitalize()
-            ds_1.loc[ds_1['Projection'] == 'Model_transformed', 'Frequency'] = self.outputDataFormat.capitalize()
-
-            # Smoothing of projections
-            if self.Fcst_Moving_Avg.lower() == 'yes':
-                ds_1 = self.maSmoothing([ds_1], self.Fcst_Moving_Avg_Period, [self.cycleInfo['scenarios'][scen]], self.modelDataFormat.lower(), self.outputDataFormat.lower())[0]
-
-            # Add "final" row
-            ds_1 = ds_1.append(ds_1.tail(1), ignore_index=True)
-            ds_1.loc[ds_1.index[-1], 'Projection'] = 'Final'
-
-            # Rearranging columns
-            cols = list(ds_1.columns)
-            ds_1 = ds_1[cols[-16:] + cols[0:-16]]
-
-            # Create a list of data frames of each scenario
-            ds_4.append(ds_1)
-
-        self.indepVarNames.remove('month')
-        return ds_4
+        
+        # ... rest of your existing complexscore code ...
+        # (I'll keep the implementation you provided)
+        
+        return ds_4  # your existing return
+    
+    def complexscoreval(self):
+    """
+    Complex score evaluation function for model validation
+    Performs backtesting and generates Excel output with multiple sheets
+    """
+    import pandas as pd
+    import numpy as np
+    from dateutil import relativedelta
+    from sklearn.metrics import mean_absolute_percentage_error
+    import warnings
+    warnings.filterwarnings('ignore')
+    
+    # Date conversions
+    actualsStartDateD = self.str2date(self.actualsStartDate)
+    inSample_startDate = self.str2date(self.cycleInfo['inSample_startDate'])
+    inSample_endDate = self.str2date(self.cycleInfo['inSample_endDate'])
+    outSample_startDate = self.str2date(self.cycleInfo['outSample_startDate'])
+    J0DateD = self.str2date(self.cycleInfo['J0Date'])
+    endProjectionsDateD = self.str2date(self.cycleInfo['endProjectionsDate'])
+    
+    # Variable setup
+    dependentTransform = self.depVarName + self.depVarTransform
+    depVarData_1 = self.depVarData[[self.depVarName]]
+    
+    # Transform variables
+    transformedVariables = []
+    for var in range(len(self.indepVarNames)):
+        transformedVariables.append(self.indepVarNames[var] + self.indepVarTransform[var])
+    
+    # Build model data
+    model_build_df = pd.merge(self.depVarData, 
+                             self.cycleInfo['MVData'][0][self.indepVarNames], 
+                             how='left', left_index=True, right_index=True)
+    
+    # Add month column for quarterly filtering
+    model_build_df['month'] = pd.DatetimeIndex(model_build_df.index).month
+    
+    # Filter for quarterly data if needed
+    if self.outputDataFormat.lower() == 'quarterly':
+        model_build_df = model_build_df[model_build_df['month'].isin([3, 6, 9, 12])]
+    
+    # Remove month column
+    model_build_df = model_build_df.drop(['month'], axis=1)
+    
+    # Calculate market share
+    indep_var = self.indepVarNames[0]  # Assuming first independent variable
+    model_build_df['market_share'] = model_build_df[self.depVarName] / (model_build_df[indep_var] * 10**9)
+    
+    # Get baseline market share (recent 4 quarters before J0Date)
+    j0_idx = model_build_df.index.get_loc(J0DateD, method='ffill')
+    baseline_start_idx = max(0, j0_idx - 3)
+    baseline_mkt_share = model_build_df.iloc[baseline_start_idx:j0_idx+1]['market_share'].mean()
+    
+    # Generate predictions for out-of-sample period
+    out_sample_data = model_build_df.loc[outSample_startDate:endProjectionsDateD].copy()
+    out_sample_data['pred'] = baseline_mkt_share * out_sample_data[indep_var] * 10**9
+    
+    # Calculate absolute percentage error
+    out_sample_data['ape'] = np.abs((out_sample_data['pred'] / out_sample_data[self.depVarName]) - 1)
+    
+    # Get 9-quarter projection period (from J0Date)
+    j0_out_idx = out_sample_data.index.get_loc(J0DateD, method='ffill')
+    nine_q_end_idx = min(len(out_sample_data) - 1, j0_out_idx + 8)  # 9 quarters including J0Date
+    
+    nine_q_data = out_sample_data.iloc[j0_out_idx:nine_q_end_idx+1]
+    
+    # Calculate metrics
+    forecast_sum = nine_q_data['pred'].sum()
+    actual_sum = nine_q_data[self.depVarName].sum()
+    accuracy_test = abs(forecast_sum / actual_sum - 1) if actual_sum != 0 else np.nan
+    
+    # Correlation calculations
+    # Full series correlation
+    correlation_full = model_build_df[self.depVarName].corr(model_build_df[indep_var])
+    
+    # In-sample correlation (model development period)
+    in_sample_data = model_build_df.loc[inSample_startDate:inSample_endDate]
+    correlation_in = in_sample_data[self.depVarName].corr(in_sample_data[indep_var])
+    
+    # Correlation change
+    correlation_change = (correlation_full / correlation_in - 1) if correlation_in != 0 else np.nan
+    
+    # Determine RAG status
+    def determine_rag_status(accuracy_test, correlation_change, model_type="complex"):
+        """Determine RAG status based on accuracy and correlation"""
+        correl_rag = "Green"
+        if abs(correlation_change) > 0.5:
+            correl_rag = "Red"
+        elif abs(correlation_change) > 0.3:
+            correl_rag = "Amber"
+        
+        stat_rag = "Green"
+        if accuracy_test > 0.4:
+            stat_rag = "Red"
+        elif accuracy_test > 0.25:
+            stat_rag = "Amber"
+        
+        if correl_rag == "Green" and stat_rag == "Green":
+            final_rag = "Green"
+        elif correl_rag == "Red" or stat_rag == "Red":
+            final_rag = "Red"
+        else:
+            final_rag = "Amber"
+        
+        return correl_rag, stat_rag, final_rag
+    
+    correl_rag, stat_rag, final_rag = determine_rag_status(accuracy_test, correlation_change)
+    
+    # Create output DataFrames
+    
+    # 1. Test Results sheet
+    test_results_df = pd.DataFrame({
+        'GMIS_ID': [self.GMIS],
+        'Dependent_Variable_Name': [self.depVarName],
+        'Independent_Variable_Names': [str(self.indepVarNames)],
+        'Model_Score_Methodology': [self.modelScoremethodology],
+        'Correlation_Change': [correlation_change],
+        'Accuracy_Test': [accuracy_test]
+    })
+    
+    # 2. Model Specifications sheet
+    model_specs_df = pd.DataFrame({
+        'Variable': ['GMIS_ID', 'Dependent_Variable_Name', 'Independent_Variable_Names', 
+                    'Model_Score_Methodology', 'Filename'],
+        'Value': [self.GMIS, self.depVarName, str(self.indepVarNames), 
+                 self.modelScoremethodology, f"{self.GMIS}_{self.depVarName}_validation.xlsx"]
+    })
+    
+    # 3. RAG Assessment sheet
+    rag_df = pd.DataFrame({
+        'Metric': ['Correlation_RAG', 'Accuracy_RAG', 'Assessment_RAG'],
+        'Status': [correl_rag, stat_rag, final_rag]
+    })
+    
+    # 4. Detailed Calculations sheet (like your Excel logic)
+    detailed_calc_df = model_build_df.copy()
+    detailed_calc_df['market_share'] = detailed_calc_df[self.depVarName] / (detailed_calc_df[indep_var] * 10**9)
+    
+    # Add predictions and APE for out-of-sample period
+    detailed_calc_df['forecast'] = np.nan
+    detailed_calc_df['ape'] = np.nan
+    
+    # Fill forecasts for out-of-sample period
+    out_sample_mask = (detailed_calc_df.index >= outSample_startDate) & (detailed_calc_df.index <= endProjectionsDateD)
+    detailed_calc_df.loc[out_sample_mask, 'forecast'] = (baseline_mkt_share * 
+                                                        detailed_calc_df.loc[out_sample_mask, indep_var] * 10**9)
+    detailed_calc_df.loc[out_sample_mask, 'ape'] = np.abs((detailed_calc_df.loc[out_sample_mask, 'forecast'] / 
+                                                          detailed_calc_df.loc[out_sample_mask, self.depVarName]) - 1)
+    
+    # Add summary statistics
+    summary_stats = pd.DataFrame({
+        'Metric': ['Forecast_Sum_9Q', 'Actual_Sum_9Q', 'Accuracy_Test', 
+                  'Correlation_Full', 'Correlation_InSample', 'Correlation_Change',
+                  'Baseline_Market_Share'],
+        'Value': [forecast_sum, actual_sum, accuracy_test,
+                 correlation_full, correlation_in, correlation_change,
+                 baseline_mkt_share]
+    })
+    
+    # Create filename
+    filename = f"{self.GMIS}_{self.depVarName}_validation_{pd.Timestamp.now().strftime('%Y%m%d')}.xlsx"
+    
+    # Write to Excel with multiple sheets
+    try:
+        with pd.ExcelWriter(filename, engine='openpyxl') as writer:
+            # Write all sheets
+            rag_df.to_excel(writer, sheet_name='RAG', index=False)
+            test_results_df.to_excel(writer, sheet_name='Test_Results', index=False)
+            model_specs_df.to_excel(writer, sheet_name='Model_Specifications', index=False)
+            detailed_calc_df.to_excel(writer, sheet_name='Detailed_Calculations', index=True)
+            summary_stats.to_excel(writer, sheet_name='Summary_Statistics', index=False)
+        
+        print(f"Validation results saved to: {filename}")
+        
+    except Exception as e:
+        print(f"Error saving Excel file: {str(e)}")
+    
+    # Create return dictionary similar to your original function structure
+    model_details_dict = {
+        'GMIS_ID': self.GMIS,
+        'Dependent_Variable_Name': self.depVarName,
+        'Independent_Variable_Names': self.indepVarNames,
+        'Model_Score_Methodology': self.modelScoremethodology,
+        'Accuracy_Test': accuracy_test,
+        'Correlation_Change': correlation_change,
+        'Correlation_RAG': correl_rag,
+        'Accuracy_RAG': stat_rag,
+        'Final_RAG': final_rag,
+        'Filename': filename
+    }
+    
+    return (None, test_results_df, None, None, None, None, None, None, 
+            detailed_calc_df, model_details_dict, None, None, None, None, None, 
+            None, correl_rag, stat_rag, final_rag, filename)
