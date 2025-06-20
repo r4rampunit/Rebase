@@ -1,41 +1,20 @@
-class Complex(ModelSpec):
-    def __init__(self, order, executionStatus, Portfolio, GMIS, modelSegment, modelSubsegment, LOB, modelType, modelScoremethodology, cycleInfo, depVarData, depVarName, depVarTransform, indepVarNames, indepVarTransform, modelEq, Fcst_Moving_Avg, Fcst_Moving_Avg_Period, actualsStartDate, modelDataFormat, outputDataFormat, modelscriptpath):
-        super().__init__(order, executionStatus, Portfolio, GMIS, modelSegment, modelSubsegment, LOB, modelType, modelScoremethodology, cycleInfo, depVarData, depVarName, depVarTransform, indepVarNames, indepVarTransform, modelEq, Fcst_Moving_Avg, Fcst_Moving_Avg_Period, actualsStartDate, modelDataFormat, outputDataFormat)
-        self.modelscriptpath = modelscriptpath
-        
-        # Main execution logic
-        if self.cycleInfo['Objective'][0] == "Validation":
-            print('Running complexscoreval for validation')
-            self.projections = self.complexscoreval()
-        else:
-            print('Running complexscore for projections')
-            self.projections = self.complexscore()
-    
-    def complexscore(self):
-        # Your existing complexscore implementation
-        actualsStartDateD = self.str2date(self.actualsStartDate)
-        inSample_startDate = self.str2date(self.cycleInfo['inSample_startDate'])
-        inSample_endDate = self.str2date(self.cycleInfo['inSample_endDate'])
-        outSample_startDate = self.str2date(self.cycleInfo['outSample_startDate'])
-        J0DateD = self.str2date(self.cycleInfo['J0Date'])
-        endProjectionsDateD = self.str2date(self.cycleInfo['endProjectionsDate'])
-        
-        # ... rest of your existing complexscore code ...
-        # (I'll keep the implementation you provided)
-        
-        return ds_4  # your existing return
-    
-    def complexscoreval(self):
+def complexscoreval(self):
     """
     Complex score evaluation function for model validation
     Performs backtesting and generates Excel output with multiple sheets
     """
     import pandas as pd
     import numpy as np
+    import os
     from dateutil import relativedelta
     from sklearn.metrics import mean_absolute_percentage_error
     import warnings
     warnings.filterwarnings('ignore')
+    
+    # Create output folder if it doesn't exist
+    output_folder = "output"
+    if not os.path.exists(output_folder):
+        os.makedirs(output_folder)
     
     # Date conversions
     actualsStartDateD = self.str2date(self.actualsStartDate)
@@ -69,46 +48,70 @@ class Complex(ModelSpec):
     # Remove month column
     model_build_df = model_build_df.drop(['month'], axis=1)
     
-    # Calculate market share
+    # Sort by date to ensure proper indexing
+    model_build_df = model_build_df.sort_index()
+    
+    # Calculate market share (Column D logic: =B2/(C2*10^9))
     indep_var = self.indepVarNames[0]  # Assuming first independent variable
     model_build_df['market_share'] = model_build_df[self.depVarName] / (model_build_df[indep_var] * 10**9)
     
-    # Get baseline market share (recent 4 quarters before J0Date)
+    # Find J0Date index position
     j0_idx = model_build_df.index.get_loc(J0DateD, method='ffill')
-    baseline_start_idx = max(0, j0_idx - 3)
-    baseline_mkt_share = model_build_df.iloc[baseline_start_idx:j0_idx+1]['market_share'].mean()
     
-    # Generate predictions for out-of-sample period
-    out_sample_data = model_build_df.loc[outSample_startDate:endProjectionsDateD].copy()
-    out_sample_data['pred'] = baseline_mkt_share * out_sample_data[indep_var] * 10**9
+    # Get baseline market share (recent 4 quarters before J0Date) - Your J5 logic: AVERAGE(D54:D57)
+    baseline_start_idx = max(0, j0_idx - 3)  # 4 quarters including J0Date-1
+    baseline_mkt_share = model_build_df.iloc[baseline_start_idx:j0_idx]['market_share'].mean()
     
-    # Calculate absolute percentage error
-    out_sample_data['ape'] = np.abs((out_sample_data['pred'] / out_sample_data[self.depVarName]) - 1)
+    # Create Ref_Validation sheet calculations
+    ref_validation_df = model_build_df.copy()
     
-    # Get 9-quarter projection period (from J0Date)
-    j0_out_idx = out_sample_data.index.get_loc(J0DateD, method='ffill')
-    nine_q_end_idx = min(len(out_sample_data) - 1, j0_out_idx + 8)  # 9 quarters including J0Date
+    # Add forecast column (F column logic: C58*$J$5*10^9 from F58 to F66)
+    ref_validation_df['forecast'] = np.nan
+    ref_validation_df['ape'] = np.nan
     
-    nine_q_data = out_sample_data.iloc[j0_out_idx:nine_q_end_idx+1]
+    # Calculate forecasts for 9 quarters starting from J0Date (row 57 to 66 in your example)
+    forecast_start_idx = j0_idx
+    forecast_end_idx = min(len(ref_validation_df) - 1, j0_idx + 8)  # 9 quarters
     
-    # Calculate metrics
-    forecast_sum = nine_q_data['pred'].sum()
-    actual_sum = nine_q_data[self.depVarName].sum()
-    accuracy_test = abs(forecast_sum / actual_sum - 1) if actual_sum != 0 else np.nan
+    # Fill forecasts: baseline_mkt_share * independent_var * 10^9
+    for i in range(forecast_start_idx, forecast_end_idx + 1):
+        ref_validation_df.iloc[i, ref_validation_df.columns.get_loc('forecast')] = (
+            baseline_mkt_share * ref_validation_df.iloc[i][indep_var] * 10**9
+        )
+        
+        # Calculate APE: ABS((F58/B58-1))
+        actual_val = ref_validation_df.iloc[i][self.depVarName]
+        forecast_val = ref_validation_df.iloc[i]['forecast']
+        if actual_val != 0:
+            ref_validation_df.iloc[i, ref_validation_df.columns.get_loc('ape')] = abs((forecast_val / actual_val) - 1)
+    
+    # Calculate summary metrics
+    forecast_9q = ref_validation_df.iloc[forecast_start_idx:forecast_end_idx + 1]['forecast']
+    actual_9q = ref_validation_df.iloc[forecast_start_idx:forecast_end_idx + 1][self.depVarName]
+    
+    # Forecast 9Q Sum and Actuals 9Q Sum
+    forecast_sum = forecast_9q.sum()
+    actual_sum = actual_9q.sum()
+    
+    # Accuracy Test: ABS(F67/F68-1) where F67=forecast_sum, F68=actual_sum
+    accuracy_test = abs((forecast_sum / actual_sum) - 1) if actual_sum != 0 else np.nan
     
     # Correlation calculations
-    # Full series correlation
+    # Model development period correlation: CORREL($B$2:$B$55,$C$2:$C$55)
+    model_dev_end_idx = model_build_df.index.get_loc(inSample_endDate, method='ffill')
+    model_dev_start_idx = model_build_df.index.get_loc(inSample_startDate, method='ffill')
+    
+    correlation_model_dev = (model_build_df.iloc[model_dev_start_idx:model_dev_end_idx + 1][self.depVarName]
+                            .corr(model_build_df.iloc[model_dev_start_idx:model_dev_end_idx + 1][indep_var]))
+    
+    # Full series correlation: CORREL($B$2:$B$66,$C$2:$C$66)
     correlation_full = model_build_df[self.depVarName].corr(model_build_df[indep_var])
     
-    # In-sample correlation (model development period)
-    in_sample_data = model_build_df.loc[inSample_startDate:inSample_endDate]
-    correlation_in = in_sample_data[self.depVarName].corr(in_sample_data[indep_var])
-    
-    # Correlation change
-    correlation_change = (correlation_full / correlation_in - 1) if correlation_in != 0 else np.nan
+    # Correlation Test: J3/J2-1
+    correlation_change = (correlation_full / correlation_model_dev - 1) if correlation_model_dev != 0 else np.nan
     
     # Determine RAG status
-    def determine_rag_status(accuracy_test, correlation_change, model_type="complex"):
+    def determine_rag_status(accuracy_test, correlation_change):
         """Determine RAG status based on accuracy and correlation"""
         correl_rag = "Green"
         if abs(correlation_change) > 0.5:
@@ -133,9 +136,7 @@ class Complex(ModelSpec):
     
     correl_rag, stat_rag, final_rag = determine_rag_status(accuracy_test, correlation_change)
     
-    # Create output DataFrames
-    
-    # 1. Test Results sheet
+    # Create Test_Results sheet
     test_results_df = pd.DataFrame({
         'GMIS_ID': [self.GMIS],
         'Dependent_Variable_Name': [self.depVarName],
@@ -145,64 +146,80 @@ class Complex(ModelSpec):
         'Accuracy_Test': [accuracy_test]
     })
     
-    # 2. Model Specifications sheet
+    # Create Model_Specifications sheet
     model_specs_df = pd.DataFrame({
         'Variable': ['GMIS_ID', 'Dependent_Variable_Name', 'Independent_Variable_Names', 
-                    'Model_Score_Methodology', 'Filename'],
+                    'Model_Score_Methodology', 'Filename', 'Test_Result_9Q_Backtesting',
+                    'Correlation_Full', 'Correlation_In'],
         'Value': [self.GMIS, self.depVarName, str(self.indepVarNames), 
-                 self.modelScoremethodology, f"{self.GMIS}_{self.depVarName}_validation.xlsx"]
+                 self.modelScoremethodology, f"{self.GMIS}_{self.depVarName}_validation.xlsx",
+                 accuracy_test, correlation_full, correlation_model_dev]
     })
     
-    # 3. RAG Assessment sheet
+    # Create RAG Assessment sheet
     rag_df = pd.DataFrame({
         'Metric': ['Correlation_RAG', 'Accuracy_RAG', 'Assessment_RAG'],
         'Status': [correl_rag, stat_rag, final_rag]
     })
     
-    # 4. Detailed Calculations sheet (like your Excel logic)
-    detailed_calc_df = model_build_df.copy()
-    detailed_calc_df['market_share'] = detailed_calc_df[self.depVarName] / (detailed_calc_df[indep_var] * 10**9)
+    # Create Forecast_Revised sheet (extended data from actualsStartDate to endProjectionsDate)
+    # Generate full date range
+    full_date_range = pd.date_range(start=actualsStartDateD, end=endProjectionsDateD, freq='Q')
     
-    # Add predictions and APE for out-of-sample period
-    detailed_calc_df['forecast'] = np.nan
-    detailed_calc_df['ape'] = np.nan
+    # Create forecast revised dataframe
+    forecast_revised_df = pd.DataFrame(index=full_date_range)
     
-    # Fill forecasts for out-of-sample period
-    out_sample_mask = (detailed_calc_df.index >= outSample_startDate) & (detailed_calc_df.index <= endProjectionsDateD)
-    detailed_calc_df.loc[out_sample_mask, 'forecast'] = (baseline_mkt_share * 
-                                                        detailed_calc_df.loc[out_sample_mask, indep_var] * 10**9)
-    detailed_calc_df.loc[out_sample_mask, 'ape'] = np.abs((detailed_calc_df.loc[out_sample_mask, 'forecast'] / 
-                                                          detailed_calc_df.loc[out_sample_mask, self.depVarName]) - 1)
+    # Merge with existing data
+    forecast_revised_df = forecast_revised_df.join(model_build_df, how='left')
     
-    # Add summary statistics
-    summary_stats = pd.DataFrame({
-        'Metric': ['Forecast_Sum_9Q', 'Actual_Sum_9Q', 'Accuracy_Test', 
-                  'Correlation_Full', 'Correlation_InSample', 'Correlation_Change',
-                  'Baseline_Market_Share'],
-        'Value': [forecast_sum, actual_sum, accuracy_test,
-                 correlation_full, correlation_in, correlation_change,
-                 baseline_mkt_share]
+    # Add transformed variable names
+    indep_var_transformed = self.indepVarNames[0] + self.indepVarTransform[0]
+    dep_var_transformed = self.depVarName + self.depVarTransform
+    
+    # Rename columns to match your naming convention
+    forecast_revised_df = forecast_revised_df.rename(columns={
+        indep_var: indep_var_transformed,
+        self.depVarName: self.depVarName
     })
     
-    # Create filename
-    filename = f"{self.GMIS}_{self.depVarName}_validation_{pd.Timestamp.now().strftime('%Y%m%d')}.xlsx"
+    # Add prediction columns
+    forecast_revised_df[f'{self.depVarName}_NT'] = forecast_revised_df[self.depVarName]  # Transformed variable
+    forecast_revised_df[f'{self.depVarName}_NT_pred'] = baseline_mkt_share * forecast_revised_df[indep_var_transformed] * 10**9
+    forecast_revised_df[f'{self.depVarName}_pred'] = baseline_mkt_share * forecast_revised_df[indep_var_transformed] * 10**9
+    
+    # Calculate APE for all dates: ABS((G2/E2)-1)
+    forecast_revised_df['APE'] = np.abs((forecast_revised_df[f'{self.depVarName}_pred'] / forecast_revised_df[self.depVarName]) - 1)
+    
+    # Add summary statistics for Ref_Validation sheet
+    ref_validation_summary = pd.DataFrame({
+        'Metric': ['Correlation_Model_Dev', 'Correlation_Full', 'Baseline_Market_Share', 
+                  'Correlation_Test', 'Forecast_9Q_Sum', 'Actuals_9Q_Sum', 'Accuracy_Test'],
+        'Value': [correlation_model_dev, correlation_full, baseline_mkt_share,
+                 correlation_change, forecast_sum, actual_sum, accuracy_test]
+    })
+    
+    # Create filename with timestamp
+    filename = f"{self.GMIS}_{self.depVarName}_validation_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    filepath = os.path.join(output_folder, filename)
     
     # Write to Excel with multiple sheets
     try:
-        with pd.ExcelWriter(filename, engine='openpyxl') as writer:
-            # Write all sheets
-            rag_df.to_excel(writer, sheet_name='RAG', index=False)
+        with pd.ExcelWriter(filepath, engine='openpyxl') as writer:
+            # Write all sheets in the order you specified
+            ref_validation_df.to_excel(writer, sheet_name='Ref_Validation', index=True)
             test_results_df.to_excel(writer, sheet_name='Test_Results', index=False)
             model_specs_df.to_excel(writer, sheet_name='Model_Specifications', index=False)
-            detailed_calc_df.to_excel(writer, sheet_name='Detailed_Calculations', index=True)
-            summary_stats.to_excel(writer, sheet_name='Summary_Statistics', index=False)
+            forecast_revised_df.to_excel(writer, sheet_name='Forecast_Revised', index=True)
+            rag_df.to_excel(writer, sheet_name='RAG_Assessment', index=False)
+            ref_validation_summary.to_excel(writer, sheet_name='Summary_Statistics', index=False)
         
-        print(f"Validation results saved to: {filename}")
+        print(f"Validation results saved to: {filepath}")
         
     except Exception as e:
         print(f"Error saving Excel file: {str(e)}")
+        filepath = None
     
-    # Create return dictionary similar to your original function structure
+    # Create return dictionary
     model_details_dict = {
         'GMIS_ID': self.GMIS,
         'Dependent_Variable_Name': self.depVarName,
@@ -213,9 +230,14 @@ class Complex(ModelSpec):
         'Correlation_RAG': correl_rag,
         'Accuracy_RAG': stat_rag,
         'Final_RAG': final_rag,
-        'Filename': filename
+        'Filename': filepath,
+        'Baseline_Market_Share': baseline_mkt_share,
+        'Correlation_Full': correlation_full,
+        'Correlation_Model_Dev': correlation_model_dev,
+        'Forecast_Sum': forecast_sum,
+        'Actual_Sum': actual_sum
     }
     
     return (None, test_results_df, None, None, None, None, None, None, 
-            detailed_calc_df, model_details_dict, None, None, None, None, None, 
-            None, correl_rag, stat_rag, final_rag, filename)
+            forecast_revised_df, model_details_dict, None, None, None, None, None, 
+            None, correl_rag, stat_rag, final_rag, filepath)
