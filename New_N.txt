@@ -1,0 +1,1634 @@
+[07/08, 16:46] Rampunit Singh: # src/gemini_scenario_models/glm_model_scenario_projection/__init__.py
+from .model import GLMModelScenarioProjection
+
+__all__ = ["GLMModelScenarioProjection"]
+
+# src/gemini_scenario_models/glm_model_scenario_projection/dependencies/__init__.py
+from ._constants import Constants
+from ._dataclasses import Inputs, Outputs
+from ._parameters import Params
+from ._schemas import (
+    CLV4Combined,
+    NationalHPI,
+    StateMetroMap,
+    MoodysMapping,
+    GLMResults,
+    HPIForecast
+)
+
+__all__ = [
+    "Constants",
+    "Inputs", 
+    "Outputs",
+    "Params",
+    "CLV4Combined",
+    "NationalHPI", 
+    "StateMetroMap",
+    "MoodysMapping",
+    "GLMResults",
+    "HPIForecast"
+]
+
+# src/gemini_scenario_models/glm_model_scenario_projection/dependencies/_constants.py
+class Constants:
+    QUARTERS_IN_YEAR = 4
+    YEAR = "YEAR"
+    QUARTER = "QUARTER"
+    NATIONAL_NAME = "National"
+    STATE_CODE_MAX = 100
+    METRO_CODE_MAX = 100000
+    HISTORY_CUTOFF = "2025-03-31"
+    MODEL_START = "2000-03-31"
+    MODEL_END = "2023-06-30"
+    FORECAST_START = "2025-06-30"
+
+# src/gemini_scenario_models/glm_model_scenario_projection/dependencies/_dataclasses.py
+from dataclasses import dataclass
+from pandera.typing.polars import DataFrame
+from ._schemas import CLV4Combined, NationalHPI, StateMetroMap, MoodysMapping, GLMResults, HPIForecast
+
+@dataclass
+class Inputs:
+    clv4_state_extract: DataFrame[CLV4Combined]
+    clv4_msa_extract: DataFrame[CLV4Combined]
+    ce_hpi_national: DataFrame[NationalHPI]
+    up_hpi_national: DataFrame[NationalHPI]
+    dn_hpi_national: DataFrame[NationalHPI]
+    dn2_hpi_national: DataFrame[NationalHPI]
+    moodys_mapping: DataFrame[MoodysMapping]
+    state_metro_map: DataFrame[StateMetroMap]
+
+@dataclass
+class Outputs:
+    state_ce_forecast: DataFrame[HPIForecast]
+    state_up_forecast: DataFrame[HPIForecast]
+    state_dn_forecast: DataFrame[HPIForecast]
+    state_dn2_forecast: DataFrame[HPIForecast]
+    metro_ce_forecast: DataFrame[HPIForecast]
+    metro_up_forecast: DataFrame[HPIForecast]
+    metro_dn_forecast: DataFrame[HPIForecast]
+    metro_dn2_forecast: DataFrame[HPIForecast]
+
+# src/gemini_scenario_models/glm_model_scenario_projection/dependencies/_parameters.py
+from dataclasses import dataclass
+from typing import Optional
+
+@dataclass
+class Params:
+    root_dir: str
+    results_dir: str
+    scenario: str
+    region: str
+    last_history_date: str = "2025-03-31"
+    model_start_date: str = "2000-03-31"
+    model_end_date: str = "2023-06-30"
+    forecast_start_date: str = "2025-06-30"
+
+# src/gemini_scenario_models/glm_model_scenario_projection/dependencies/_schemas.py
+import pandera.polars as pa
+import polars as pl
+
+class CLV4Combined(pa.DataFrameModel):
+    code: int = pa.Field()
+    name: str = pa.Field()
+    yyyymm: str = pa.Field()
+    home_price_index: float = pa.Field()
+    date: pl.Date = pa.Field()
+    qtrdt: str = pa.Field()
+    hpi_sa: float = pa.Field()
+    yoy_corelogicv4: float = pa.Field()
+    dlog_corelogicv4: float = pa.Field()
+
+class NationalHPI(pa.DataFrameModel):
+    f_date: pl.Date = pa.Field()
+    corelogic_v4: float = pa.Field()
+
+class StateMetroMap(pa.DataFrameModel):
+    st: str = pa.Field()
+    geography: str = pa.Field()
+    cbsa_code: int = pa.Field()
+
+class MoodysMapping(pa.DataFrameModel):
+    geography: str = pa.Field()
+    fip: int = pa.Field()
+    geocode: str = pa.Field()
+
+class GLMResults(pa.DataFrameModel):
+    code1: str = pa.Field()
+    date1: pl.Date = pa.Field()
+    pred: float = pa.Field()
+    hpipred: float = pa.Field()
+
+class HPIForecast(pa.DataFrameModel):
+    cbsa_code: int = pa.Field()
+    cbsa_name: str = pa.Field()
+    date: pl.Date = pa.Field()
+    hpi: float = pa.Field()
+
+# src/gemini_scenario_models/glm_model_scenario_projection/data_preparation.py
+import polars as pl
+import pandas as pd
+from datetime import datetime
+from pandera.typing.polars import DataFrame
+from .dependencies import (
+    Constants,
+    Params,
+    CLV4Combined,
+    NationalHPI,
+    StateMetroMap,
+    MoodysMapping
+)
+
+def run_data_prep(
+    params: Params,
+    clv4_state_extract: DataFrame[CLV4Combined],
+    clv4_msa_extract: DataFrame[CLV4Combined],
+    moodys_mapping: DataFrame[MoodysMapping]
+) -> tuple[DataFrame[CLV4Combined], DataFrame[CLV4Combined], DataFrame[CLV4Combined]]:
+    
+    state_data = _prepare_state_data(clv4_state_extract, moodys_mapping)
+    metro_data = _prepare_metro_data(clv4_msa_extract, moodys_mapping)
+    combined_data = _combine_data(state_data, metro_data)
+    
+    return state_data, metro_data, combined_data
+
+def _prepare_state_data(
+    clv4_state_extract: DataFrame[CLV4Combined],
+    moodys_mapping: DataFrame[MoodysMapping]
+) -> DataFrame[CLV4Combined]:
+    
+    state_with_fip = clv4_state_extract.join(
+        moodys_mapping.select([
+            pl.col("geography").str.to_uppercase().alias("state_name_upper"),
+            pl.col("fip").alias("state_code")
+        ]),
+        left_on=pl.col("state_name").str.to_uppercase(),
+        right_on="state_name_upper",
+        how="left"
+    )
+    
+    state_with_yyyymm = state_with_fip.with_columns([
+        pl.when(pl.col("d") < 10)
+        .then(pl.concat_str([pl.col("year"), "0", pl.col("d").cast(pl.Utf8)]))
+        .otherwise(pl.concat_str([pl.col("year"), pl.col("d").cast(pl.Utf8)]))
+        .alias("yyyymm")
+    ])
+    
+    state_filtered = state_with_yyyymm.filter(
+        pl.col("yyyymm").cast(pl.Int32) <= 202503
+    )
+    
+    return state_filtered
+
+def _prepare_metro_data(
+    clv4_msa_extract: DataFrame[CLV4Combined],
+    moodys_mapping: DataFrame[MoodysMapping]
+) -> DataFrame[CLV4Combined]:
+    
+    metro_with_cbsa = clv4_msa_extract.join(
+        moodys_mapping.select([
+            pl.col("geography").str.replace_all(r"[^a-zA-Z0-9\s]", "").str.to_uppercase().alias("cbsa_name_clean"),
+            pl.col("fip").alias("cbsa_code")
+        ]),
+        left_on=pl.col("cbsa_name").str.replace_all(r"[^a-zA-Z0-9\s]", "").str.to_uppercase(),
+        right_on="cbsa_name_clean",
+        how="left"
+    )
+    
+    metro_with_yyyymm = metro_with_cbsa.with_columns([
+        pl.when(pl.col("d") < 10)
+        .then(pl.concat_str([pl.col("year"), "0", pl.col("d").cast(pl.Utf8)]))
+        .otherwise(pl.concat_str([pl.col("year"), pl.col("d").cast(pl.Utf8)]))
+        .alias("yyyymm")
+    ])
+    
+    metro_filtered = metro_with_yyyymm.filter(
+        pl.col("yyyymm").cast(pl.Int32) <= 202503
+    )
+    
+    return metro_filtered
+
+def _combine_data(
+    state_data: DataFrame[CLV4Combined],
+    metro_data: DataFrame[CLV4Combined]
+) -> DataFrame[CLV4Combined]:
+    
+    state_renamed = state_data.select([
+        pl.col("state_code").alias("code"),
+        pl.col("state_name").alias("name"),
+        pl.col("yyyymm"),
+        pl.col("home_price_index")
+    ])
+    
+    metro_renamed = metro_data.select([
+        pl.col("cbsa_code").alias("code"),
+        pl.col("cbsa_name").alias("name"),
+        pl.col("yyyymm"),
+        pl.col("home_price_index")
+    ])
+    
+    combined = pl.concat([state_renamed, metro_renamed])
+    
+    combined_with_date = combined.with_columns([
+        pl.col("yyyymm").str.strptime(pl.Date, "%Y%m").alias("date_char"),
+        pl.when(pl.col("yyyymm").str.slice(4, 2).is_in(["01", "02", "03"]))
+        .then(pl.concat_str([pl.col("yyyymm").str.slice(0, 4), "Q1"]))
+        .when(pl.col("yyyymm").str.slice(4, 2).is_in(["04", "05", "06"]))
+        .then(pl.concat_str([pl.col("yyyymm").str.slice(0, 4), "Q2"]))
+        .when(pl.col("yyyymm").str.slice(4, 2).is_in(["07", "08", "09"]))
+        .then(pl.concat_str([pl.col("yyyymm").str.slice(0, 4), "Q3"]))
+        .when(pl.col("yyyymm").str.slice(4, 2).is_in(["10", "11", "12"]))
+        .then(pl.concat_str([pl.col("yyyymm").str.slice(0, 4), "Q4"]))
+        .otherwise(pl.concat_str([pl.col("yyyymm").str.slice(0, 4), "Q1"]))
+        .alias("qtrdt")
+    ])
+    
+    combined_final = combined_with_date.with_columns([
+        pl.col("date_char").alias("date")
+    ]).sort(["code", "date"])
+    
+    return combined_final
+
+def _apply_seasonal_adjustment(data: DataFrame[CLV4Combined]) -> DataFrame[CLV4Combined]:
+    
+    data_pandas = data.to_pandas()
+    
+    seasonal_adjusted = []
+    for code in data_pandas['code'].unique():
+        code_data = data_pandas[data_pandas['code'] == code].copy()
+        code_data = code_data.sort_values('date')
+        
+        if len(code_data) >= 24:
+            from statsmodels.tsa.x13 import x13_arima_analysis
+            try:
+                result = x13_arima_analysis(code_data['home_price_index'])
+                code_data['hpi_sa'] = result.seasadj
+            except:
+                code_data['hpi_sa'] = code_data['home_price_index']
+        else:
+            code_data['hpi_sa'] = code_data['home_price_index']
+        
+        seasonal_adjusted.append(code_data)
+    
+    result_pandas = pd.concat(seasonal_adjusted, ignore_index=True)
+    return pl.from_pandas(result_pandas)
+
+def _calculate_quarterly_metrics(data: DataFrame[CLV4Combined]) -> DataFrame[CLV4Combined]:
+    
+    quarterly_data = data.group_by(["code", "name", "qtrdt"]).agg([
+        pl.col("date").max().alias("date"),
+        pl.col("home_price_index").mean().alias("hpi"),
+        pl.col("hpi_sa").mean().alias("hpi_sa")
+    ])
+    
+    quarterly_metrics = quarterly_data.sort(["code", "date"]).with_columns([
+        (pl.col("hpi_sa") / pl.col("hpi_sa").shift(4) - 1).alias("yoy_corelogicv4"),
+        (pl.col("hpi_sa").log() - pl.col("hpi_sa").shift(1).log()).alias("dlog_corelogicv4")
+    ])
+    
+    return quarterly_metrics
+
+def _split_data_by_type(data: DataFrame[CLV4Combined]) -> tuple[DataFrame[CLV4Combined], DataFrame[CLV4Combined], DataFrame[CLV4Combined]]:
+    
+    national = data.filter(pl.col("name") == Constants.NATIONAL_NAME)
+    state = data.filter(
+        (pl.col("code") > 0) & (pl.col("code") <= Constants.STATE_CODE_MAX)
+    )
+    metro = data.filter(
+        (pl.col("code") >= Constants.STATE_CODE_MAX) & (pl.col("code") < Constants.METRO_CODE_MAX)
+    )
+    
+    return national, state, metro
+
+# src/gemini_scenario_models/glm_model_scenario_projection/data_projection.py
+import polars as pl
+import pandas as pd
+from pandera.typing.polars import DataFrame
+from .dependencies import (
+    Constants,
+    Params,
+    NationalHPI
+)
+
+def _prepare_national_data(
+    national_forecast: DataFrame[NationalHPI],
+    last_history_date: str
+) -> DataFrame[NationalHPI]:
+    """
+    Prepare national forecast data by cleaning and calculating metrics
+    """
+    
+    national_clean = national_forecast.filter(
+        pl.col("f_date") != pl.date(2025, 3, 31)
+    )
+    
+    national_with_metrics = national_clean.sort("f_date").with_columns([
+        (pl.col("corelogic_v4") / pl.col("corelogic_v4").shift(4) - 1).alias("yoy_corelogicv4_us"),
+        (pl.col("corelogic_v4").log() - pl.col("corelogic_v4").shift(1).log()).alias("dlog_corelogicv4_us")
+    ])
+    
+    return national_with_metricsvalue=0)
+    
+    predictions = model.predict(X_forecast)
+    
+    forecast_results = forecast_data.copy()
+    forecast_results['pred'] = predictions
+    
+    history_data = data.filter(
+        (pl.col("date1") >= pl.date(2000, 3, 31)) &
+        (pl.col("date1") <= pl.date(2025, 3, 31))
+    ).to_pandas()
+    history_data['pred'] = None
+    
+    combined_results = pd.concat([history_data, forecast_results])
+    
+    return pl.from_pandas(combined_results)
+
+def _add_state_hpi_to_metro(
+    metro_data: DataFrame,
+    state_forecast: DataFrame[HPIForecast]
+) -> DataFrame:
+    
+    metro_with_state = metro_data.join(
+        state_forecast.select([
+            pl.col("date"),
+            pl.col("hpi").alias("corelogicv4_st"),
+            pl.col("cbsa_code")
+        ]),
+        left_on=["date1", "code"],
+        right_on=["date", "cbsa_code"],
+        how="left"
+    )
+    
+    metro_with_dlog_st = metro_with_state.sort(["name", "date1"]).with_columns([
+        (pl.col("corelogicv4_st").log() - pl.col("corelogicv4_st").shift(1).log()).alias("dlog_corelogicv4_st")
+    ])
+    
+    return metro_with_dlog_st
+
+def _convert_to_hpi_forecast(
+    model_results: DataFrame[GLMResults],
+    original_data: DataFrame[CLV4Combined]
+) -> DataFrame[HPIForecast]:
+    
+    results_sorted = model_results.sort(["name", "date1"])
+    
+    results_with_hpi = results_sorted.with_columns([
+        pl.when(pl.col("date1") == pl.date(2025, 3, 31))
+        .then(pl.col("hpi_sa"))
+        .otherwise(
+            pl.col("hpi_sa").shift(1) * (pl.col("pred").exp())
+        ).alias("hpipred")
+    ])
+    
+    code_summary = original_data.select(["code", "name"]).unique()
+    
+    final_results = results_with_hpi.join(
+        code_summary,
+        on="name",
+        how="left"
+    ).select([
+        pl.col("code").alias("cbsa_code"),
+        pl.col("name").alias("cbsa_name"),
+        pl.col("date1").alias("date"),
+        pl.col("hpipred").alias("hpi")
+    ])
+    
+    return final_results
+
+def _convert_to_monthly(data: DataFrame[HPIForecast]) -> DataFrame[HPIForecast]:
+    
+    data_pandas = data.to_pandas()
+    data_pandas = data_pandas.sort_values(['cbsa_code', 'date'])
+    
+    monthly_data = []
+    for cbsa_code in data_pandas['cbsa_code'].unique():
+        cbsa_data = data_pandas[data_pandas['cbsa_code'] == cbsa_code].copy()
+        cbsa_data = cbsa_data.set_index('date')
+        
+        monthly_cbsa = cbsa_data.resample('M').interpolate(method='linear')
+        monthly_cbsa = monthly_cbsa.reset_index()
+        monthly_data.append(monthly_cbsa)
+    
+    monthly_combined = pd.concat(monthly_data, ignore_index=True)
+    return pl.from_pandas(monthly_combined)
+
+# src/gemini_scenario_models/glm_model_scenario_projection/model.py
+import polars as pl
+from gemini_cft_model_interface import DependencyContainer, PolarsWrapper, profile_performance
+from utils.glm_model_architecture import GLMModelFactory, prepare_master_dataset
+from .data_preparation import run_data_prep, _prepare_national_data
+from .dependencies import Outputs, Params
+
+class GLMModelScenarioProjection(PolarsWrapper):
+    
+    def __init__(self, dependencies: DependencyContainer) -> None:
+        super().__init__(dependencies)
+    
+    @profile_performance
+    def _calculate(self) -> Outputs:
+        
+        state_data, metro_data, combined_data = run_data_prep(
+            params=self.parameters,
+            clv4_state_extract=self._inputs.clv4_state_extract,
+            clv4_msa_extract=self._inputs.clv4_msa_extract,
+            moodys_mapping=self._inputs.moodys_mapping
+        )
+        
+        scenarios = ['ce', 'up', 'dn', 'dn2']
+        national_forecasts = {
+            'ce': self._inputs.ce_hpi_national,
+            'up': self._inputs.up_hpi_national,
+            'dn': self._inputs.dn_hpi_national,
+            'dn2': self._inputs.dn2_hpi_national
+        }
+        
+        state_forecasts = {}
+        metro_forecasts = {}
+        
+        for scenario in scenarios:
+            
+            state_glm_model = GLMModelFactory.create_model('state')
+            national_processed = _prepare_national_data(
+                national_forecasts[scenario], 
+                self.parameters.last_history_date
+            )
+            state_master_data = prepare_master_dataset(state_data, national_processed)
+            
+            state_results = state_glm_model.run_full_modeling_workflow(
+                data=state_master_data,
+                train_start_date=self.parameters.model_start_date,
+                train_end_date=self.parameters.model_end_date,
+                forecast_start_date=self.parameters.forecast_start_date,
+                history_end_date=self.parameters.last_history_date
+            )
+            
+            state_hpi_results = state_glm_model.convert_dlog_to_hpi(
+                state_results,
+                self.parameters.last_history_date,
+                scenario
+            )
+            
+            state_forecasts[scenario] = self._format_final_output(
+                state_hpi_results, 
+                state_data, 
+                scenario
+            )
+            
+            metro_glm_model = GLMModelFactory.create_model('metro')
+            metro_master_data = self._add_state_hpi_to_metro_data(
+                metro_data, 
+                national_processed, 
+                state_forecasts[scenario]
+            )
+            
+            metro_results = metro_glm_model.run_full_modeling_workflow(
+                data=metro_master_data,
+                train_start_date=self.parameters.model_start_date,
+                train_end_date=self.parameters.model_end_date,
+                forecast_start_date=self.parameters.forecast_start_date,
+                history_end_date=self.parameters.last_history_date
+            )
+            
+            metro_hpi_results = metro_glm_model.convert_dlog_to_hpi(
+                metro_results,
+                self.parameters.last_history_date,
+                scenario
+            )
+            
+            metro_forecasts[scenario] = self._format_final_output(
+                metro_hpi_results, 
+                metro_data, 
+                scenario
+            )
+        
+        return Outputs(
+            state_ce_forecast=state_forecasts['ce'],
+            state_up_forecast=state_forecasts['up'],
+            state_dn_forecast=state_forecasts['dn'],
+            state_dn2_forecast=state_forecasts['dn2'],
+            metro_ce_forecast=metro_forecasts['ce'],
+            metro_up_forecast=metro_forecasts['up'],
+            metro_dn_forecast=metro_forecasts['dn'],
+            metro_dn2_forecast=metro_forecasts['dn2']
+        )
+    
+    def _add_state_hpi_to_metro_data(
+        self, 
+        metro_data: pl.DataFrame,
+        national_processed: pl.DataFrame,
+        state_forecast: pl.DataFrame
+    ) -> pl.DataFrame:
+        
+        metro_master_data = prepare_master_dataset(metro_data, national_processed)
+        
+        metro_with_state = metro_master_data.join(
+            state_forecast.select([
+                pl.col("date"),
+                pl.col("hpi").alias("corelogicv4_st"),
+                pl.col("cbsa_code")
+            ]),
+            left_on=["date1", "code"],
+            right_on=["date", "cbsa_code"],
+            how="left"
+        )
+        
+        metro_with_dlog_st = metro_with_state.sort(["name", "date1"]).with_columns([
+            (pl.col("corelogicv4_st").log() - pl.col("corelogicv4_st").shift(1).log()).alias("dlog_corelogicv4_st")
+        ])
+        
+        return metro_with_dlog_st
+    
+    def _format_final_output(
+        self, 
+        model_results: pl.DataFrame,
+        original_data: pl.DataFrame,
+        scenario: str
+    ) -> pl.DataFrame:
+        
+        code_summary = original_data.select(["code", "name"]).unique()
+        
+        hpi_col = f"hpipred_{scenario}"
+        
+        final_results = model_results.join(
+            code_summary,
+            on="name",
+            how="left"
+        ).select([
+            pl.col("code").alias("cbsa_code"),
+            pl.col("name").alias("cbsa_name"),
+            pl.col("date1").alias("date"),
+            pl.col(hpi_col).alias("hpi")
+        ])
+        
+        return self._convert_to_monthly(final_results)
+    
+    def _convert_to_monthly(self, data: pl.DataFrame) -> pl.DataFrame:
+        
+        import pandas as pd
+        
+        data_pandas = data.to_pandas()
+        data_pandas = data_pandas.sort_values(['cbsa_code', 'date'])
+        
+        monthly_data = []
+        for cbsa_code in data_pandas['cbsa_code'].unique():
+            cbsa_data = data_pandas[data_pandas['cbsa_code'] == cbsa_code].copy()
+            cbsa_data = cbsa_data.set_index('date')
+            
+            monthly_cbsa = cbsa_data.resample('M').interpolate(method='linear')
+            monthly_cbsa = monthly_cbsa.reset_index()
+            monthly_data.append(monthly_cbsa)
+        
+        monthly_combined = pd.concat(monthly_data, ignore_index=True)
+        return pl.from_pandas(monthly_combined)
+
+# tests/glm_model_scenario_projection/__init__.py
+
+# tests/glm_model_scenario_projection/conftest.py
+import pytest
+import polars as pl
+from datetime import date
+from src.gemini_scenario_models.glm_model_scenario_projection.dependencies import (
+    Params, Inputs, CLV4Combined, NationalHPI, StateMetroMap, MoodysMapping
+)
+
+@pytest.fixture
+def sample_params():
+    return Params(
+        root_dir="/test/root",
+        results_dir="/test/results",
+        scenario="ce",
+        region="state"
+    )
+
+@pytest.fixture
+def sample_clv4_state():
+    return pl.DataFrame({
+        "state_name": ["California", "Texas", "New York"],
+        "year": [2023, 2023, 2023],
+        "d": [3, 6, 9],
+        "home_price_index": [450.5, 280.3, 390.2]
+    })
+
+@pytest.fixture
+def sample_clv4_msa():
+    return pl.DataFrame({
+        "cbsa_name": ["San Francisco-Oakland-Hayward, CA", "Houston-The Woodlands-Sugar Land, TX"],
+        "year": [2023, 2023],
+        "d": [3, 6],
+        "home_price_index": [850.5, 320.3]
+    })
+
+@pytest.fixture
+def sample_national_hpi():
+    return pl.DataFrame({
+        "f_date": [date(2023, 3, 31), date(2023, 6, 30), date(2023, 9, 30)],
+        "corelogic_v4": [320.5, 325.2, 330.1]
+    })
+
+@pytest.fixture
+def sample_moodys_mapping():
+    return pl.DataFrame({
+        "geography": ["CALIFORNIA", "TEXAS", "NEW YORK", "SAN FRANCISCO-OAKLAND-HAYWARD, CA"],
+        "fip": [6, 48, 36, 41860],
+        "geocode": ["CA", "TX", "NY", "41860"]
+    })
+
+@pytest.fixture
+def sample_state_metro_map():
+    return pl.DataFrame({
+        "st": ["CA", "TX", "NY"],
+        "geography": ["California", "Texas", "New York"],
+        "cbsa_code": [41860, 26420, 35620]
+    })
+
+@pytest.fixture
+def sample_inputs(sample_clv4_state, sample_clv4_msa, sample_national_hpi, 
+                 sample_moodys_mapping, sample_state_metro_map):
+    return Inputs(
+        clv4_state_extract=sample_clv4_state,
+        clv4_msa_extract=sample_clv4_msa,
+        ce_hpi_national=sample_national_hpi,
+        up_hpi_national=sample_national_hpi,
+        dn_hpi_national=sample_national_hpi,
+        dn2_hpi_national=sample_national_hpi,
+        moodys_mapping=sample_moodys_mapping,
+        state_metro_map=sample_state_metro_map
+    )
+
+# tests/glm_model_scenario_projection/test_container.py
+import pytest
+from unittest.mock import Mock
+from src.gemini_scenario_models.glm_model_scenario_projection.model import GLMModelScenarioProjection
+
+def test_container_initialization():
+    mock_container = Mock()
+    mock_container.parameters = Mock()
+    mock_container._inputs = Mock()
+    
+    model = GLMModelScenarioProjection(mock_container)
+    assert model is not None
+
+def test_container_parameters():
+    mock_container = Mock()
+    mock_params = Mock()
+    mock_params.root_dir = "/test"
+    mock_params.scenario = "ce"
+    mock_container.parameters = mock_params
+    
+    model = GLMModelScenarioProjection(mock_container)
+    assert model.parameters.root_dir == "/test"
+    assert model.parameters.scenario == "ce"
+
+# tests/glm_model_scenario_projection/test_data_preparation.py
+import pytest
+import polars as pl
+from src.gemini_scenario_models.glm_model_scenario_projection.data_preparation import (
+    run_data_prep,
+    _prepare_state_data,
+    _prepare_metro_data,
+    _combine_data
+)
+
+def test_run_data_prep(sample_params, sample_clv4_state, sample_clv4_msa, sample_moodys_mapping):
+    state_data, metro_data, combined_data = run_data_prep(
+        sample_params,
+        sample_clv4_state,
+        sample_clv4_msa,
+        sample_moodys_mapping
+    )
+    
+    assert isinstance(state_data, pl.DataFrame)
+    assert isinstance(metro_data, pl.DataFrame)
+    assert isinstance(combined_data, pl.DataFrame)
+    assert len(state_data) > 0
+    assert len(metro_data) > 0
+    assert len(combined_data) > 0
+
+def test_prepare_state_data(sample_clv4_state, sample_moodys_mapping):
+    result = _prepare_state_data(sample_clv4_state, sample_moodys_mapping)
+    
+    assert isinstance(result, pl.DataFrame)
+    assert "yyyymm" in result.columns
+    assert "state_code" in result.columns
+
+def test_prepare_metro_data(sample_clv4_msa, sample_moodys_mapping):
+    result = _prepare_metro_data(sample_clv4_msa, sample_moodys_mapping)
+    
+    assert isinstance(result, pl.DataFrame)
+    assert "yyyymm" in result.columns
+    assert "cbsa_code" in result.columns
+
+def test_combine_data(sample_clv4_state, sample_clv4_msa, sample_moodys_mapping):
+    state_data = _prepare_state_data(sample_clv4_state, sample_moodys_mapping)
+    metro_data = _prepare_metro_data(sample_clv4_msa, sample_moodys_mapping)
+    
+    result = _combine_data(state_data, metro_data)
+    
+    assert isinstance(result, pl.DataFrame)
+    assert "code" in result.columns
+    assert "name" in result.columns
+    assert "qtrdt" in result.columns
+
+# tests/glm_model_scenario_projection/test_data_projection.py
+import pytest
+import polars as pl
+from datetime import date
+from src.gemini_scenario_models.glm_model_scenario_projection.data_projection import (
+    run_data_projection,
+    _prepare_national_data,
+    _create_master_dataset,
+    _convert_to_monthly
+)
+
+def test_run_data_projection(sample_params):
+    region_data = pl.DataFrame({
+        "name": ["California", "Texas"],
+        "date": [date(2023, 3, 31), date(2023, 3, 31)],
+        "code": [6, 48],
+        "hpi_sa": [450.0, 280.0],
+        "yoy_corelogicv4": [0.05, 0.03],
+        "dlog_corelogicv4": [0.01, 0.008]
+    })
+    
+    national_forecast = pl.DataFrame({
+        "f_date": [date(2023, 3, 31)],
+        "corelogic_v4": [320.0]
+    })
+    
+    result = run_data_projection(
+        sample_params,
+        region_data,
+        national_forecast,
+        "state"
+    )
+    
+    assert isinstance(result, pl.DataFrame)
+
+def test_prepare_national_data(sample_national_hpi):
+    result = _prepare_national_data(sample_national_hpi, "2025-03-31")
+    
+    assert isinstance(result, pl.DataFrame)
+    assert "yoy_corelogicv4_us" in result.columns
+    assert "dlog_corelogicv4_us" in result.columns
+
+def test_create_master_dataset():
+    region_data = pl.DataFrame({
+        "name": ["California", "Texas"],
+        "date": [date(2023, 3, 31), date(2023, 3, 31)],
+        "code": [6, 48],
+        "hpi_sa": [450.0, 280.0],
+        "yoy_corelogicv4": [0.05, 0.03],
+        "dlog_corelogicv4": [0.01, 0.008]
+    })
+    
+    national_data = pl.DataFrame({
+        "f_date": [date(2023, 3, 31)],
+        "yoy_corelogicv4_us": [0.04],
+        "dlog_corelogicv4_us": [0.009]
+    })
+    
+    result = _create_master_dataset(region_data, national_data)
+    
+    assert isinstance(result, pl.DataFrame)
+    assert "name" in result.columns
+    assert "date1" in result.columns
+
+def test_convert_to_monthly():
+    quarterly_data = pl.DataFrame({
+        "cbsa_code": [6, 6],
+        "cbsa_name": ["California", "California"],
+        "date": [date(2023, 3, 31), date(2023, 6, 30)],
+        "hpi": [450.0, 455.0]
+    })
+    
+    result = _convert_to_monthly(quarterly_data)
+    
+    assert isinstance(result, pl.DataFrame)
+    assert len(result) >= len(quarterly_data)
+
+# tests/glm_model_scenario_projection/test_model.py
+import pytest
+from unittest.mock import Mock, patch
+from src.gemini_scenario_models.glm_model_scenario_projection.model import GLMModelScenarioProjection
+
+def test_model_initialization():
+    mock_container = Mock()
+    mock_container.parameters = Mock()
+    mock_container._inputs = Mock()
+    
+    model = GLMModelScenarioProjection(mock_container)
+    assert model is not None
+
+@patch('src.gemini_scenario_models.glm_model_scenario_projection.model.GLMModelFactory')
+@patch('src.gemini_scenario_models.glm_model_scenario_projection.model.run_data_prep')
+@patch('src.gemini_scenario_models.glm_model_scenario_projection.model.prepare_master_dataset')
+def test_calculate_method(mock_master_dataset, mock_prep, mock_factory, sample_inputs, sample_params):
+    mock_container = Mock()
+    mock_container.parameters = sample_params
+    mock_container._inputs = sample_inputs
+    
+    mock_prep.return_value = (Mock(), Mock(), Mock())
+    mock_glm_model = Mock()
+    mock_glm_model.run_full_modeling_workflow.return_value = Mock()
+    mock_glm_model.convert_dlog_to_hpi.return_value = Mock()
+    mock_factory.create_model.return_value = mock_glm_model
+    mock_master_dataset.return_value = Mock()
+    
+    model = GLMModelScenarioProjection(mock_container)
+    
+    with patch.object(model, '_format_final_output', return_value=Mock()):
+        with patch.object(model, '_add_state_hpi_to_metro_data', return_value=Mock()):
+            result = model._calculate()
+    
+    assert result is not None
+    assert mock_prep.called
+    assert mock_factory.create_model.called
+
+def test_glm_factory_integration():
+    from utils.glm_model_architecture import GLMModelFactory
+    
+    state_model = GLMModelFactory.create_model('state')
+    metro_model = GLMModelFactory.create_model('metro')
+    
+    assert state_model is not None
+    assert metro_model is not None
+    assert state_model.model_type == 'state'
+    assert metro_model.model_type == 'metro'
+
+def test_available_models():
+    from utils.glm_model_architecture import GLMModelFactory
+    
+    available_models = GLMModelFactory.get_available_models()
+    assert 'state' in available_models
+    assert 'metro' in available_models
+
+# tests/glm_model_scenario_projection/test_parameters.py
+import pytest
+from src.gemini_scenario_models.glm_model_scenario_projection.dependencies import Params
+
+def test_params_creation():
+    params = Params(
+        root_dir="/test/root",
+        results_dir="/test/results",
+        scenario="ce",
+        region="state"
+    )
+    
+    assert params.root_dir == "/test/root"
+    assert params.results_dir == "/test/results"
+    assert params.scenario == "ce"
+    assert params.region == "state"
+    assert params.last_history_date == "2025-03-31"
+
+def test_params_with_custom_dates():
+    params = Params(
+        root_dir="/test/root",
+        results_dir="/test/results",
+        scenario="up",
+        region="metro",
+        last_history_date="2024-12-31",
+        model_start_date="1999-12-31"
+    )
+    
+    assert params.last_history_date == "2024-12-31"
+    assert params.model_start_date == "1999-12-31"
+    assert params.scenario == "up"
+    assert params.region == "metro"
+
+def test_params_default_values():
+    params = Params(
+        root_dir="/test",
+        results_dir="/results",
+        scenario="dn",
+        region="state"
+    )
+    
+    assert params.model_end_date == "2023-06-30"
+    assert params.forecast_start_date == "2025-06-30"
+
+# tests/glm_model_scenario_projection/test_glm_architecture.py
+import pytest
+import polars as pl
+import pandas as pd
+from datetime import date
+from utils.glm_model_architecture import (
+    GLMModelFactory,
+    GeneralGLMModelRunner,
+    HPIStateGLMModel,
+    HPIMetroGLMModel,
+    prepare_master_dataset
+)
+
+def test_glm_model_factory():
+    state_model = GLMModelFactory.create_model('state')
+    metro_model = GLMModelFactory.create_model('metro')
+    
+    assert isinstance(state_model, GeneralGLMModelRunner)
+    assert isinstance(metro_model, GeneralGLMModelRunner)
+    assert state_model.model_type == 'state'
+    assert metro_model.model_type == 'metro'
+
+def test_available_models():
+    models = GLMModelFactory.get_available_models()
+    assert 'state' in models
+    assert 'metro' in models
+
+def test_hpi_state_glm_model():
+    model = HPIStateGLMModel()
+    
+    sample_data = pl.DataFrame({
+        'dlog_corelogicv4_us': [0.01, 0.02, 0.015],
+        'name': ['California', 'Texas', 'New York'],
+        'dlog_corelogicv4': [0.012, 0.018, 0.014]
+    })
+    
+    features = model.prepare_features(sample_data)
+    target = model.prepare_target(sample_data)
+    
+    assert isinstance(features, pd.DataFrame)
+    assert isinstance(target, pd.Series)
+    assert len(features) == len(sample_data)
+    assert len(target) == len(sample_data)
+
+def test_hpi_metro_glm_model():
+    model = HPIMetroGLMModel()
+    
+    sample_data = pl.DataFrame({
+        'dlog_corelogicv4_st': [0.01, 0.02, 0.015],
+        'name': ['San Francisco', 'Houston', 'New York Metro'],
+        'dlog_corelogicv4': [0.012, 0.018, 0.014]
+    })
+    
+    features = model.prepare_features(sample_data)
+    target = model.prepare_target(sample_data)
+    
+    assert isinstance(features, pd.DataFrame)
+    assert isinstance(target, pd.Series)
+    assert len(features) == len(sample_data)
+
+def test_general_glm_model_runner():
+    runner = GeneralGLMModelRunner('state')
+    
+    sample_data = pl.DataFrame({
+        'name': ['California', 'Texas'] * 10,
+        'date1': [date(2020, 3, 31), date(2020, 6, 30)] * 10,
+        'dlog_corelogicv4_us': [0.01, 0.02] * 10,
+        'dlog_corelogicv4': [0.012, 0.018] * 10,
+        'hpi_sa': [450.0, 280.0] * 10
+    })
+    
+    assert runner.model_type == 'state'
+    assert hasattr(runner, 'glm_model')
+
+def test_prepare_master_dataset():
+    region_data = pl.DataFrame({
+        'name': ['California', 'Texas'],
+        'date': [date(2023, 3, 31), date(2023, 3, 31)],
+        'code': [6, 48],
+        'yoy_corelogicv4': [0.05, 0.03],
+        'dlog_corelogicv4': [0.01, 0.008],
+        'hpi_sa': [450.0, 280.0]
+    })
+    
+    national_data = pl.DataFrame({
+        'f_date': [date(2023, 3, 31)],
+        'yoy_corelogicv4_us': [0.04],
+        'dlog_corelogicv4_us': [0.009]
+    })
+    
+    result = prepare_master_dataset(region_data, national_data)
+    
+    assert isinstance(result, pl.DataFrame)
+    assert 'name' in result.columns
+    assert 'date1' in result.columns
+    assert len(result) >= len(region_data)
+[07/08, 17:18] Rampunit Singh: def Model_statistics(model_name, model_id, model_type, series_type):
+
+    y_actual = ds_1.iloc[:ds_1.index.get_loc(outSample_endDate, method="ffill") + 1][depVar]
+
+    y_pred = ds_1.iloc[:ds_1.index.get_loc(outSample_endDate, method="ffill") + 1][depVar + "_pred"]
+
+    y_actual_in = ds_1.iloc[:ds_1.index.get_loc(inSample_endDate, method="ffill") + 1][depVar]
+
+    y_pred_in = ds_1.iloc[:ds_1.index.get_loc(inSample_endDate, method="ffill") + 1][depVar + "_pred"]
+
+    y_actual_out = ds_1.iloc[
+        ds_1.index.get_loc(cutoff_date, method="bfill"):ds_1.index.get_loc(outSample_endDate, method="ffill") + 1][depVar]
+
+    y_pred_out = ds_1.iloc[
+        ds_1.index.get_loc(cutoff_date, method="bfill"):ds_1.index.get_loc(
+            outSample_endDate, method="ffill") + 1][depVar + "_pred"]
+
+    y_full = ds_1.iloc[:ds_1.index.get_loc(outSample_endDate, method="ffill") + 1][depVar]
+
+    x_full = ds_1.iloc[:ds_1.index.get_loc(outSample_endDate, method="ffill") + 1][[x.strip("'") for x in indep_Var_List]]
+
+    y_in = ds_1.iloc[:ds_1.index.get_loc(inSample_endDate, method="ffill") + 1][depVar]
+
+    x_in = ds_1.iloc[:ds_1.index.get_loc(inSample_endDate, method="ffill") + 1][[x.strip("'") for x in indep_Var_List]]
+
+    y_out = ds_1.iloc[
+        ds_1.index.get_loc(cutoff_date, method="bfill"):ds_1.index.get_loc(
+            outSample_endDate, method="ffill") + 1][depVar]
+
+    x_out = ds_1.iloc[
+        ds_1.index.get_loc(cutoff_date, method="bfill"):ds_1.index.get_loc(
+            outSample_endDate, method="ffill") + 1][[x.strip("'") for x in indep_Var_List]]
+
+    df_model_params = model.params.to_frame()
+
+    df_model_pValues = model.pvalues.to_frame()
+
+    df_model_stdError = model.bse.to_frame()
+
+    df_model_tStat = model.tvalues.to_frame()
+
+    df_model_details = pd.concat([df_model_params, df_model_pValues, df_model_stdError, df_model_tStat], axis=1)
+
+    df_model_details.columns = ["COEFFICIENTS", "P-VALUES", "STANDARD ERROR", "T-STATISTICS"]
+
+    df_model_details["APE"] = absolute_percentage_error(y_actual=ds_1[depVar], y_pred=ds_1[depVar + "_pred"])
+
+    sw_test_normality_pval = shapiro(model.resid)[1]
+
+    bp_hetero_test_pval = model.test_heteroskedasticity('breakvar')[0][1]
+
+    dw_autocorr_test_stat = sms.durbin_watson(model.resid)
+
+    r_sq = r_squared(y_full.iloc[:, 0], model.fittedvalues)
+
+    feature_columns = indep_Var_List
+
+    k = len(feature_columns)
+
+    n = len(ds_1.iloc[ds_1.index.get_loc(ds_1.index.values[0]):-1])
+
+    adj_r_sq = 1 - (1 - r_sq) * (n - 1) / (n - k - 1)
+
+    mape_in = mean_absolute_percentage_error(y_actual_in, y_pred_in)
+    mape_out = mean_absolute_percentage_error(y_actual_out, y_pred_out)
+
+    mse_in = mean_squared_error(y_actual_in, y_pred_in)
+
+    mse_out = mean_squared_error(y_actual_out, y_pred_out)
+
+    rmse_in = sqrt(mean_squared_error(y_actual_in, y_pred_in))
+    rmse_out = sqrt(mean_squared_error(y_actual_out, y_pred_out))
+
+    rmspe_in = (np.sqrt(np.mean(np.square((y_actual_in - y_pred_in) / y_actual_in)))) * 100
+
+    rmspe_out = (np.sqrt(np.mean(np.square((y_actual_out - y_pred_out) / y_actual_out)))) * 100
+
+    correl_full = correlation_calc(dep_var=y_full, indep_vars=x_full)
+
+    correl_in = correlation_calc(dep_var=y_in, indep_vars=x_in)
+    correl_out = correlation_calc(dep_var=y_out, indep_vars=x_out)
+
+    correl_full.rename(columns={"correlation": "correlation_full"}, inplace=True)
+
+    correl_in.rename(columns={"correlation": "correlation_in"}, inplace=True)
+
+    correl_out.rename(columns={"correlation": "correlation_out"}, inplace=True)
+
+    correal = pd.concat([correl_full, correl_in["correlation_in"], correl_out["correlation_out"]], join="inner", axis=1)
+    
+    df_model_details["Rsquare"] = r_sq
+
+    df_model_details["ADJRsq"] = adj_r_sq
+
+    df_model_details["MAPE_in"] = mape_in
+
+    df_model_details["RMSPE_in"] = rmspe_in
+    df_model_details["MSE_in"] = mse_in
+
+    df_model_details["RMSE_in"] = rmse_in
+
+    df_model_details["MAPE_out"] = mape_out
+
+    df_model_details["RMSPE_out"] = rmspe_out
+
+    df_model_details["MSE_out"] = mse_out
+
+    df_model_details["RMSE_out"] = rmse_out
+
+    df_model_details["AutoCorrel_DW"] = dw_autocorr_test_stat
+
+    df_model_details["Normality_pvalue"] = sw_test_normality_pval
+
+    df_model_details["Normality_test"] = "Shaprio Wilk"
+
+    df_model_details["Hetero_pvalue"] = bp_hetero_test_pval
+    df_model_details["Hetero_desc"] = "Breusch-Pagan"
+
+    df_model_details["y Actual In-Sample Mean"] = y_actual_in.mean()
+
+    df_model_details["y Actual Out-Sample Mean"] = y_actual_out.mean()
+
+    df_model_details["y Actual Full Mean"] = y_actual.mean()
+
+    df_model_details["y Actual In-Sample St.Dev"] = statistics.stdev(y_actual_in)
+
+    df_model_details["y Actual Out-Sample St.Dev"] = statistics.stdev(y_actual_out)
+    df_model_details["y Actual Full St.Dev"] = statistics.stdev(y_actual)
+
+    df_model_details["y Pred In-Sample Mean"] = y_pred_in.mean()
+
+    df_model_details["y Pred Out-Sample Mean"] = y_pred_out.mean()
+
+    df_model_details["y Pred Full Mean"] = y_pred.mean()
+
+    df_model_details["y Pred In-Sample St.Dev"] = statistics.stdev(y_pred_in)
+
+    df_model_details["y Pred Out-Sample St.Dev"] = statistics.stdev(y_pred_out)
+
+    df_model_details["y Pred Full St.Dev"] = statistics.stdev(y_pred)
+
+    df_model_details = df_model_details.reset_index().rename(columns={'index': 'Variable'})
+
+    df_model_details = df_model_details.merge(correal, left_on=["Variable"], right_on=["Variable"], how="left")
+
+    model_stat_df = model_build_df.dropna()
+
+    if (series_type == "Actual") or (series_type == "Revised"):
+
+        dep_adf, dep_trans_adf, residual_adf = OrderedDict(), OrderedDict(), OrderedDict()
+
+        dep_adf["GIMS_ID"], dep_trans_adf["GIMS_ID"], residual_adf["GIMS_ID"] = gmis, gmis, gmis
+
+        dep_adf["Dependent_Variable_Name"], dep_trans_adf["Dependent_Variable_Name"], residual_adf[
+            "Dependent_Variable_Name"] = depVar, depVar, depVar
+
+        dep_adf["Independent_Variable_Names"], dep_trans_adf["Independent_Variable_Names"], residual_adf[
+            "Independent_Variable_Names"] = str([x.strip("'") for x in indep_Var_List]), str(
+            [x.strip("'") for x in indep_Var_List]), str([x.strip("'") for x in indep_Var_List])
+
+        dep_adf["Model_Score_Methodology"], dep_trans_adf["Model_Score_Methodology"], residual_adf[
+            "Model_Score_Methodology"] = model_method, model_method, model_method
+
+        dep_adf["Series_Type"], dep_trans_adf["Series_Type"], residual_adf[
+            "Series_Type"] = series_type, series_type, series_type
+
+        dep_adf["variable"], dep_trans_adf["variable"], residual_adf[
+            "variable"] = depVar, f"{depVar} {transformDep}", "residual"
+
+        for regression in ["nc", "c", "ct"]:
+
+            for maxlag in [0, 1, 2]:
+
+                model_dep = \
+                    model_build_df.iloc[0:model_build_df.index.get_loc(inSample_endDate, method="nearest") + 1][
+                        depVar].dropna()
+                model_dep_trans = \
+                    model_build_df.iloc[0:model_build_df.index.get_loc(inSample_endDate, method="nearest") + 1][
+                        depVar + transformDep].dropna()
+
+                dep_adf[f"Stationarity_{regression}{str(maxlag)}_t"] = \
+                    adfuller(model_dep, maxlag=maxlag, regression=regression, autolag=None)[0]
+
+                dep_adf[f"Stationarity_{regression}{str(maxlag)}_pVal"] = \
+                    adfuller(model_dep, maxlag=maxlag, regression=regression, autolag=None)[1]
+
+                dep_trans_adf[f"Stationarity_{regression}{str(maxlag)}_t"] = \
+                    adfuller(model_dep_trans, maxlag=maxlag, regression=regression, autolag=None)[0]
+
+                dep_trans_adf[f"Stationarity_{regression}{str(maxlag)}_pVal"] = \
+                    adfuller(model_dep_trans, maxlag=maxlag, regression=regression, autolag=None)[1]
+
+                residual_adf[f"Stationarity_{regression}{str(maxlag)}_t"] = \
+                    adfuller(model.resid.dropna(), maxlag=maxlag, regression=regression, autolag=None)[0]
+
+                residual_adf[f"Stationarity_{regression}{str(maxlag)}_pVal"] = \
+                    adfuller(model.resid.dropna(), maxlag=maxlag, regression=regression, autolag=None)[1]
+
+        df_dep_adf = pd.DataFrame([dep_adf])
+
+        df_dep_trans_adf = pd.DataFrame([dep_trans_adf])
+
+        df_residuals = pd.DataFrame([residual_adf])
+
+        dep_stationarity = pd.concat([df_dep_adf, df_dep_trans_adf, df_residuals])
+
+        indep_stationarity = pd.DataFrame()
+
+        for indepVar, transformIndep in zip(indep_Var_List, transform_Indep_List):
+
+            indep_adf, indep_trans_adf = OrderedDict(), OrderedDict()
+
+            indep_adf["GIMS_ID"], indep_trans_adf["GIMS_ID"] = gmis, gmis
+
+            indep_adf["Dependent_Variable_Name"], indep_trans_adf["Dependent_Variable_Name"] = depVar, depVar
+            indep_adf["Independent_Variable_Names"], indep_trans_adf["Independent_Variable_Names"] = str(
+                [x.strip("'") for x in indep_Var_List]), str([x.strip("'") for x in indep_Var_List])
+
+            indep_adf["Model_Score_Methodology"], indep_trans_adf[
+                "Model_Score_Methodology"] = model_method, model_method
+
+            indep_adf["Series_Type"], indep_trans_adf["Series_Type"] = series_type, series_type
+
+            indepVar = indepVar[1:-1]
+
+            transformIndep = transformIndep[1:-1]
+
+            indep_adf["variable"], indep_trans_adf["variable"] = indepVar, f"{indepVar} {transformIndep}"
+
+            for regression in ['nc', 'c', 'ct']:
+
+                for maxlag in [0, 1, 2]:
+
+                    model_indep = \
+                        model_build_df.iloc[0:model_build_df.index.get_loc(inSample_endDate, method="nearest") + 1][
+                            indepVar].dropna()
+                    model_indep_trans = \
+                        model_build_df.iloc[0:model_build_df.index.get_loc(inSample_endDate, method="nearest") + 1][
+                            indepVar + transformIndep].dropna()
+
+                    indep_adf[f"Stationarity_{regression}{str(maxlag)}_t"] = \
+                        adfuller(model_indep, maxlag=maxlag, regression=regression, autolag=None)[0]
+
+                    indep_adf[f"Stationarity_{regression}{str(maxlag)}_pVal"] = \
+                        adfuller(model_indep, maxlag=maxlag, regression=regression, autolag=None)[1]
+
+                    indep_trans_adf[f"Stationarity_{regression}{str(maxlag)}_t"] = \
+                        adfuller(model_indep_trans, maxlag=maxlag, regression=regression, autolag=None)[0]
+
+                    indep_trans_adf[f"Stationarity_{regression}{str(maxlag)}_pVal"] = \
+                        adfuller(model_indep_trans, maxlag=maxlag, regression=regression, autolag=None)[1]
+
+            df_indep_adf = pd.DataFrame([indep_adf])
+
+            df_indep_trans_adf = pd.DataFrame([indep_trans_adf])
+
+            indep_stationarity = pd.concat([indep_stationarity, df_indep_adf, df_indep_trans_adf])
+
+        stationarity_tests = pd.concat([dep_stationarity, indep_stationarity])
+
+        model_stat_df = model_build_df.dropna()
+
+        eg_test = OrderedDict()
+
+        eg_test["GIMS_ID"] = self.GMIS
+
+        eg_test["Dependent_Variable_Name"] = depVar
+
+        eg_test["Independent_Variable_Names"] = str([x.strip("'") for x in indep_Var_List])
+
+        eg_test["Model_Score_Methodology"] = self.modelScoremethodology
+
+        eg_test["Series_Type"] = series_type
+
+        for regression in ['nc', 'c', 'ct']:
+
+            for maxlag in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]:
+
+                model_dep_coint = \
+                    model_stat_df.iloc[0:model_stat_df.index.get_loc(inSample_endDate, method="nearest") + 1][
+                        depVar + self.depVarTransform]
+
+                model_indep_coint = \
+                    model_stat_df.iloc[0:model_stat_df.index.get_loc(inSample_endDate, method="nearest") + 1][
+                        feature_columns]
+
+                eg_test[f"EG_Coint_{regression}{maxlag}_t"] = \
+                    coint(model_dep_coint, model_indep_coint, trend=regression, maxlag=maxlag, autolag=None)[0]
+
+                eg_test[f"EG_Coint_{regression}{maxlag}_pVal"] = \
+                    coint(model_dep_coint, model_indep_coint, trend=regression, maxlag=maxlag, autolag=None)[1]
+
+        df_eg = pd.DataFrame([eg_test])
+
+    elif series_type == "Full":
+
+        dep_adf, dep_trans_adf, residual_adf = OrderedDict(), OrderedDict(), OrderedDict()
+
+        dep_adf["GIMS_ID"], dep_trans_adf["GIMS_ID"], residual_adf["GIMS_ID"] = gmis, gmis, gmis
+
+        dep_adf["Dependent_Variable_Name"], dep_trans_adf["Dependent_Variable_Name"], residual_adf[
+            "Dependent_Variable_Name"] = depVar, depVar, depVar
+
+        dep_adf["Independent_Variable_Names"], dep_trans_adf["Independent_Variable_Names"], residual_adf[
+            "Independent_Variable_Names"] = str([x.strip("'") for x in indep_Var_List]), str(
+            [x.strip("'") for x in indep_Var_List]), str([x.strip("'") for x in indep_Var_List])
+
+        dep_adf["Model_Score_Methodology"], dep_trans_adf["Model_Score_Methodology"], residual_adf[
+            "Model_Score_Methodology"] = model_method, model_method, model_method
+
+        dep_adf["Series_Type"], dep_trans_adf["Series_Type"], residual_adf[
+            "Series_Type"] = series_type, series_type, series_type
+
+        dep_adf["variable"], dep_trans_adf["variable"], residual_adf[
+            "variable"] = depVar, f"{depVar}{self.depVarTransform}", "residual"
+
+        for regression in ["nc", "c", "ct"]:
+
+            for maxlag in [0, 1, 2]:
+
+                model_dep = model_build_df[[depVar]].dropna()
+
+                model_dep_trans = model_build_df[[depVar + self.depVarTransform]].dropna()
+
+                dep_adf[f"Stationarity_{regression}{str(maxlag)}_t"] = \
+                    adfuller(model_dep, maxlag=maxlag, regression=regression, autolag=None)[0]
+
+                dep_adf[f"Stationarity_{regression}{str(maxlag)}_pVal"] = \
+                    adfuller(model_dep, maxlag=maxlag, regression=regression, autolag=None)[1]
+
+                dep_trans_adf[f"Stationarity_{regression}{str(maxlag)}_t"] = \
+                    adfuller(model_dep_trans, maxlag=maxlag, regression=regression, autolag=None)[0]
+                dep_trans_adf[f"Stationarity_{regression}{str(maxlag)}_pVal"] = \
+                    adfuller(model_dep_trans, maxlag=maxlag, regression=regression, autolag=None)[1]
+
+                residual_adf[f"Stationarity_{regression}{str(maxlag)}_t"] = \
+                    adfuller(model.resid.dropna(), maxlag=maxlag, regression=regression, autolag=None)[0]
+
+                residual_adf[f"Stationarity_{regression}{str(maxlag)}_pVal"] = \
+                    adfuller(model.resid.dropna(), maxlag=maxlag, regression=regression, autolag=None)[1]
+
+        df_dep_adf = pd.DataFrame([dep_adf])
+
+        df_dep_trans_adf = pd.DataFrame([dep_trans_adf])
+
+        df_residuals = pd.DataFrame([residual_adf])
+
+        dep_stationarity = pd.concat([df_dep_adf, df_dep_trans_adf, df_residuals])
+
+        indep_stationarity = pd.DataFrame()
+
+        for indepVar, transformIndep in zip(indep_Var_List, transform_Indep_List):
+
+            indep_adf, indep_trans_adf = OrderedDict(), OrderedDict()
+
+            indep_adf["GIMS_ID"], indep_trans_adf["GIMS_ID"] = self.GMIS, self.GMIS
+
+            indep_adf["Dependent_Variable_Name"], indep_trans_adf["Dependent_Variable_Name"] = depVar, depVar
+
+            indep_adf["Independent_Variable_Names"], indep_trans_adf["Independent_Variable_Names"] = str(
+                [x.strip("'") for x in indep_Var_List]), str([x.strip("'") for x in indep_Var_List])
+
+            indep_adf["Model_Score_Methodology"], indep_trans_adf[
+                "Model_Score_Methodology"] = model_method, model_method
+
+            indep_adf["Series_Type"], indep_trans_adf["Series_Type"] = series_type, series_type
+
+            indepVar = indepVar[1:-1]
+
+            transformIndep = transformIndep[1:-1]
+
+            indep_adf["variable"], indep_trans_adf["variable"] = indepVar, f"{indepVar}{transformIndep}"
+
+            for regression in ['nc', 'c', 'ct']:
+
+                for maxlag in [0, 1, 2]:
+
+                    model_indep = model_build_df[[indepVar]].dropna()
+
+                    model_indep_trans = model_build_df[[indepVar + transformIndep]].dropna()
+
+                    indep_adf[f"Stationarity_{regression}{str(maxlag)}_t"] = \
+                        adfuller(model_indep, maxlag=maxlag, regression=regression, autolag=None)[0]
+
+                    indep_adf[f"Stationarity_{regression}{str(maxlag)}_pVal"] = \
+                        adfuller(model_indep, maxlag=maxlag, regression=regression, autolag=None)[1]
+
+                    indep_trans_adf[f"Stationarity_{regression}{str(maxlag)}_t"] = \
+                        adfuller(model_indep_trans, maxlag=maxlag, regression=regression, autolag=None)[0]
+
+                    indep_trans_adf[f"Stationarity_{regression}{str(maxlag)}_pVal"] = \
+                        adfuller(model_indep_trans, maxlag=maxlag, regression=regression, autolag=None)[1]
+
+            df_indep_adf = pd.DataFrame([indep_adf])
+
+            df_indep_trans_adf = pd.DataFrame([indep_trans_adf])
+
+            indep_stationarity = pd.concat([indep_stationarity, df_indep_adf, df_indep_trans_adf])
+
+        stationarity_tests = pd.concat([dep_stationarity, indep_stationarity])
+
+        model_stat_df = model_build_df.dropna()
+
+        eg_test = OrderedDict()
+
+        eg_test["GIMS_ID"] = self.GMIS
+
+        eg_test["Dependent_Variable_Name"] = depVar
+
+        eg_test["Independent_Variable_Names"] = str([x.strip("'") for x in indep_Var_List])
+
+        eg_test["Model_Score_Methodology"] = model_method
+
+        eg_test["Series_Type"] = series_type
+
+        for regression in ['nc', 'c', 'ct']:
+
+            for maxlag in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]:
+
+                eg_test[f"EG_Coint_{regression}{maxlag}_t"] = \
+                    coint(model_stat_df[depVar + self.depVarTransform], model_stat_df[feature_columns], trend=regression,
+                          maxlag=maxlag, autolag=None)[0]
+
+                eg_test[f"EG_Coint_{regression}{maxlag}_pVal"] = \
+                    coint(model_stat_df[depVar + self.depVarTransform], model_stat_df[feature_columns], trend=regression,
+                          maxlag=maxlag, autolag=None)[1]
+
+        df_eg = pd.DataFrame([eg_test])
+
+    adf_dep = pd.DataFrame(columns=["Dep_var", "type", "lag", "Test Statistic", "p-value"])
+
+    adf_dep_trans = pd.DataFrame(columns=["Transformed_Dep_var", "type", "lag", "Test Statistic", "p-value"])
+
+    adf_resid = pd.DataFrame(columns=["Residuals", "type", "lag", "Test Statistic", "p-value"])
+
+    model_stat_df = model_build_df.dropna()
+
+    if ((series_type == "Actual") or (series_type == "Revised")):
+
+        for regression in ['nc', 'c', 'ct']:
+
+            for maxlag in [0, 1, 2]:
+
+                model_dep = \
+                    model_stat_df.iloc[0:model_stat_df.index.get_loc(inSample_endDate, method="nearest") + 1][
+                        depVar]
+
+                model_dep_trans = \
+                    model_stat_df.iloc[0:model_stat_df.index.get_loc(inSample_endDate, method="nearest") + 1][
+                        depVar + self.depVarTransform]
+
+                regression_dict = {'nc': 'No Mean', 'c': 'Mean', 'ct': 'Trend'}
+
+                adf_dep_pValue = adfuller(model_dep, maxlag=maxlag, regression=regression, autolag=None)[1]
+
+                adf_dep_tstat = adfuller(model_dep, maxlag=maxlag, regression=regression, autolag=None)[0]
+
+                adf_dep.loc[len(adf_dep.index)] = [depVar, regression_dict[regression], maxlag, adf_dep_tstat,
+                                                   adf_dep_pValue]
+
+                adf_dep_trans_pvalue = \
+                    adfuller(model_dep_trans, maxlag=maxlag, regression=regression, autolag=None)[1]
+
+                adf_dep_trans_tstat = \
+                    adfuller(model_dep_trans, maxlag=maxlag, regression=regression, autolag=None)[0]
+
+                adf_dep_trans.loc[len(adf_dep_trans.index)] = [
+                    depVar + self.depVarTransform, regression_dict[regression], maxlag, adf_dep_trans_tstat, adf_dep_trans_pvalue]
+
+                adf_resid_pValue = \
+                    adfuller(model.resid.dropna(), maxlag=maxlag, regression=regression, autolag=None)[1]
+
+                adf_resid_tstat = \
+                    adfuller(model.resid.dropna(), maxlag=maxlag, regression=regression, autolag=None)[0]
+
+                adf_resid.loc[len(adf_resid.index)] = ["actual y_trans predicted y_trans",
+                                                       regression_dict[regression], maxlag, adf_resid_tstat,
+                                                       adf_resid_pValue]
+
+    else:
+
+        for regression in ['nc', 'c', 'ct']:
+
+            for maxlag in [0, 1, 2]:
+
+                regression_dict = {'nc': 'No Mean', 'c': 'Mean', 'ct': 'Trend'}
+
+                adf_dep_pValue = \
+                    adfuller(model_stat_df[depVar], maxlag=maxlag, regression=regression, autolag=None)[1]
+
+                adf_dep_tstat = \
+                    adfuller(model_stat_df[depVar], maxlag=maxlag, regression=regression, autolag=None)[0]
+
+                adf_dep.loc[len(adf_dep.index)] = [depVar, regression_dict[regression], maxlag, adf_dep_tstat,
+                                                   adf_dep_pValue]
+
+                adf_dep_trans_pvalue = \
+                    adfuller(model_stat_df[depVar + self.depVarTransform], maxlag=maxlag, regression=regression,
+                             autolag=None)[1]
+
+                adf_dep_trans_tstat = \
+                    adfuller(model_stat_df[depVar + self.depVarTransform], maxlag=maxlag, regression=regression,
+                             autolag=None)[0]
+
+                adf_dep_trans.loc[len(adf_dep_trans.index)] = [depVar + self.depVarTransform,
+                                                               regression_dict[regression], maxlag, adf_dep_trans_tstat, adf_dep_trans_pvalue]
+
+                adf_resid_pValue = \
+                    adfuller(model.resid.dropna(), maxlag=maxlag, regression=regression, autolag=None)[1]
+
+                adf_resid_tstat = \
+                    adfuller(model.resid.dropna(), maxlag=maxlag, regression=regression, autolag=None)[0]
+
+                adf_resid.loc[len(adf_resid.index)] = ["actual y_trans predicted y_trans",
+                                                       regression_dict[regression], maxlag, adf_resid_tstat, adf_resid_pValue]
+
+    adf_indep = pd.DataFrame(columns=["Indep_var", "type", "lag", "Test Statistic", "p-value"])
+
+    adf_indep_trans = pd.DataFrame(
+        columns=["Transformed_Indep_var", "type", "lag", "Test Statistic", "p-value"])
+
+    if ((series_type == "Actual") or (series_type == "Revised")):
+
+        for indepVar, transformIndep in zip(indep_Var_List, transform_Indep_List):
+
+            indepVar = indepVar[1:-1]
+
+            transformIndep = transformIndep[1:-1]
+
+            for regression in ['nc', 'c', 'ct']:
+
+                for maxlag in [0, 1, 2]:
+
+                    model_indep = \
+                        model_stat_df.iloc[0:model_stat_df.index.get_loc(inSample_endDate, method="nearest") + 1][
+                            indepVar]
+
+                    model_indep_trans = \
+                        model_stat_df.iloc[0:model_stat_df.index.get_loc(inSample_endDate, method="nearest") + 1][
+                            indepVar + transformIndep]
+
+                    regression_dict = {'nc': 'No Mean', 'c': 'Mean', 'ct': 'Trend'}
+
+                    adf_indep_pValue = \
+                        adfuller(model_indep, maxlag=maxlag, regression=regression, autolag=None)[1]
+
+                    adf_indep_tstat = adfuller(model_indep, maxlag=maxlag, regression=regression, autolag=None)[0]
+
+                    adf_indep.loc[len(adf_indep.index)] = [indepVar, regression_dict[regression], maxlag,
+                                                           adf_indep_tstat, adf_indep_pValue]
+
+                    adf_indep_trans_pvalue = \
+                        adfuller(model_indep_trans, maxlag=maxlag, regression=regression, autolag=None)[1]
+
+                    adf_indep_trans_tstat = \
+                        adfuller(model_indep_trans, maxlag=maxlag, regression=regression, autolag=None)[0]
+
+                    adf_indep_trans.loc[len(adf_indep_trans.index)] = [indepVar + transformIndep,
+                                                                       regression_dict[regression], maxlag,
+                                                                       adf_indep_trans_tstat,
+                                                                       adf_indep_trans_pvalue]
+
+    else:
+
+        for indepVar, transformIndep in zip(indep_Var_List, transform_Indep_List):
+
+            indepVar = indepVar[1:-1]
+
+            transformIndep = transformIndep[1:-1]
+
+            for regression in ['nc', 'c', 'ct']:
+
+                for maxlag in [0, 1, 2]:
+
+                    regression_dict = {'nc': 'No Mean', 'c': 'Mean', 'ct': 'Trend'}
+
+                    adf_indep_pValue = \
+                        adfuller(model_stat_df[indepVar], maxlag=maxlag, regression=regression, autolag=None)[1]
+
+                    adf_indep_tstat = \
+                        adfuller(model_stat_df[indepVar], maxlag=maxlag, regression=regression, autolag=None)[0]
+
+                    adf_indep.loc[len(adf_indep.index)] = [indepVar, regression_dict[regression], maxlag,
+                                                           adf_indep_tstat, adf_indep_pValue]
+
+                    adf_indep_trans_pvalue = \
+                        adfuller(model_stat_df[indepVar + transformIndep], maxlag=maxlag, regression=regression, autolag=None)[1]
+
+                    adf_indep_trans_tstat = \
+                        adfuller(model_stat_df[indepVar + transformIndep], maxlag=maxlag, regression=regression, autolag=None)[0]
+
+                    adf_indep_trans.loc[len(adf_indep_trans.index)] = [indepVar + transformIndep, regression_dict[regression], maxlag, adf_indep_trans_tstat,
+                                                                       adf_indep_trans_pvalue]
+
+    coint_df = pd.DataFrame(columns=["Test", "Type", "lag", "Test Statistic", "p-value"])
+
+    if ((series_type == "Actual") or (series_type == "Revised")):
+
+        for regression in ['nc', 'c', 'ct']:
+
+            for maxlag in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]:
+
+                regression_dict = {'nc': 'No Mean', 'c': 'Mean', 'ct': 'Trend'}
+
+                model_dep_coint = \
+                    model_stat_df.iloc[0:model_stat_df.index.get_loc(inSample_endDate, method="nearest") + 1][
+                        depVar + self.depVarTransform]
+
+                model_indep_coint = \
+                    model_stat_df.iloc[0:model_stat_df.index.get_loc(inSample_endDate, method="nearest") + 1][
+                        feature_columns]
+
+                coint_tstat, coint_pval, critstat_n = coint(model_dep_coint, model_indep_coint, trend=regression, maxlag=maxlag, autolag=None)
+
+                coint_df.loc[len(coint_df.index)] = ["Engle Granger Co-Integration Test", regression_dict[regression], maxlag, coint_tstat, coint_pval]
+
+    else:
+
+        for regression in ['nc', 'c', 'ct']:
+
+            for maxlag in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]:
+
+                regression_dict = {'nc': 'No Mean', 'c': 'Mean', 'ct': 'Trend'}
+
+                coint_tstat, coint_pval, critstat_n = coint(model_stat_df[depVar + self.depVarTransform], model_stat_df[feature_columns], trend=regression, maxlag=maxlag, autolag=None)
+
+                coint_df.loc[len(coint_df.index)] = ["Engle Granger Co-Integration Test", regression_dict[regression], maxlag, coint_tstat, coint_pval]
+
+    return model, df_model_details, y_actual, y_pred, y_actual_in, y_actual_out, y_pred_in, y_pred_out, model_build_df, self.model_val_dict, adf_dep, adf_dep_trans, adf_indep, adf_indep_trans, adf_resid, coint_df, stationarity_tests, df_eg
