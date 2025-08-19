@@ -1,0 +1,66 @@
+Process 1: Ingestion
+Purpose: Initial data intake into the system
+
+Raw CORA data is collected and prepared for processing
+This involves loading documents, files, or structured data from various sources
+Data validation and initial formatting occurs here
+Sets up the pipeline for subsequent processing steps
+
+Process 2: Generate Embeddings
+Purpose: Convert textual data into numerical vector representations
+
+Text documents are processed through an embedding model (likely a transformer-based model)
+Each piece of text is converted into high-dimensional vectors that capture semantic meaning
+These embeddings enable mathematical similarity comparisons between different pieces of content
+Chunking strategies may be applied to break large documents into manageable segments
+
+Process 3: Save Embeddings
+Purpose: Persist vector representations in a specialized database
+
+Generated embeddings are stored in a Vector Database (Vector DB)
+The database is optimized for similarity search operations
+Metadata and original text references are typically stored alongside embeddings
+Indexing structures are created to enable fast retrieval
+
+Process 4: Query
+Purpose: User initiates a search or question
+
+User submits a natural language query through the interface
+The query represents what information the user wants to retrieve
+This triggers the retrieval process in the RAG system
+
+Process 5: Search Relevant Information
+Purpose: Find semantically similar content using vector similarity
+
+User query is converted into an embedding using the same model from Process 2
+Vector similarity search is performed against the stored embeddings
+Top-k most relevant document chunks are retrieved based on similarity scores
+Metadata and context from relevant documents are extracted
+
+Process 6: Generated Prompt using Query + Top K Context
+Purpose: Construct an enhanced prompt for the language model
+
+Original user query is combined with the retrieved relevant context
+A structured prompt is created that includes:
+
+The user's original question
+Relevant background information from retrieved documents
+Instructions for how to use the context
+
+
+This enriched prompt provides the LLM with domain-specific knowledge
+
+Process 7: Return Formatted Response
+Purpose: Generate final answer using retrieved context
+
+ALICE (the LLM) processes the enhanced prompt
+Generates a response that combines the retrieved information with its training knowledge
+Response is formatted according to specified guidelines
+May include citations or references to source documents
+
+Process 8: Return Human-like Response
+Purpose: Present final answer to the user
+
+The generated response is delivered back to the user
+Response appears natural and conversational while being grounded in the retrieved documents
+User receives an answer that is both contextually relevant and factually supported by the CORA data
