@@ -1,0 +1,893 @@
+# ==================== src/gemini_scenario_models/hpi_projection_us/dependencies/_constants.py ====================
+
+from datetime import datetime
+
+class Constants:
+    LAST_HISTORY_DATE = "202503"
+    FORECAST_START_DATE = "2025-06-30"
+    MODEL_START_DATE = "2000-03-31"
+    MODEL_END_DATE = "2023-06-30"
+    CUTOFF_DATE = "2025-03-31"
+    
+    STATE_CODE_MIN = 0
+    STATE_CODE_MAX = 100
+    METRO_CODE_MIN = 100
+    METRO_CODE_MAX = 100000
+    
+    SCENARIO_TYPES = ["ce", "up", "dn", "dn2"]
+    REGION_TYPES = ["state", "metro"]
+    
+    QUARTER_MONTHS = {
+        ('01', '02', '03'): 'Q1',
+        ('04', '05', '06'): 'Q2', 
+        ('07', '08', '09'): 'Q3',
+        ('10', '11', '12'): 'Q4'
+    }
+
+# ==================== src/gemini_scenario_models/hpi_projection_us/dependencies/_dataclasses.py ====================
+
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Optional
+import polars as pl
+
+@dataclass
+class CLV4Combined:
+    code: str
+    name: str
+    date: datetime
+    home_price_index: float
+    hpi_sa: Optional[float] = None
+    yoy_corelogicv4: Optional[float] = None
+    dlog_corelogicv4: Optional[float] = None
+    qtrdt: Optional[str] = None
+    yyyymm: Optional[str] = None
+
+@dataclass
+class NationalHPI:
+    date: datetime
+    corelogic_v4: float
+    scenario: str
+
+@dataclass
+class StateMetroMap:
+    cbsa_code: str
+    cbsa_name: str
+    st: str
+
+@dataclass
+class MoodysMapping:
+    geography: str
+    fip: str
+    geocode: Optional[str] = None
+
+@dataclass
+class Params:
+    scenario: str
+    region: str
+    root_dir: str
+    results_dir: str
+    last_history_date: str = "202503"
+
+# ==================== src/gemini_scenario_models/hpi_projection_us/dependencies/_parameters.py ====================
+
+import polars as pl
+from typing import Dict, Any, List
+from datetime import datetime
+
+class Parameters:
+    def __init__(self):
+        self.scenarios = ["ce", "up", "dn", "dn2"]
+        self.regions = ["state", "metro"]
+        self.input_files = {
+            "moodys_mapping": "Basket_2016-10-5_13_45_V2.xlsx",
+            "state_hpi": "HPI Data by State.xlsx",
+            "cbsa_hpi": "HPI Data by CBSA.xlsx",
+            "national_forecast": "Data_Forecast_National_HPI_2025Q2.xlsx",
+            "state_metro_map": "state_metro_map.xlsx",
+            "scenario_data": "scenario_data.xlsx"
+        }
+        
+    def get_file_path(self, file_key: str, root_dir: str) -> str:
+        return f"{root_dir}/Input/{self.input_files[file_key]}"
+        
+    def get_output_path(self, filename: str, results_dir: str) -> str:
+        return f"{results_dir}/{filename}"
+
+# ==================== src/gemini_scenario_models/hpi_projection_us/dependencies/_schemas.py ====================
+
+import polars as pl
+from typing import Dict, Any
+
+class HPISchemas:
+    @staticmethod
+    def get_state_schema() -> Dict[str, pl.DataType]:
+        return {
+            "State_Name": pl.Utf8,
+            "Year": pl.Int32,
+            "Month": pl.Int32,
+            "HOME_PRICE_INDEX": pl.Float64
+        }
+    
+    @staticmethod
+    def get_cbsa_schema() -> Dict[str, pl.DataType]:
+        return {
+            "CBSA_Name": pl.Utf8,
+            "Year": pl.Int32,
+            "Month": pl.Int32,
+            "HOME_PRICE_INDEX": pl.Float64
+        }
+    
+    @staticmethod
+    def get_moodys_schema() -> Dict[str, pl.DataType]:
+        return {
+            "Geography": pl.Utf8,
+            "FIP": pl.Utf8,
+            "Geocode": pl.Utf8
+        }
+
+# ==================== src/gemini_scenario_models/hpi_projection_us/dependencies/__init__.py ====================
+
+from ._constants import Constants
+from ._parameters import Parameters
+from ._dataclasses import CLV4Combined, NationalHPI, StateMetroMap, MoodysMapping, Params
+from ._schemas import HPISchemas
+
+__all__ = [
+    "Constants",
+    "Parameters",
+    "CLV4Combined",
+    "NationalHPI",
+    "StateMetroMap",
+    "MoodysMapping",
+    "Params",
+    "HPISchemas"
+]
+
+# ==================== src/gemini_scenario_models/hpi_projection_us/__init__.py ====================
+
+from .model import GLMModelScenarioProjection
+
+__all__ = ["GLMModelScenarioProjection"]
+
+# ==================== Utils/data_import_helpers.py ====================
+
+import polars as pl
+from typing import Dict, Any, Optional
+import pandas as pd
+
+class DataImportHelpers:
+    @staticmethod
+    def import_excel_sheet(file_path: str, sheet_name: str) -> pl.DataFrame:
+        df_pandas = pd.read_excel(file_path, sheet_name=sheet_name)
+        return pl.from_pandas(df_pandas)
+    
+    @staticmethod
+    def clean_geography_name(df: pl.DataFrame, column: str) -> pl.DataFrame:
+        return df.with_columns([
+            pl.col(column).str.to_uppercase().str.replace_all(r"[^A-Z0-9\s]", "").alias(f"{column}_clean")
+        ])
+    
+    @staticmethod
+    def create_yyyymm(df: pl.DataFrame, year_col: str = "Year", month_col: str = "Month") -> pl.DataFrame:
+        return df.with_columns([
+            pl.when(pl.col(month_col) < 10)
+            .then(pl.concat_str([pl.col(year_col).cast(pl.Utf8), pl.lit("0"), pl.col(month_col).cast(pl.Utf8)]))
+            .otherwise(pl.concat_str([pl.col(year_col).cast(pl.Utf8), pl.col(month_col).cast(pl.Utf8)]))
+            .alias("YYYYMM")
+        ])
+    
+    @staticmethod
+    def create_quarter_date(df: pl.DataFrame, yyyymm_col: str = "YYYYMM") -> pl.DataFrame:
+        return df.with_columns([
+            pl.when(pl.col(yyyymm_col).str.slice(4, 2).is_in(["01", "02", "03"]))
+            .then(pl.concat_str([pl.col(yyyymm_col).str.slice(0, 4), pl.lit("Q1")]))
+            .when(pl.col(yyyymm_col).str.slice(4, 2).is_in(["04", "05", "06"]))
+            .then(pl.concat_str([pl.col(yyyymm_col).str.slice(0, 4), pl.lit("Q2")]))
+            .when(pl.col(yyyymm_col).str.slice(4, 2).is_in(["07", "08", "09"]))
+            .then(pl.concat_str([pl.col(yyyymm_col).str.slice(0, 4), pl.lit("Q3")]))
+            .when(pl.col(yyyymm_col).str.slice(4, 2).is_in(["10", "11", "12"]))
+            .then(pl.concat_str([pl.col(yyyymm_col).str.slice(0, 4), pl.lit("Q4")]))
+            .otherwise(pl.concat_str([pl.col(yyyymm_col).str.slice(0, 4), pl.lit("Q1")]))
+            .alias("QtrDt")
+        ])
+
+# ==================== Utils/glm_model_architecture.py ====================
+
+import polars as pl
+from sklearn.linear_model import LinearRegression
+from typing import List, Dict, Optional, Tuple, Any
+from abc import ABC, abstractmethod
+from datetime import datetime, date
+import numpy as np
+
+class BaseGLMModel(ABC):
+    def __init__(self, fit_intercept: bool = False):
+        self.model = LinearRegression(fit_intercept=fit_intercept)
+        self.is_fitted = False
+        self.feature_columns = None
+        self.target_column = None
+
+    @abstractmethod
+    def prepare_features(self, data: pl.DataFrame) -> pl.DataFrame:
+        pass
+
+    @abstractmethod
+    def prepare_target(self, data: pl.DataFrame) -> pl.DataFrame:
+        pass
+
+    def fit(self, data: pl.DataFrame) -> 'BaseGLMModel':
+        X = self.prepare_features(data)
+        y = self.prepare_target(data)
+        
+        X_pandas = X.to_pandas()
+        y_pandas = y.to_pandas().values.ravel()
+        
+        self.model.fit(X_pandas, y_pandas)
+        self.is_fitted = True
+        self.feature_columns = X.columns
+        return self
+    
+    def predict(self, data: pl.DataFrame) -> pl.DataFrame:
+        if not self.is_fitted:
+            raise ValueError("Model must be fitted before prediction")
+        
+        X = self.prepare_features(data)
+        X_pandas = X.to_pandas()
+        predictions = self.model.predict(X_pandas)
+        
+        return pl.DataFrame({
+            "predictions": predictions
+        })
+
+class HPIGLMModel(BaseGLMModel):
+    def __init__(self, region_type: str = "state"):
+        super().__init__(fit_intercept=False)
+        self.region_type = region_type
+    
+    def prepare_features(self, data: pl.DataFrame) -> pl.DataFrame:
+        if self.region_type == "state":
+            return self._prepare_state_features(data)
+        else:
+            return self._prepare_metro_features(data)
+    
+    def prepare_target(self, data: pl.DataFrame) -> pl.DataFrame:
+        return data.select(["DLOG_CoreLogicV4"])
+    
+    def _prepare_state_features(self, data: pl.DataFrame) -> pl.DataFrame:
+        feature_df = data.select([
+            "DLOG_CoreLogicV4_US",
+            "name"
+        ])
+        
+        dummies = feature_df.to_dummies(columns=["name"], drop_first=False)
+        
+        us_data = feature_df.select("DLOG_CoreLogicV4_US")
+        dummy_cols = [col for col in dummies.columns if col.startswith("name_")]
+        
+        interaction_features = []
+        for col in dummy_cols:
+            interaction_col = f"US_x_{col}"
+            interaction_df = (us_data * dummies.select(col)).rename({"DLOG_CoreLogicV4_US": interaction_col})
+            interaction_features.append(interaction_df)
+        
+        if interaction_features:
+            result = pl.concat(interaction_features, how="horizontal")
+        else:
+            result = pl.DataFrame()
+        
+        return result
+    
+    def _prepare_metro_features(self, data: pl.DataFrame) -> pl.DataFrame:
+        feature_df = data.select([
+            "DLOG_CoreLogicV4_St",
+            "name"
+        ])
+        
+        dummies = feature_df.to_dummies(columns=["name"], drop_first=False)
+        
+        st_data = feature_df.select("DLOG_CoreLogicV4_St")
+        dummy_cols = [col for col in dummies.columns if col.startswith("name_")]
+        
+        interaction_features = []
+        for col in dummy_cols:
+            interaction_col = f"ST_x_{col}"
+            interaction_df = (st_data * dummies.select(col)).rename({"DLOG_CoreLogicV4_St": interaction_col})
+            interaction_features.append(interaction_df)
+        
+        if interaction_features:
+            result = pl.concat(interaction_features, how="horizontal")
+        else:
+            result = pl.DataFrame()
+        
+        return result
+
+# ==================== src/gemini_scenario_models/hpi_projection_us/data_preparation.py ====================
+
+import polars as pl
+from datetime import datetime
+from typing import Tuple
+from .dependencies import Constants, Parameters, CLV4Combined, NationalHPI, StateMetroMap, MoodysMapping, Params
+from Utils.data_import_helpers import DataImportHelpers
+import numpy as np
+from scipy import signal
+
+class DataPreparation:
+    def __init__(self):
+        self.helpers = DataImportHelpers()
+        self.constants = Constants()
+        self.parameters = Parameters()
+    
+    def run_data_prep(self, params: Params, clv4_state_extract: pl.DataFrame, 
+                     clv4_msa_extract: pl.DataFrame, moodys_mapping: pl.DataFrame) -> Tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame]:
+        state_data = self._prepare_state_data(clv4_state_extract, moodys_mapping)
+        metro_data = self._prepare_metro_data(clv4_msa_extract, moodys_mapping)
+        combined_data = self._combine_data(state_data, metro_data)
+        return state_data, metro_data, combined_data
+    
+    def _prepare_state_data(self, clv4_state_extract: pl.DataFrame, moodys_mapping: pl.DataFrame) -> pl.DataFrame:
+        moodys_clean = moodys_mapping.select([
+            pl.col("Geography").str.to_uppercase().alias("geography_upper"),
+            pl.col("FIP").alias("state_code")
+        ])
+        
+        state_with_yyyymm = self.helpers.create_yyyymm(clv4_state_extract, "Year", "Month")
+        
+        state_filtered = state_with_yyyymm.filter(
+            pl.col("YYYYMM").cast(pl.Int32) <= int(self.constants.LAST_HISTORY_DATE)
+        )
+        
+        result = state_filtered.join(
+            moodys_clean,
+            left_on=pl.col("State_Name").str.to_uppercase(),
+            right_on="geography_upper",
+            how="left"
+        ).rename({"state_code": "Code", "State_Name": "Name"})
+        
+        return result
+    
+    def _prepare_metro_data(self, clv4_msa_extract: pl.DataFrame, moodys_mapping: pl.DataFrame) -> pl.DataFrame:
+        moodys_clean = moodys_mapping.select([
+            pl.col("Geography").str.to_uppercase().str.replace_all(r"[^A-Z0-9\s]", "").alias("geography_clean"),
+            pl.col("FIP").alias("cbsa_code")
+        ])
+        
+        metro_with_yyyymm = self.helpers.create_yyyymm(clv4_msa_extract, "Year", "Month")
+        
+        metro_filtered = metro_with_yyyymm.filter(
+            pl.col("YYYYMM").cast(pl.Int32) <= int(self.constants.LAST_HISTORY_DATE)
+        )
+        
+        metro_clean = metro_filtered.with_columns([
+            pl.col("CBSA_Name").str.to_uppercase().str.replace_all(r"[^A-Z0-9\s]", "").alias("cbsa_name_clean")
+        ])
+        
+        result = metro_clean.join(
+            moodys_clean,
+            left_on="cbsa_name_clean",
+            right_on="geography_clean",
+            how="left"
+        ).rename({"cbsa_code": "Code", "CBSA_Name": "Name"})
+        
+        return result
+    
+    def _combine_data(self, state_data: pl.DataFrame, metro_data: pl.DataFrame) -> pl.DataFrame:
+        state_selected = state_data.select([
+            "Code", "Name", "YYYYMM", "HOME_PRICE_INDEX"
+        ])
+        
+        metro_selected = metro_data.select([
+            "Code", "Name", "YYYYMM", "HOME_PRICE_INDEX"
+        ])
+        
+        combined = pl.concat([state_selected, metro_selected], how="vertical")
+        
+        combined_with_date = combined.with_columns([
+            pl.col("YYYYMM").str.strptime(pl.Date, "%Y%m", strict=False).alias("date")
+        ])
+        
+        combined_with_quarter = self.helpers.create_quarter_date(combined_with_date, "YYYYMM")
+        
+        sorted_data = combined_with_date.sort(["Code", "date"])
+        
+        return sorted_data
+    
+    def _apply_seasonal_adjustment(self, data: pl.DataFrame) -> pl.DataFrame:
+        result_dfs = []
+        
+        for code in data["Code"].unique():
+            code_data = data.filter(pl.col("Code") == code).sort("date")
+            hpi_values = code_data["HOME_PRICE_INDEX"].to_numpy()
+            
+            if len(hpi_values) >= 24:
+                try:
+                    trend = signal.savgol_filter(hpi_values, window_length=13, polyorder=2)
+                    seasonal = hpi_values - trend
+                    hpi_sa = hpi_values - seasonal
+                except:
+                    hpi_sa = hpi_values
+            else:
+                hpi_sa = hpi_values
+            
+            code_result = code_data.with_columns([
+                pl.Series("HPI_SA", hpi_sa)
+            ])
+            result_dfs.append(code_result)
+        
+        return pl.concat(result_dfs, how="vertical")
+    
+    def create_quarterly_data(self, data: pl.DataFrame) -> pl.DataFrame:
+        data_with_quarter = data.with_columns([
+            pl.col("date").dt.quarter().alias("quarter"),
+            pl.col("date").dt.year().alias("year")
+        ])
+        
+        quarterly = data_with_quarter.group_by(["Code", "Name", "year", "quarter"]).agg([
+            pl.col("HOME_PRICE_INDEX").mean().alias("HPI"),
+            pl.col("HPI_SA").mean().alias("HPI_SA"),
+            pl.col("date").max().alias("date")
+        ])
+        
+        quarterly_sorted = quarterly.sort(["Code", "date"])
+        
+        quarterly_with_calcs = quarterly_sorted.with_columns([
+            (pl.col("HPI_SA") / pl.col("HPI_SA").shift(4) - 1).alias("YOY_CoreLogicV4").over("Code"),
+            (pl.col("HPI_SA").log() - pl.col("HPI_SA").log().shift(1)).alias("DLOG_CoreLogicV4").over("Code")
+        ])
+        
+        return quarterly_with_calcs
+    
+    def split_datasets(self, data: pl.DataFrame) -> Tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame]:
+        national = data.filter(pl.col("Name") == "National")
+        
+        state = data.filter(
+            (pl.col("Code").cast(pl.Int32) > self.constants.STATE_CODE_MIN) & 
+            (pl.col("Code").cast(pl.Int32) <= self.constants.STATE_CODE_MAX)
+        )
+        
+        metro = data.filter(
+            (pl.col("Code").cast(pl.Int32) >= self.constants.METRO_CODE_MIN) & 
+            (pl.col("Code").cast(pl.Int32) < self.constants.METRO_CODE_MAX)
+        )
+        
+        return national, state, metro
+
+# ==================== src/gemini_scenario_models/hpi_projection_us/data_projection.py ====================
+
+import polars as pl
+from datetime import datetime, date
+from typing import Dict, List, Tuple, Optional
+from .dependencies import Constants, Parameters
+from Utils.glm_model_architecture import HPIGLMModel
+import numpy as np
+
+class DataProjection:
+    def __init__(self):
+        self.constants = Constants()
+        self.parameters = Parameters()
+    
+    def create_forecast(self, scenario: str, region: str, region_data: pl.DataFrame, 
+                       national_data: pl.DataFrame, scenario_forecast: pl.DataFrame) -> pl.DataFrame:
+        
+        if region == "state":
+            return self._state_forecast(scenario, region_data, national_data, scenario_forecast)
+        else:
+            return self._metro_forecast(scenario, region_data, national_data, scenario_forecast)
+    
+    def _state_forecast(self, scenario: str, state_data: pl.DataFrame, 
+                       national_data: pl.DataFrame, scenario_forecast: pl.DataFrame) -> pl.DataFrame:
+        
+        national_merged = self._merge_national_forecast(national_data, scenario_forecast)
+        
+        national_with_changes = self._calculate_national_changes(national_merged)
+        
+        master_data = self._create_master_dataset(state_data, national_with_changes)
+        
+        merged_data = self._merge_region_data(master_data, state_data, national_with_changes)
+        
+        model_data = self._prepare_model_data(merged_data)
+        
+        predictions = self._run_glm_model(model_data, region_type="state")
+        
+        forecast_result = self._convert_predictions_to_hpi(predictions, scenario)
+        
+        return forecast_result
+    
+    def _metro_forecast(self, scenario: str, metro_data: pl.DataFrame, 
+                       national_data: pl.DataFrame, scenario_forecast: pl.DataFrame,
+                       state_forecast: Optional[pl.DataFrame] = None) -> pl.DataFrame:
+        
+        national_merged = self._merge_national_forecast(national_data, scenario_forecast)
+        national_with_changes = self._calculate_national_changes(national_merged)
+        
+        master_data = self._create_master_dataset(metro_data, national_with_changes)
+        
+        if state_forecast is not None:
+            merged_data = self._merge_state_data_for_metro(master_data, metro_data, state_forecast)
+        else:
+            merged_data = self._merge_region_data(master_data, metro_data, national_with_changes)
+        
+        model_data = self._prepare_model_data(merged_data, region_type="metro")
+        
+        predictions = self._run_glm_model(model_data, region_type="metro")
+        
+        forecast_result = self._convert_predictions_to_hpi(predictions, scenario)
+        
+        return forecast_result
+    
+    def _merge_national_forecast(self, national_data: pl.DataFrame, 
+                                scenario_forecast: pl.DataFrame) -> pl.DataFrame:
+        return national_data.join(
+            scenario_forecast,
+            on="date",
+            how="outer_coalesce"
+        )
+    
+    def _calculate_national_changes(self, national_merged: pl.DataFrame) -> pl.DataFrame:
+        cutoff_date = datetime.strptime(self.constants.CUTOFF_DATE, "%Y-%m-%d").date()
+        
+        return national_merged.with_columns([
+            pl.when(pl.col("date") > cutoff_date)
+            .then(pl.col("CORELOGIC_V4"))
+            .otherwise(pl.col("HPI_SA"))
+            .alias("HPI_SA_updated")
+        ]).with_columns([
+            (pl.col("HPI_SA_updated") / pl.col("HPI_SA_updated").shift(4) - 1).alias("YOY_CoreLogicV4"),
+            (pl.col("HPI_SA_updated").log() - pl.col("HPI_SA_updated").log().shift(1)).alias("DLOG_CoreLogicV4")
+        ])
+    
+    def _create_master_dataset(self, region_data: pl.DataFrame, 
+                              national_data: pl.DataFrame) -> pl.DataFrame:
+        codes = region_data.select("Name").unique().with_columns(pl.lit(1).alias("ind"))
+        dates = national_data.select("date").unique().with_columns(pl.lit(1).alias("ind"))
+        
+        return codes.join(dates, on="ind", how="outer").drop("ind")
+    
+    def _merge_region_data(self, master_data: pl.DataFrame, region_data: pl.DataFrame,
+                          national_data: pl.DataFrame) -> pl.DataFrame:
+        merged = master_data.join(
+            region_data,
+            left_on=["Name", "date"],
+            right_on=["Name", "date"],
+            how="left"
+        )
+        
+        merged_with_national = merged.join(
+            national_data.select(["date", "YOY_CoreLogicV4", "DLOG_CoreLogicV4"]),
+            on="date",
+            how="left",
+            suffix="_US"
+        )
+        
+        return merged_with_national
+    
+    def _merge_state_data_for_metro(self, master_data: pl.DataFrame, metro_data: pl.DataFrame,
+                                   state_forecast: pl.DataFrame) -> pl.DataFrame:
+        merged = master_data.join(
+            metro_data,
+            left_on=["Name", "date"],
+            right_on=["Name", "date"],
+            how="left"
+        )
+        
+        merged_with_state = merged.join(
+            state_forecast.select(["date", "Code", "HPI"]),
+            on=["date", "Code"],
+            how="left"
+        ).rename({"HPI": "CoreLogicV4_St"})
+        
+        merged_with_state_changes = merged_with_state.with_columns([
+            (pl.col("CoreLogicV4_St").log() - pl.col("CoreLogicV4_St").log().shift(1)).alias("DLOG_CoreLogicV4_St").over("Code")
+        ])
+        
+        return merged_with_state_changes
+    
+    def _prepare_model_data(self, merged_data: pl.DataFrame, region_type: str = "state") -> pl.DataFrame:
+        model_start = datetime.strptime(self.constants.MODEL_START_DATE, "%Y-%m-%d").date()
+        model_end = datetime.strptime(self.constants.MODEL_END_DATE, "%Y-%m-%d").date()
+        forecast_start = datetime.strptime(self.constants.FORECAST_START_DATE, "%Y-%m-%d").date()
+        
+        training_data = merged_data.filter(
+            (pl.col("date") >= model_start) & (pl.col("date") <= model_end)
+        )
+        
+        forecast_data = merged_data.filter(pl.col("date") >= forecast_start)
+        
+        return {
+            "training": training_data,
+            "forecast": forecast_data,
+            "full": merged_data
+        }
+    
+    def _run_glm_model(self, model_data: Dict[str, pl.DataFrame], region_type: str = "state") -> pl.DataFrame:
+        model = HPIGLMModel(region_type=region_type)
+        
+        training_data = model_data["training"].filter(pl.col("DLOG_CoreLogicV4").is_not_null())
+        
+        if len(training_data) == 0:
+            raise ValueError("No valid training data available")
+        
+        model.fit(training_data)
+        
+        forecast_data = model_data["forecast"]
+        if region_type == "state":
+            forecast_data = forecast_data.filter(pl.col("DLOG_CoreLogicV4_US").is_not_null())
+        else:
+            forecast_data = forecast_data.filter(pl.col("DLOG_CoreLogicV4_St").is_not_null())
+        
+        if len(forecast_data) == 0:
+            return model_data["full"].with_columns(pl.lit(None).alias("predictions"))
+        
+        predictions = model.predict(forecast_data)
+        
+        history_data = model_data["full"].filter(
+            pl.col("date") < datetime.strptime(self.constants.FORECAST_START_DATE, "%Y-%m-%d").date()
+        ).with_columns(pl.lit(None).alias("predictions"))
+        
+        forecast_with_pred = forecast_data.with_columns(
+            predictions.select("predictions")
+        )
+        
+        result = pl.concat([history_data, forecast_with_pred], how="vertical").sort(["Name", "date"])
+        
+        return result
+    
+    def _convert_predictions_to_hpi(self, predictions: pl.DataFrame, scenario: str) -> pl.DataFrame:
+        cutoff_date = datetime.strptime(self.constants.CUTOFF_DATE, "%Y-%m-%d").date()
+        
+        result = predictions.with_columns([
+            pl.when(pl.col("date") <= cutoff_date)
+            .then(pl.col("HPI_SA"))
+            .otherwise(None)
+            .alias(f"HPIPred_{scenario}")
+        ])
+        
+        result_groups = []
+        for name in result["Name"].unique():
+            group_data = result.filter(pl.col("Name") == name).sort("date")
+            
+            hpi_pred_values = []
+            last_hpi = None
+            
+            for row in group_data.iter_rows(named=True):
+                if row["date"] <= cutoff_date and row["HPI_SA"] is not None:
+                    last_hpi = row["HPI_SA"]
+                    hpi_pred_values.append(last_hpi)
+                elif row["predictions"] is not None and last_hpi is not None:
+                    new_hpi = last_hpi * np.exp(row["predictions"])
+                    last_hpi = new_hpi
+                    hpi_pred_values.append(new_hpi)
+                else:
+                    hpi_pred_values.append(None)
+            
+            group_result = group_data.with_columns([
+                pl.Series(f"HPIPred_{scenario}", hpi_pred_values)
+            ])
+            result_groups.append(group_result)
+        
+        final_result = pl.concat(result_groups, how="vertical")
+        
+        return final_result
+    
+    def convert_to_monthly(self, quarterly_data: pl.DataFrame, value_column: str) -> pl.DataFrame:
+        monthly_data = []
+        
+        for row in quarterly_data.iter_rows(named=True):
+            base_date = row["date"]
+            value = row[value_column]
+            
+            if base_date.month in [3, 6, 9, 12]:
+                for i in range(3):
+                    if base_date.month == 3:
+                        months = [1, 2, 3]
+                    elif base_date.month == 6:
+                        months = [4, 5, 6]
+                    elif base_date.month == 9:
+                        months = [7, 8, 9]
+                    else:
+                        months = [10, 11, 12]
+                    
+                    for month in months:
+                        monthly_data.append({
+                            "Code": row["Code"],
+                            "Name": row["Name"],
+                            "date": base_date.replace(month=month),
+                            value_column: value
+                        })
+        
+        return pl.DataFrame(monthly_data)
+
+# ==================== src/gemini_scenario_models/hpi_projection_us/model.py ====================
+
+import polars as pl
+from typing import Dict, List, Tuple, Optional
+from datetime import datetime
+from .dependencies import Constants, Parameters, Params
+from .data_preparation import DataPreparation
+from .data_projection import DataProjection
+from Utils.data_import_helpers import DataImportHelpers
+
+class GLMModelScenarioProjection:
+    def __init__(self, root_dir: str):
+        self.root_dir = root_dir
+        self.results_dir = f"{root_dir}/Output"
+        self.constants = Constants()
+        self.parameters = Parameters()
+        self.data_prep = DataPreparation()
+        self.data_projection = DataProjection()
+        self.helpers = DataImportHelpers()
+        
+    def run_full_projection(self) -> Dict[str, Dict[str, pl.DataFrame]]:
+        moodys_mapping = self._load_moodys_mapping()
+        clv4_state, clv4_msa = self._load_hpi_data()
+        national_forecasts = self._load_national_forecasts()
+        
+        state_data, metro_data, combined_data = self.data_prep.run_data_prep(
+            Params("ce", "combined", self.root_dir, self.results_dir),
+            clv4_state, clv4_msa, moodys_mapping
+        )
+        
+        combined_sa = self.data_prep._apply_seasonal_adjustment(combined_data)
+        quarterly_data = self.data_prep.create_quarterly_data(combined_sa)
+        national, state, metro = self.data_prep.split_datasets(quarterly_data)
+        
+        results = {}
+        
+        for scenario in self.constants.SCENARIO_TYPES:
+            scenario_forecast = national_forecasts[scenario]
+            results[scenario] = {}
+            
+            state_forecast = self.data_projection.create_forecast(
+                scenario, "state", state, national, scenario_forecast
+            )
+            results[scenario]["state"] = state_forecast
+            
+            metro_forecast = self.data_projection.create_forecast(
+                scenario, "metro", metro, national, scenario_forecast, state_forecast
+            )
+            results[scenario]["metro"] = metro_forecast
+            
+            self._export_results(scenario, state_forecast, metro_forecast)
+        
+        return results
+    
+    def _load_moodys_mapping(self) -> pl.DataFrame:
+        file_path = self.parameters.get_file_path("moodys_mapping", self.root_dir)
+        return self.helpers.import_excel_sheet(file_path, "Mapping")
+    
+    def _load_hpi_data(self) -> Tuple[pl.DataFrame, pl.DataFrame]:
+        state_file = self.parameters.get_file_path("state_hpi", self.root_dir)
+        cbsa_file = self.parameters.get_file_path("cbsa_hpi", self.root_dir)
+        
+        clv4_state = self.helpers.import_excel_sheet(state_file, "HPI Data by State")
+        clv4_msa = self.helpers.import_excel_sheet(cbsa_file, "HPI Data by CBSA")
+        
+        return clv4_state, clv4_msa
+    
+    def _load_national_forecasts(self) -> Dict[str, pl.DataFrame]:
+        file_path = self.parameters.get_file_path("national_forecast", self.root_dir)
+        forecasts = {}
+        
+        for scenario in self.constants.SCENARIO_TYPES:
+            sheet_name = scenario.upper()
+            df = self.helpers.import_excel_sheet(file_path, sheet_name)
+            forecasts[scenario] = df
+        
+        return forecasts
+    
+    def _load_state_metro_map(self) -> pl.DataFrame:
+        file_path = self.parameters.get_file_path("state_metro_map", self.root_dir)
+        return self.helpers.import_excel_sheet(file_path, "Sheet1")
+    
+    def _export_results(self, scenario: str, state_forecast: pl.DataFrame, metro_forecast: pl.DataFrame):
+        state_monthly = self.data_projection.convert_to_monthly(state_forecast, f"HPIPred_{scenario}")
+        metro_monthly = self.data_projection.convert_to_monthly(metro_forecast, f"HPIPred_{scenario}")
+        
+        state_output = self.parameters.get_output_path(f"CoreLogic_state_CECL24_V3_{scenario}.xlsx", self.results_dir)
+        metro_output = self.parameters.get_output_path(f"CoreLogic_metro_CECL24_V3_{scenario}.xlsx", self.results_dir)
+        
+        state_monthly.write_excel(state_output)
+        metro_monthly.write_excel(metro_output)
+
+# ==================== main.py ====================
+
+import sys
+import os
+from pathlib import Path
+
+sys.path.append(str(Path(__file__).parent / "src" / "gemini_scenario_models"))
+
+from hpi_projection_us.model import GLMModelScenarioProjection
+
+def main():
+    root_dir = Path(__file__).parent
+    
+    try:
+        model = GLMModelScenarioProjection(str(root_dir))
+        results = model.run_full_projection()
+        
+        print("HPI Projection completed successfully!")
+        
+        for scenario, regions in results.items():
+            print(f"\nScenario: {scenario}")
+            for region, data in regions.items():
+                print(f"  {region}: {len(data)} records")
+        
+    except Exception as e:
+        print(f"Error running HPI projection: {str(e)}")
+        raise
+
+if __name__ == "__main__":
+    main()
+
+# ==================== pyproject.toml ====================
+
+[build-system]
+requires = ["setuptools>=45", "wheel", "setuptools_scm[toml]>=6.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hpi-projection-us"
+version = "1.0.0"
+description = "HPI Projection Model for US Markets"
+authors = [
+    {name = "Your Name", email = "your.email@example.com"},
+]
+dependencies = [
+    "polars>=0.20.0",
+    "pandas>=2.0.0",
+    "numpy>=1.24.0",
+    "scikit-learn>=1.3.0",
+    "scipy>=1.10.0",
+    "openpyxl>=3.1.0",
+    "xlsxwriter>=3.1.0"
+]
+requires-python = ">=3.9"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "black>=23.0.0",
+    "flake8>=6.0.0",
+    "mypy>=1.0.0"
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-dir]
+"" = "src"
+
+# ==================== File Structure Summary ====================
+
+# Project Structure:
+# project_root/
+# ├── src/
+# │   └── gemini_scenario_models/
+# │       └── hpi_projection_us/
+# │           ├── dependencies/
+# │           │   ├── __init__.py                    [Lines 76-89]
+# │           │   ├── _constants.py                  [Lines 7-32]
+# │           │   ├── _dataclasses.py               [Lines 34-61]
+# │           │   ├── _parameters.py                [Lines 63-74]
+# │           │   └── _schemas.py                   [Lines 91-115]
+# │           ├── __init__.py                       [Lines 117-121]
+# │           ├── data_preparation.py               [Lines 174-347]
+# │           ├── data_projection.py                [Lines 349-523]
+# │           └── model.py                          [Lines 525-618]
+# ├── Utils/
+# │   ├── data_import_helpers.py                    [Lines 123-172]
+# │   └── glm_model_architecture.py                 [Lines 174-281]
+# ├── Input/
+# │   └── [All Excel input files]
+# ├── Output/
+# │   └── [Generated output files]
+# ├── main.py                                       [Lines 620-649]
+# └── pyproject.toml                                [Lines 651-685]
+
+# Instructions:
+# 1. Create the folder structure as shown above
+# 2. Copy each code section to its respective file location
+# 3. Install dependencies: pip install -e .
+# 4. Run the model: python main.py
