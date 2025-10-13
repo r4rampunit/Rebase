@@ -1,0 +1,398 @@
+import polars as pl
+import numpy as np
+import pandas as pd
+from pathlib import Path
+from datetime import date
+from sklearn.linear_model import LinearRegression
+
+INPUT_DIR = Path("Input")
+OUTPUT_DIR = Path("Output")
+OUTPUT_DIR.mkdir(exist_ok=True)
+
+LAST_HISTORY_DATE = date(2025, 3, 31)
+REGRESSION_START_DATE = date(2000, 3, 31)
+REGRESSION_END_DATE = date(2023, 6, 30)
+FORECAST_START_DATE = date(2025, 6, 30)
+
+MONTH_MAP = {
+    "January": "01", "February": "02", "March": "03", "April": "04",
+    "May": "05", "June": "06", "July": "07", "August": "08",
+    "September": "09", "October": "10", "November": "11", "December": "12"
+}
+
+def import_excel(filename, sheet_name=None):
+    df = pl.read_excel(INPUT_DIR / filename, sheet_name=sheet_name)
+    for col in df.columns:
+        if col.lower() in ['date', 'f_date'] and df[col].dtype == pl.Utf8:
+            try:
+                df = df.with_columns([pl.col(col).str.to_date("%m/%d/%Y").alias(col)])
+            except:
+                try:
+                    df = df.with_columns([pl.col(col).str.to_date("%Y-%m-%d").alias(col)])
+                except:
+                    pass
+    return df
+
+def export_excel(data, filename, sheet_name="Sheet1"):
+    data.write_excel(OUTPUT_DIR / filename, worksheet=sheet_name)
+
+moodys_mapping = import_excel("Basket_2016-10-5_13_45_V2.xlsx", "Mapping")
+clv4_state = import_excel("HPI Data by State.xlsx", "HPI Data by State")
+clv4_msa = import_excel("HPI Data by CBSA.xlsx", "HPI Data by CBSA")
+state_metro_map = import_excel("state_metro_map.xlsx")
+ce_hpi = import_excel("Data_Forecast_National_HPI_2025Q2.xlsx", "CE")
+up_hpi = import_excel("Data_Forecast_National_HPI_2025Q2.xlsx", "UP")
+dn_hpi = import_excel("Data_Forecast_National_HPI_2025Q2.xlsx", "DN")
+dn2_hpi = import_excel("Data_Forecast_National_HPI_2025Q2.xlsx", "DN2")
+
+state_name_col = "State Name" if "State Name" in clv4_state.columns else "State_Name"
+cbsa_name_col = "CBSA Name" if "CBSA Name" in clv4_msa.columns else "CBSA_Name"
+hpi_col_state = "Home Price Index" if "Home Price Index" in clv4_state.columns else "Home_Price_Index"
+hpi_col_msa = "Home Price Index" if "Home Price Index" in clv4_msa.columns else "Home_Price_Index"
+
+state_data = clv4_state.join(
+    moodys_mapping.select([
+        pl.col("Geography").str.to_uppercase().alias("geo_upper"),
+        pl.col("FIP").alias("State_Code")
+    ]),
+    left_on=pl.col(state_name_col).str.to_uppercase(),
+    right_on="geo_upper",
+    how="left"
+).with_columns([
+    pl.col("Month").map_elements(lambda x: MONTH_MAP.get(x, "01"), return_dtype=pl.Utf8).alias("month_str")
+]).with_columns([
+    (pl.col("Year").cast(pl.Utf8) + pl.col("month_str")).alias("YYYYMM")
+]).filter(
+    pl.col("YYYYMM").cast(pl.Int32) <= 202503
+).select([
+    "State_Code",
+    pl.col(state_name_col).alias("State_Name"),
+    "YYYYMM",
+    pl.col(hpi_col_state).alias("Home_Price_Index")
+])
+
+metro_data = clv4_msa.join(
+    moodys_mapping.select([
+        pl.col("Geography").str.replace_all(r"[^a-zA-Z0-9\s]", "").str.to_uppercase().alias("geo_clean"),
+        pl.col("FIP").alias("CBSA_Code")
+    ]),
+    left_on=pl.col(cbsa_name_col).str.replace_all(r"[^a-zA-Z0-9\s]", "").str.to_uppercase(),
+    right_on="geo_clean",
+    how="left"
+).with_columns([
+    pl.col("Month").map_elements(lambda x: MONTH_MAP.get(x, "01"), return_dtype=pl.Utf8).alias("month_str")
+]).with_columns([
+    (pl.col("Year").cast(pl.Utf8) + pl.col("month_str")).alias("YYYYMM")
+]).filter(
+    pl.col("YYYYMM").cast(pl.Int32) <= 202503
+).select([
+    "CBSA_Code",
+    pl.col(cbsa_name_col).alias("CBSA_Name"),
+    "YYYYMM",
+    pl.col(hpi_col_msa).alias("Home_Price_Index")
+])
+
+state_renamed = state_data.select([
+    pl.col("State_Code").alias("Code"),
+    pl.col("State_Name").alias("Name"),
+    "YYYYMM",
+    "Home_Price_Index"
+])
+
+metro_renamed = metro_data.select([
+    pl.col("CBSA_Code").alias("Code"),
+    pl.col("CBSA_Name").alias("Name"),
+    "YYYYMM",
+    "Home_Price_Index"
+])
+
+combined = pl.concat([state_renamed, metro_renamed]).with_columns([
+    pl.col("YYYYMM").str.slice(0, 4).cast(pl.Int32).alias("Year"),
+    pl.col("YYYYMM").str.slice(4, 2).cast(pl.Int32).alias("Month")
+]).with_columns([
+    pl.date(pl.col("Year"), pl.col("Month"), 1).alias("date")
+]).with_columns([
+    pl.when(pl.col("Month").is_in([1, 2, 3])).then(pl.lit("Q1"))
+    .when(pl.col("Month").is_in([4, 5, 6])).then(pl.lit("Q2"))
+    .when(pl.col("Month").is_in([7, 8, 9])).then(pl.lit("Q3"))
+    .when(pl.col("Month").is_in([10, 11, 12])).then(pl.lit("Q4"))
+    .alias("QtrDt")
+]).sort(["Code", "date"]).unique(["Code", "date"])
+
+combined = combined.with_columns([
+    pl.col("Home_Price_Index").alias("HPI_SA")
+])
+
+quarterly = combined.group_by(["Code", "Name", "QtrDt"]).agg([
+    pl.col("date").max().alias("date"),
+    pl.col("Home_Price_Index").mean().alias("HPI"),
+    pl.col("HPI_SA").mean().alias("HPI_SA")
+]).sort(["Code", "date"])
+
+with_yoy = quarterly.with_columns([
+    pl.col("HPI_SA").shift(4).over("Code").alias("HPI_SA_lag4"),
+    pl.col("HPI_SA").shift(1).over("Code").alias("HPI_SA_lag1")
+]).with_columns([
+    ((pl.col("HPI_SA") / pl.col("HPI_SA_lag4")) - 1).alias("YOY_CoreLogicV4"),
+    (pl.col("HPI_SA").log() - pl.col("HPI_SA_lag1").log()).alias("DLOG_CoreLogicV4")
+]).filter(~pl.col("Name").str.contains("Micropolitan"))
+
+national_agg = with_yoy.group_by("date").agg([
+    pl.col("HPI").mean().alias("HPI"),
+    pl.col("HPI_SA").mean().alias("HPI_SA")
+]).sort("date").with_columns([
+    pl.col("HPI_SA").shift(4).alias("HPI_SA_lag4"),
+    pl.col("HPI_SA").shift(1).alias("HPI_SA_lag1")
+]).with_columns([
+    ((pl.col("HPI_SA") / pl.col("HPI_SA_lag4")) - 1).alias("YOY_CoreLogicV4"),
+    (pl.col("HPI_SA").log() - pl.col("HPI_SA_lag1").log()).alias("DLOG_CoreLogicV4")
+]).with_columns([
+    pl.lit("0").alias("Code"),
+    pl.lit("National").alias("Name"),
+    pl.lit(None, dtype=pl.Utf8).alias("QtrDt")
+]).select(with_yoy.columns)
+
+combined_final = pl.concat([with_yoy, national_agg]).sort(["Code", "date"])
+
+national_data = combined_final.filter(pl.col("Name") == "National")
+state_regional = combined_final.filter(
+    (pl.col("Code").cast(pl.Int64, strict=False) > 0) & 
+    (pl.col("Code").cast(pl.Int64, strict=False) <= 100)
+)
+metro_regional = combined_final.filter(
+    (pl.col("Code").cast(pl.Int64, strict=False) >= 100) & 
+    (pl.col("Code").cast(pl.Int64, strict=False) < 100000)
+)
+
+def merge_national_with_scenario(national_df, scenario_df):
+    date_col = next((col for col in scenario_df.columns if col.lower() in ['date', 'f_date']), 'date')
+    hpi_col = next((col for col in scenario_df.columns if col.upper() == 'CORELOGIC_V4'), 'CORELOGIC_V4')
+    
+    scenario_renamed = scenario_df.select([
+        pl.col(date_col).alias("date"),
+        pl.col(hpi_col).alias("forecast_hpi")
+    ])
+    
+    merged = national_df.join(scenario_renamed, on="date", how="outer")
+    
+    cleaned = merged.filter(
+        ~((pl.col("HPI_SA").is_not_null()) & (pl.col("forecast_hpi").is_not_null()) & (pl.col("date") == LAST_HISTORY_DATE))
+    )
+    
+    final = cleaned.with_columns([
+        pl.coalesce([pl.col("HPI_SA"), pl.col("forecast_hpi")]).alias("HPI_SA")
+    ]).sort("date").with_columns([
+        pl.col("HPI_SA").shift(4).alias("HPI_SA_lag4"),
+        pl.col("HPI_SA").shift(1).alias("HPI_SA_lag1")
+    ]).with_columns([
+        ((pl.col("HPI_SA") / pl.col("HPI_SA_lag4")) - 1).alias("YOY_CoreLogicV4"),
+        (pl.col("HPI_SA").log() - pl.col("HPI_SA_lag1").log()).alias("DLOG_CoreLogicV4")
+    ])
+    
+    return final.filter(pl.col("date") >= date(2000, 1, 1))
+
+def create_master_panel(regional_df, national_df):
+    codes = regional_df.select("Name").unique().with_columns(pl.lit(1).alias("ind"))
+    dates = national_df.select("date").unique().with_columns(pl.lit(1).alias("ind"))
+    
+    master = codes.join(dates, on="ind").drop("ind")
+    
+    master_regional = master.join(regional_df, on=["date", "Name"], how="left")
+    
+    master_final = master_regional.join(
+        national_df.select([
+            "date",
+            pl.col("YOY_CoreLogicV4").alias("YOY_CoreLogicV4_US"),
+            pl.col("DLOG_CoreLogicV4").alias("DLOG_CoreLogicV4_US")
+        ]),
+        on="date",
+        how="left"
+    )
+    
+    return master_final
+
+def run_glm_model(data_df, target_col, cat_cols, cont_cols):
+    train_data = data_df.filter(
+        (pl.col("date") >= REGRESSION_START_DATE) &
+        (pl.col("date") <= REGRESSION_END_DATE) &
+        (pl.col(target_col).is_not_null()) &
+        (pl.col(cont_cols[0]).is_not_null())
+    )
+    
+    forecast_data = data_df.filter(pl.col("date") >= FORECAST_START_DATE)
+    
+    features_train = []
+    cat_data = train_data.select(cat_cols[0]).to_pandas()
+    encoded = pd.get_dummies(cat_data, drop_first=True, dtype=float)
+    features_train.append(encoded.values)
+    cont_data = train_data.select(cont_cols[0]).to_numpy().reshape(-1, 1)
+    features_train.append(cont_data)
+    X_train = np.hstack(features_train)
+    y_train = train_data.select(target_col).to_numpy().ravel()
+    
+    model = LinearRegression(fit_intercept=False)
+    model.fit(X_train, y_train)
+    
+    features_forecast = []
+    cat_data_f = forecast_data.select(cat_cols[0]).to_pandas()
+    encoded_f = pd.get_dummies(cat_data_f, drop_first=True, dtype=float)
+    features_forecast.append(encoded_f.values)
+    cont_data_f = forecast_data.select(cont_cols[0]).to_numpy().reshape(-1, 1)
+    features_forecast.append(cont_data_f)
+    X_forecast = np.hstack(features_forecast)
+    
+    predictions = model.predict(X_forecast)
+    
+    scored = forecast_data.with_columns(pl.Series(name="Pred", values=predictions))
+    
+    history = data_df.filter(
+        (pl.col("date") >= REGRESSION_START_DATE) &
+        (pl.col("date") <= LAST_HISTORY_DATE)
+    ).with_columns(pl.lit(None, dtype=pl.Float64).alias("Pred"))
+    
+    combined = pl.concat([history, scored]).sort(["Name", "date"])
+    
+    return combined
+
+def convert_to_hpi(model_results, scenario):
+    hpi_col = f"HPIPred_{scenario}"
+    
+    with_hpi = model_results.with_columns([pl.lit(None, dtype=pl.Float64).alias(hpi_col)])
+    
+    result_list = []
+    for name in with_hpi["Name"].unique():
+        name_data = with_hpi.filter(pl.col("Name") == name).sort("date")
+        
+        hpi_values = []
+        current_hpi = None
+        
+        for row in name_data.iter_rows(named=True):
+            if row["date"] == LAST_HISTORY_DATE:
+                current_hpi = row["HPI_SA"]
+                hpi_values.append(current_hpi)
+            elif row["Pred"] is not None and current_hpi is not None:
+                current_hpi = current_hpi * np.exp(row["Pred"])
+                hpi_values.append(current_hpi)
+            else:
+                hpi_values.append(current_hpi if current_hpi is not None else row.get("HPI_SA"))
+        
+        name_result = name_data.with_columns(pl.Series(name=hpi_col, values=hpi_values))
+        result_list.append(name_result)
+    
+    return pl.concat(result_list)
+
+def prepare_output(forecast_df, scenario):
+    hpi_col = f"HPIPred_{scenario}"
+    
+    quarterly = forecast_df.select([
+        pl.col("Code").alias("CBSA_Code"),
+        pl.col("Name").alias("CBSA_name"),
+        "date",
+        pl.col(hpi_col).alias("HPI")
+    ]).sort(["CBSA_Code", "CBSA_name", "date"])
+    
+    monthly_data = []
+    for row in quarterly.iter_rows(named=True):
+        qtr_date = row["date"]
+        hpi = row["HPI"]
+        
+        if qtr_date.month == 3:
+            months = [1, 2, 3]
+        elif qtr_date.month == 6:
+            months = [4, 5, 6]
+        elif qtr_date.month == 9:
+            months = [7, 8, 9]
+        elif qtr_date.month == 12:
+            months = [10, 11, 12]
+        else:
+            continue
+        
+        for month in months:
+            monthly_data.append({
+                "CBSA_Code": row["CBSA_Code"],
+                "CBSA_name": row["CBSA_name"],
+                "date": date(qtr_date.year, month, 1),
+                "HPI": hpi
+            })
+    
+    monthly = pl.DataFrame(monthly_data)
+    
+    quarterly_tr = quarterly.pivot(values="HPI", index="date", columns="CBSA_name")
+    monthly_tr = monthly.pivot(values="HPI", index="date", columns="CBSA_name")
+    
+    return quarterly, monthly, quarterly_tr, monthly_tr
+
+all_results = {}
+
+for scenario_name, scenario_df in [("ce", ce_hpi), ("up", up_hpi), ("dn", dn_hpi), ("dn2", dn2_hpi)]:
+    print(f"Processing {scenario_name}...")
+    
+    national_merged = merge_national_with_scenario(national_data, scenario_df)
+    state_master = create_master_panel(state_regional, national_merged)
+    state_model_results = run_glm_model(state_master, "DLOG_CoreLogicV4", ["Name"], ["DLOG_CoreLogicV4_US"])
+    state_forecast = convert_to_hpi(state_model_results, scenario_name)
+    state_q, state_m, state_q_tr, state_m_tr = prepare_output(state_forecast, scenario_name)
+    
+    export_excel(state_q, f"CoreLogic_state_{scenario_name}_quarterly.xlsx", scenario_name)
+    export_excel(state_m, f"CoreLogic_state_{scenario_name}_monthly.xlsx", scenario_name)
+    export_excel(state_q_tr, f"CoreLogic_state_{scenario_name}_quarterly_transposed.xlsx", scenario_name)
+    export_excel(state_m_tr, f"CoreLogic_state_{scenario_name}_monthly_transposed.xlsx", scenario_name)
+    
+    all_results[f"state_{scenario_name}"] = {"quarterly": state_q, "monthly": state_m}
+    
+    state_results_for_metro = state_q
+    
+    cbsa_code_col = next((col for col in state_metro_map.columns if col.upper().replace('_', '').replace(' ', '') == 'CBSACODE'), 'CBSA_Code')
+    st_col = next((col for col in state_metro_map.columns if col.upper() == 'ST'), 'ST')
+    
+    state_metro_enhanced = state_metro_map.join(
+        moodys_mapping.select([
+            pl.col("Geography").str.to_uppercase().alias("Geography_Upper"),
+            pl.col("Geocode")
+        ]),
+        left_on=st_col,
+        right_on="Geocode",
+        how="left"
+    )
+    
+    state_with_metro = state_results_for_metro.join(
+        state_metro_enhanced.select([
+            "Geography_Upper",
+            pl.col(cbsa_code_col).alias("metro_code")
+        ]),
+        left_on=pl.col("CBSA_name").str.to_uppercase(),
+        right_on="Geography_Upper",
+        how="left"
+    )
+    
+    metro_master = create_master_panel(metro_regional, national_merged)
+    
+    metro_with_state = metro_master.join(
+        state_with_metro.select([
+            "date",
+            "metro_code",
+            pl.col("HPI").alias("CoreLogicV4_St")
+        ]),
+        left_on=["date", "Code"],
+        right_on=["date", "metro_code"],
+        how="left"
+    ).with_columns([
+        pl.col("CoreLogicV4_St").shift(1).over("Name").alias("CoreLogicV4_St_lag1")
+    ]).with_columns([
+        (pl.col("CoreLogicV4_St").log() - pl.col("CoreLogicV4_St_lag1").log()).alias("DLOG_CoreLogicV4_St")
+    ])
+    
+    metro_model_results = run_glm_model(metro_with_state, "DLOG_CoreLogicV4", ["Name"], ["DLOG_CoreLogicV4_St"])
+    metro_forecast = convert_to_hpi(metro_model_results, scenario_name)
+    metro_q, metro_m, metro_q_tr, metro_m_tr = prepare_output(metro_forecast, scenario_name)
+    
+    export_excel(metro_q, f"CoreLogic_metro_{scenario_name}_quarterly.xlsx", scenario_name)
+    export_excel(metro_m, f"CoreLogic_metro_{scenario_name}_monthly.xlsx", scenario_name)
+    export_excel(metro_q_tr, f"CoreLogic_metro_{scenario_name}_quarterly_transposed.xlsx", scenario_name)
+    export_excel(metro_m_tr, f"CoreLogic_metro_{scenario_name}_monthly_transposed.xlsx", scenario_name)
+    
+    all_results[f"metro_{scenario_name}"] = {"quarterly": metro_q, "monthly": metro_m}
+
+print("HPI Projection completed successfully!")
+print(f"Generated {len(all_results)} scenario-region results")
+print(f"All files saved to {OUTPUT_DIR}")
