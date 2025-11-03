@@ -1,311 +1,448 @@
-[build-system]
-requires = ["setuptools>=61.0", "wheel"]
-build-backend = "setuptools.build_meta"
+conventions.
+Project Structure
+src/gemini_liquidity_models/liquidity_impact_calculation/__init__.py
+src/gemini_liquidity_models/liquidity_impact_calculation/dependencies/__init__.py
+src/gemini_liquidity_models/liquidity_impact_calculation/dependencies/_constants.py
+src/gemini_liquidity_models/liquidity_impact_calculation/dependencies/_dataclasses.py
+src/gemini_liquidity_models/liquidity_impact_calculation/dependencies/_schemas.py
+src/gemini_liquidity_models/liquidity_impact_calculation/dependencies/_parameters.py
+src/gemini_liquidity_models/liquidity_impact_calculation/data_preparation.py
+src/gemini_liquidity_models/liquidity_impact_calculation/calculation_engine.py
+src/gemini_liquidity_models/liquidity_impact_calculation/output_writer.py
+src/gemini_liquidity_models/liquidity_impact_calculation/model.py
+main.py
+File Contents
+src/gemini_liquidity_models/init.py
+pythonfrom .liquidity_impact_calculation import LiquidityImpactCalculation
 
-[project]
-name = "gemini-liquidity-models"
-version = "0.1.0"
-description = "Liquidity Impact Calculation Model for ILM Analysis"
-readme = "README.md"
-requires-python = ">=3.9"
-license = {text = "Proprietary"}
-authors = [
-    {name = "Gemini Team", email = "gemini-team@company.com"}
+__all__ = ["LiquidityImpactCalculation"]
+src/gemini_liquidity_models/liquidity_impact_calculation/init.py
+pythonfrom .model import LiquidityImpactCalculation
+
+__all__ = ["LiquidityImpactCalculation"]
+src/gemini_liquidity_models/liquidity_impact_calculation/dependencies/init.py
+pythonfrom ._constants import Constants
+from ._dataclasses import Inputs, Outputs, CalculationComponents
+from ._parameters import Params
+from ._schemas import LiquidityInput, Assumptions
+
+__all__ = [
+    "Constants",
+    "Inputs",
+    "Outputs",
+    "CalculationComponents",
+    "Params",
+    "LiquidityInput",
+    "Assumptions"
 ]
-maintainers = [
-    {name = "Gemini Team", email = "gemini-team@company.com"}
-]
-classifiers = [
-    "Development Status :: 3 - Alpha",
-    "Intended Audience :: Financial and Insurance Industry",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Operating System :: OS Independent",
-    "Topic :: Office/Business :: Financial",
-]
-dependencies = [
-    "polars>=0.20.0",
-    "pandera[polars]>=0.17.0",
-    "pandas>=2.0.0",
-    "openpyxl>=3.1.0",
-    "xlsxwriter>=3.1.0",
-    "numpy>=1.24.0",
-]
+src/gemini_liquidity_models/liquidity_impact_calculation/dependencies/_constants.py
+pythonclass Constants:
+    LIQUIDITY_INPUT_SHEET = "Liquidity Input"
+    ASSUMPTIONS_SHEET = "US ILM ILM Assumptions"
+    OUTPUT_SHEET = "US ILM + ILM"
+    DATE_START_COL = 9
+    DATA_START_ROW = 3
+    COLUMN_NAME_ROW = 2
+    OUTPUT_START_CELL = (2, 3)
+src/gemini_liquidity_models/liquidity_impact_calculation/dependencies/_dataclasses.py
+pythonfrom dataclasses import dataclass
+import polars as pl
+from typing import Dict, List
 
-[project.optional-dependencies]
-dev = [
-    "pytest>=7.4.0",
-    "pytest-cov>=4.1.0",
-    "black>=23.0.0",
-    "flake8>=6.0.0",
-    "mypy>=1.5.0",
-    "pre-commit>=3.4.0",
-    "isort>=5.12.0",
-    "pylint>=2.17.0",
-]
-test = [
-    "pytest>=7.4.0",
-    "pytest-cov>=4.1.0",
-    "pytest-mock>=3.11.0",
-]
+@dataclass
+class Inputs:
+    liquidity_data: pl.DataFrame
+    assumptions_data: pl.DataFrame
+    date_columns: List[str]
+    
+@dataclass
+class CalculationComponents:
+    asset_impact: pl.DataFrame
+    liability_impact: pl.DataFrame
+    committed_facility_impact: pl.DataFrame
+    
+@dataclass
+class Outputs:
+    final_output: pl.DataFrame
+    output_sheet_name: str
+src/gemini_liquidity_models/liquidity_impact_calculation/dependencies/_schemas.py
+pythonimport pandera.polars as pa
+import polars as pl
 
-[project.urls]
-Repository = "https://github.com/company/gemini-liquidity-models"
-Documentation = "https://docs.company.com/gemini-liquidity-models"
-Issues = "https://github.com/company/gemini-liquidity-models/issues"
+class LiquidityInput(pa.DataFrameModel):
+    balance_sheet: str = pa.Field()
+    business: str = pa.Field()
+    level_1: str = pa.Field()
+    level_2: str = pa.Field()
+    level_3: str = pa.Field()
+    level_4: str = pa.Field(nullable=True)
+    level_5: str = pa.Field(nullable=True)
+    
+class Assumptions(pa.DataFrameModel):
+    description: str = pa.Field()
+    us_ilm: float = pa.Field()
+    ilm: float = pa.Field(nullable=True)
+src/gemini_liquidity_models/liquidity_impact_calculation/dependencies/_parameters.py
+pythonfrom dataclasses import dataclass
 
-[tool.setuptools.packages.find]
-where = ["src"]
-include = ["gemini_liquidity_models*"]
-namespaces = false
+@dataclass
+class Params:
+    input_file_path: str
+    output_file_path: str = None
+src/gemini_liquidity_models/liquidity_impact_calculation/data_preparation.py
+pythonimport polars as pl
+import pandas as pd
+from openpyxl import load_workbook
+from .dependencies import Constants, LiquidityInput, Assumptions
 
-[tool.setuptools.package-data]
-gemini_liquidity_models = ["*.md", "*.txt"]
+def load_liquidity_input(file_path: str) -> tuple[pl.DataFrame, list]:
+    df_pandas = pd.read_excel(
+        file_path,
+        sheet_name=Constants.LIQUIDITY_INPUT_SHEET,
+        skiprows=1
+    )
+    
+    date_columns = [col for col in df_pandas.columns if isinstance(col, pd.Timestamp)]
+    date_col_names = [col.strftime('%d-%b-%y') for col in date_columns]
+    
+    rename_mapping = {col: col.strftime('%d-%b-%y') if isinstance(col, pd.Timestamp) else col 
+                     for col in df_pandas.columns}
+    df_pandas = df_pandas.rename(columns=rename_mapping)
+    
+    df_polars = pl.from_pandas(df_pandas)
+    
+    return df_polars, date_col_names
 
-[tool.black]
-line-length = 120
-target-version = ['py39', 'py310', 'py311']
-include = '\.pyi?$'
-extend-exclude = '''
-/(
-    \.eggs
-  | \.git
-  | \.hg
-  | \.mypy_cache
-  | \.tox
-  | \.venv
-  | _build
-  | buck-out
-  | build
-  | dist
-)/
-'''
+def load_assumptions(file_path: str) -> pl.DataFrame:
+    df_pandas = pd.read_excel(
+        file_path,
+        sheet_name=Constants.ASSUMPTIONS_SHEET,
+        skiprows=1,
+        usecols=[1, 2, 3]
+    )
+    
+    df_pandas.columns = ['Description', 'US_ILM', 'ILM']
+    df_pandas['US_ILM'] = df_pandas['US_ILM'].str.rstrip('%').astype('float') / 100.0 \
+                          if df_pandas['US_ILM'].dtype == 'object' else df_pandas['US_ILM']
+    df_pandas['ILM'] = df_pandas['ILM'].str.rstrip('%').astype('float') / 100.0 \
+                       if df_pandas['ILM'].dtype == 'object' else df_pandas['ILM']
+    
+    df_polars = pl.from_pandas(df_pandas)
+    
+    return df_polars
 
-[tool.isort]
-profile = "black"
-line_length = 120
-known_third_party = ["polars", "pandas", "numpy", "pandera", "openpyxl"]
-known_first_party = ["gemini_liquidity_models"]
-default_section = "THIRDPARTY"
-sections = ["FUTURE", "STDLIB", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
+def prepare_input_data(file_path: str) -> tuple[pl.DataFrame, pl.DataFrame, list]:
+    liquidity_df, date_columns = load_liquidity_input(file_path)
+    assumptions_df = load_assumptions(file_path)
+    
+    return liquidity_df, assumptions_df, date_columns
+src/gemini_liquidity_models/liquidity_impact_calculation/calculation_engine.py
+pythonimport polars as pl
+import numpy as np
+from .dependencies import CalculationComponents
 
-[tool.mypy]
-python_version = "3.9"
-warn_return_any = true
-warn_unused_configs = true
-disallow_untyped_defs = true
-disallow_any_unimported = false
-no_implicit_optional = true
-warn_redundant_casts = true
-warn_unused_ignores = true
-warn_no_return = true
-check_untyped_defs = true
-strict_equality = true
+class LiquidityCalculator:
+    
+    def __init__(self, liquidity_df: pl.DataFrame, assumptions_df: pl.DataFrame, date_columns: list):
+        self.liquidity_df = liquidity_df
+        self.assumptions_df = assumptions_df
+        self.date_columns = date_columns
+        self.base_date = '31-Dec-24'
+        
+    def _get_assumption_value(self, key: str) -> float:
+        result = self.assumptions_df.filter(pl.col("Description") == key)
+        if len(result) > 0:
+            return result["US_ILM"][0]
+        return 0.0
+    
+    def _calculate_row_difference(self, row_indices: list, date_col: str) -> float:
+        if not row_indices:
+            return 0.0
+        subset = self.liquidity_df[row_indices]
+        if date_col in subset.columns and self.base_date in subset.columns:
+            return float(subset[date_col].sum() - subset[self.base_date].sum())
+        return 0.0
+    
+    def _calculate_sumifs(self, date_col: str, column_name: str, criteria_value: str) -> float:
+        filtered = self.liquidity_df.filter(pl.col(column_name) == criteria_value)
+        if date_col in filtered.columns and self.base_date in filtered.columns:
+            return float(filtered[date_col].sum() - filtered[self.base_date].sum())
+        return 0.0
+    
+    def calculate_asset_impact(self) -> pl.DataFrame:
+        results = []
+        
+        for date_col in self.date_columns:
+            row_data = {}
+            
+            row_data['IWPB Premier'] = -self._calculate_row_difference(range(5, 21), date_col)
+            row_data['IWPB Private Banking'] = -self._calculate_row_difference(range(22, 25), date_col)
+            row_data['CIB Loans'] = -self._calculate_row_difference(range(26, 47), date_col)
+            
+            row_data['UST HTM'] = self._calculate_row_difference([54], date_col) * -self._get_assumption_value("UST HTM")
+            row_data['Level 1 MBS HTM'] = self._calculate_row_difference([53], date_col) * -self._get_assumption_value("Level 1 MBS HTM")
+            row_data['Level 1 Other HTM'] = self._calculate_row_difference([55], date_col) * -self._get_assumption_value("Level 1 Other HTM")
+            row_data['Level 2A MBS - HTM'] = self._calculate_row_difference([57], date_col) * -self._get_assumption_value("Level 2A MBS HTM")
+            row_data['Level 2A Other HTM'] = self._calculate_row_difference([58], date_col) * -self._get_assumption_value("Level 2A Other HTM")
+            row_data['Illiquid'] = 0.0
+            
+            row_data['UST AFS'] = self._calculate_row_difference([63], date_col) * -self._get_assumption_value("UST AFS")
+            row_data['Level 1 MBS AFS'] = self._calculate_row_difference([62], date_col) * -self._get_assumption_value("Level 1 MBS AFS")
+            row_data['Level 1 Other - AFS'] = self._calculate_row_difference([64], date_col) * -self._get_assumption_value("Level 1 Other AFS")
+            row_data['Level 2A- MBS - AFS'] = self._calculate_row_difference([66], date_col) * -self._get_assumption_value("Level 2A MBS AFS")
+            row_data['Level 2A- Other AFS'] = self._calculate_row_difference([67], date_col) * -self._get_assumption_value("Level 2A Other AFS")
+            
+            row_data['Liquid Equities'] = self._calculate_row_difference([86], date_col) * -self._get_assumption_value("Equities")
+            row_data['Illiquid Trading Assets'] = -self._calculate_row_difference([90], date_col)
+            row_data['MSS - Loans'] = -self._calculate_row_difference([94], date_col)
+            row_data['Liquid Trading Assets'] = 0.0
+            
+            row_data['Asset Impact'] = sum(row_data.values())
+            results.append({**{'Date': date_col}, **row_data})
+        
+        return pl.DataFrame(results)
+    
+    def calculate_liability_impact(self) -> pl.DataFrame:
+        results = []
+        
+        for date_col in self.date_columns:
+            row_data = {}
+            
+            row_data['IWPB - Premier'] = -self._calculate_row_difference([100], date_col) * (1 - self._get_assumption_value("IWPB Premier"))
+            row_data['PB - Personal'] = -self._calculate_row_difference([108], date_col) * (1 - self._get_assumption_value("PB Personal"))
+            row_data['PB Commercial - Financial'] = -self._calculate_row_difference([113], date_col) * (1 - self._get_assumption_value("PB Commercial Financial"))
+            row_data['PB Commercial - Non Financial'] = -self._calculate_row_difference([118], date_col) * (1 - self._get_assumption_value("PB Commercial Non Financial"))
+            row_data['PB - Other'] = -self._calculate_row_difference([123], date_col) * (1 - self._get_assumption_value("PB Other"))
+            
+            row_data['Affiliate'] = 0.0
+            row_data['Corp'] = 0.0
+            row_data['Operational'] = self._calculate_sumifs(date_col, 'Level 3', 'Operational') * (1 - self._get_assumption_value("Corp Operational"))
+            row_data['Non-Operational'] = self._calculate_sumifs(date_col, 'Level 3', 'Non-Operational') * (1 - self._get_assumption_value("Corp Non Operational"))
+            
+            row_data['NBFI'] = 0.0
+            row_data['NBFI Operational'] = self._calculate_sumifs(date_col, 'Level 3', 'NBFI Operational') * (1 - self._get_assumption_value("NBFI Operational"))
+            row_data['NBFI Non-Operational'] = self._calculate_sumifs(date_col, 'Level 3', 'NBFI Non-Operational') * (1 - self._get_assumption_value("NBFI Non Operational"))
+            
+            row_data['Banks'] = 0.0
+            row_data['Banks Operational'] = self._calculate_sumifs(date_col, 'Level 3', 'Banks Operational') * (1 - self._get_assumption_value("Banks Operational"))
+            row_data['Banks Non-Operational'] = self._calculate_sumifs(date_col, 'Level 3', 'Banks Non-Operational') * (1 - self._get_assumption_value("Banks Non Operational"))
+            
+            row_data['SME'] = -self._calculate_row_difference([202], date_col) * (1 - self._get_assumption_value("SME"))
+            row_data['Other (GPS)'] = -self._calculate_row_difference([208], date_col) * (1 - self._get_assumption_value("Other (GPS)"))
+            row_data['Brokered Committed'] = -self._calculate_row_difference([213], date_col) * (1 - self._get_assumption_value("Brokered Committed"))
+            row_data['Brokered Uncommitted'] = -self._calculate_row_difference([214], date_col) * (1 - 0.0)
+            row_data['ISV'] = -self._calculate_row_difference([215], date_col) * (1 - 0.0)
+            row_data['Innovation Banking'] = -self._calculate_row_difference([218], date_col) * (1 - 0.0)
+            row_data['Other (CIB)'] = -self._calculate_row_difference([221], date_col) * (1 - 0.0)
+            row_data['Structured CDs'] = -self._calculate_row_difference([130], date_col)
+            row_data['Wholesale CDs'] = -self._calculate_row_difference([139], date_col)
+            row_data['Equity'] = -self._calculate_row_difference([225], date_col)
+            
+            row_data['Liability Impact'] = sum(row_data.values())
+            results.append({**{'Date': date_col}, **row_data})
+        
+        return pl.DataFrame(results)
+    
+    def calculate_committed_facility_impact(self) -> pl.DataFrame:
+        results = []
+        
+        for date_col in self.date_columns:
+            row_data = {}
+            
+            row_data['Credit'] = self._calculate_sumifs(date_col, 'Level 2', 'Credit') * -0.0
+            row_data['Liquidity'] = self._calculate_sumifs(date_col, 'Level 2', 'Liquidity') * -0.0
+            row_data['Credit '] = self._calculate_sumifs(date_col, 'Level 2', 'Credit') * -0.0
+            row_data['Liquidity '] = self._calculate_sumifs(date_col, 'Level 2', 'Liquidity') * -0.0
+            row_data['Credit  '] = self._calculate_sumifs(date_col, 'Level 2', 'Credit') * -0.0
+            row_data['Liquidity  '] = self._calculate_sumifs(date_col, 'Level 2', 'Liquidity') * -0.0
+            row_data['Mortgage commitments'] = self._calculate_row_difference([250], date_col) * -0.0
+            row_data['Retail commitments'] = self._calculate_row_difference([253], date_col) * -0.0
+            
+            row_data['Comitted Facility Impact'] = sum(row_data.values())
+            results.append({**{'Date': date_col}, **row_data})
+        
+        return pl.DataFrame(results)
+    
+    def calculate_all_impacts(self) -> CalculationComponents:
+        asset_impact = self.calculate_asset_impact()
+        liability_impact = self.calculate_liability_impact()
+        committed_facility_impact = self.calculate_committed_facility_impact()
+        
+        return CalculationComponents(
+            asset_impact=asset_impact,
+            liability_impact=liability_impact,
+            committed_facility_impact=committed_facility_impact
+        )
+src/gemini_liquidity_models/liquidity_impact_calculation/output_writer.py
+pythonimport polars as pl
+import pandas as pd
+from openpyxl import load_workbook
+from openpyxl.styles import Font
+from .dependencies import Constants, CalculationComponents
 
-[tool.pytest.ini_options]
-minversion = "7.0"
-addopts = "-ra -q --strict-markers --cov=gemini_liquidity_models --cov-report=term-missing"
-testpaths = ["tests"]
-python_files = ["test_*.py"]
-python_classes = ["Test*"]
-python_functions = ["test_*"]
+def _create_output_dataframe(components: CalculationComponents, date_columns: list) -> pl.DataFrame:
+    asset_df = components.asset_impact
+    liability_df = components.liability_impact
+    facility_df = components.committed_facility_impact
+    
+    all_sections = []
+    
+    asset_section = asset_df.transpose(include_header=True, header_name="Category")
+    asset_section = asset_section.filter(pl.col("Category") != "Date")
+    
+    empty_row = pl.DataFrame({"Category": [""], **{col: [None] for col in date_columns}})
+    all_sections.append(asset_section)
+    all_sections.append(empty_row)
+    
+    liability_section = liability_df.transpose(include_header=True, header_name="Category")
+    liability_section = liability_section.filter(pl.col("Category") != "Date")
+    all_sections.append(liability_section)
+    all_sections.append(empty_row)
+    
+    facility_section = facility_df.transpose(include_header=True, header_name="Category")
+    facility_section = facility_section.filter(pl.col("Category") != "Date")
+    all_sections.append(facility_section)
+    all_sections.append(empty_row)
+    
+    us_ilm_data = []
+    cumulative = 0
+    for i, date_col in enumerate(date_columns):
+        asset_total = asset_df[i, "Asset Impact"]
+        liability_total = liability_df[i, "Liability Impact"]
+        facility_total = facility_df[i, "Comitted Facility Impact"]
+        cumulative += asset_total + liability_total + facility_total
+        us_ilm_data.append(cumulative)
+    
+    us_ilm_row = pl.DataFrame({"Category": ["US ILM December"], **{col: [val] for col, val in zip(date_columns, us_ilm_data)}})
+    all_sections.append(us_ilm_row)
+    
+    combined_df = pl.concat(all_sections, how="diagonal")
+    
+    return combined_df
 
-[tool.coverage.run]
-source = ["src/gemini_liquidity_models"]
-omit = ["*/tests/*", "*/test_*.py"]
+def write_output_to_excel(file_path: str, components: CalculationComponents, date_columns: list) -> None:
+    output_df = _create_output_dataframe(components, date_columns)
+    
+    wb = load_workbook(file_path)
+    
+    if Constants.OUTPUT_SHEET in wb.sheetnames:
+        del wb[Constants.OUTPUT_SHEET]
+    
+    ws = wb.create_sheet(Constants.OUTPUT_SHEET)
+    
+    for i, col in enumerate(date_columns, start=1):
+        cell = ws.cell(row=2, column=i+2)
+        cell.value = col
+        cell.font = Font(bold=True)
+    
+    output_pandas = output_df.to_pandas()
+    
+    for r_idx, row in output_pandas.iterrows():
+        ws.cell(row=r_idx+3, column=2, value=row['Category'])
+        
+        for c_idx, col in enumerate(date_columns):
+            if col in row and pd.notna(row[col]):
+                ws.cell(row=r_idx+3, column=c_idx+3, value=row[col])
+        
+        if row['Category'] in ['Asset Impact', 'Liability Impact', 'Comitted Facility Impact', 'US ILM December']:
+            for c in range(2, len(date_columns)+3):
+                ws.cell(row=r_idx+3, column=c).font = Font(bold=True)
+    
+    wb.save(file_path)
+src/gemini_liquidity_models/liquidity_impact_calculation/model.py
+pythonfrom .data_preparation import prepare_input_data
+from .calculation_engine import LiquidityCalculator
+from .output_writer import write_output_to_excel
+from .dependencies import Params, Inputs, Outputs
 
-[tool.coverage.report]
-exclude_lines = [
-    "pragma: no cover",
-    "def __repr__",
-    "if self.debug:",
-    "raise AssertionError",
-    "raise NotImplementedError",
-    "if __name__ == .__main__.:",
-    "if TYPE_CHECKING:",
-]
-precision = 2
-skip_covered = false
-show_missing = true
+class LiquidityImpactCalculation:
+    
+    def __init__(self, params: Params):
+        self.params = params
+        self._inputs = None
+        self._calculator = None
+        
+    def _prepare_data(self) -> Inputs:
+        liquidity_df, assumptions_df, date_columns = prepare_input_data(self.params.input_file_path)
+        
+        return Inputs(
+            liquidity_data=liquidity_df,
+            assumptions_data=assumptions_df,
+            date_columns=date_columns
+        )
+    
+    def _calculate(self) -> Outputs:
+        self._inputs = self._prepare_data()
+        
+        self._calculator = LiquidityCalculator(
+            liquidity_df=self._inputs.liquidity_data,
+            assumptions_df=self._inputs.assumptions_data,
+            date_columns=self._inputs.date_columns
+        )
+        
+        components = self._calculator.calculate_all_impacts()
+        
+        output_path = self.params.output_file_path or self.params.input_file_path
+        write_output_to_excel(output_path, components, self._inputs.date_columns)
+        
+        return Outputs(
+            final_output=components.asset_impact,
+            output_sheet_name="US ILM + ILM"
+        )
+    
+    def run(self) -> Outputs:
+        return self._calculate()
+main.py
+pythonimport sys
+from pathlib import Path
 
-[tool.pylint.messages_control]
-disable = [
-    "C0103",
-    "C0114",
-    "C0115",
-    "C0116",
-    "R0903",
-    "R0913",
-    "W0212",
-]
+sys.path.append(str(Path(__file__).parent))
 
-[tool.pylint.format]
-max-line-length = 120
+from src.gemini_liquidity_models.liquidity_impact_calculation import LiquidityImpactCalculation
+from src.gemini_liquidity_models.liquidity_impact_calculation.dependencies import Params
 
-[tool.pylint.basic]
-good-names = ["i", "j", "k", "df", "wb", "ws"]
+def main():
+    loc_link = r"path/to/your/excel/file.xlsx"
+    
+    params = Params(
+        input_file_path=loc_link,
+        output_file_path=loc_link
+    )
+    
+    model = LiquidityImpactCalculation(params)
+    outputs = model.run()
+    
+    print(f"Output saved to sheet: {outputs.output_sheet_name}")
+    print("Calculation completed successfully")
 
-[tool.sonarqube]
-project_key = "gemini-liquidity-models"
-project_name = "Gemini Liquidity Models"
-sources = "src"
-tests = "tests"
+if __name__ == "__main__":
+    main()
+```
 
+**requirements.txt**
+```
+polars>=0.20.0
+pandera[polars]>=0.17.0
+pandas>=2.0.0
+openpyxl>=3.1.0
+xlsxwriter>=3.1.0
+numpy>=1.24.0
+setup.py
+pythonfrom setuptools import setup, find_packages
 
-
-[build-system]
-requires = ["setuptools>=61.0", "wheel"]
-build-backend = "setuptools.build_meta"
-
-[project]
-name = "gemini-liquidity-models"
-version = "0.1.0"
-description = "Liquidity Impact Calculation Model for ILM Analysis"
-readme = "README.md"
-requires-python = ">=3.9"
-license = {text = "Proprietary"}
-authors = [
-    {name = "Gemini Team", email = "gemini-team@company.com"}
-]
-maintainers = [
-    {name = "Gemini Team", email = "gemini-team@company.com"}
-]
-classifiers = [
-    "Development Status :: 3 - Alpha",
-    "Intended Audience :: Financial and Insurance Industry",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Operating System :: OS Independent",
-    "Topic :: Office/Business :: Financial",
-]
-dependencies = [
-    "polars>=0.20.0",
-    "pandera[polars]>=0.17.0",
-    "pandas>=2.0.0",
-    "openpyxl>=3.1.0",
-    "xlsxwriter>=3.1.0",
-    "numpy>=1.24.0",
-]
-
-[project.optional-dependencies]
-dev = [
-    "pytest>=7.4.0",
-    "pytest-cov>=4.1.0",
-    "black>=23.0.0",
-    "flake8>=6.0.0",
-    "mypy>=1.5.0",
-    "pre-commit>=3.4.0",
-    "isort>=5.12.0",
-    "pylint>=2.17.0",
-]
-test = [
-    "pytest>=7.4.0",
-    "pytest-cov>=4.1.0",
-    "pytest-mock>=3.11.0",
-]
-
-[project.urls]
-Repository = "https://github.com/company/gemini-liquidity-models"
-Documentation = "https://docs.company.com/gemini-liquidity-models"
-Issues = "https://github.com/company/gemini-liquidity-models/issues"
-
-[tool.setuptools.packages.find]
-where = ["src"]
-include = ["gemini_liquidity_models*"]
-namespaces = false
-
-[tool.setuptools.package-data]
-gemini_liquidity_models = ["*.md", "*.txt"]
-
-[tool.black]
-line-length = 120
-target-version = ['py39', 'py310', 'py311']
-include = '\.pyi?$'
-extend-exclude = '''
-/(
-    \.eggs
-  | \.git
-  | \.hg
-  | \.mypy_cache
-  | \.tox
-  | \.venv
-  | _build
-  | buck-out
-  | build
-  | dist
-)/
-'''
-
-[tool.isort]
-profile = "black"
-line_length = 120
-known_third_party = ["polars", "pandas", "numpy", "pandera", "openpyxl"]
-known_first_party = ["gemini_liquidity_models"]
-default_section = "THIRDPARTY"
-sections = ["FUTURE", "STDLIB", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
-
-[tool.mypy]
-python_version = "3.9"
-warn_return_any = true
-warn_unused_configs = true
-disallow_untyped_defs = true
-disallow_any_unimported = false
-no_implicit_optional = true
-warn_redundant_casts = true
-warn_unused_ignores = true
-warn_no_return = true
-check_untyped_defs = true
-strict_equality = true
-
-[tool.pytest.ini_options]
-minversion = "7.0"
-addopts = "-ra -q --strict-markers --cov=gemini_liquidity_models --cov-report=term-missing"
-testpaths = ["tests"]
-python_files = ["test_*.py"]
-python_classes = ["Test*"]
-python_functions = ["test_*"]
-
-[tool.coverage.run]
-source = ["src/gemini_liquidity_models"]
-omit = ["*/tests/*", "*/test_*.py"]
-
-[tool.coverage.report]
-exclude_lines = [
-    "pragma: no cover",
-    "def __repr__",
-    "if self.debug:",
-    "raise AssertionError",
-    "raise NotImplementedError",
-    "if __name__ == .__main__.:",
-    "if TYPE_CHECKING:",
-]
-precision = 2
-skip_covered = false
-show_missing = true
-
-[tool.pylint.messages_control]
-disable = [
-    "C0103",
-    "C0114",
-    "C0115",
-    "C0116",
-    "R0903",
-    "R0913",
-    "W0212",
-]
-
-[tool.pylint.format]
-max-line-length = 120
-
-[tool.pylint.basic]
-good-names = ["i", "j", "k", "df", "wb", "ws"]
-
-[tool.sonarqube]
-project_key = "gemini-liquidity-models"
-project_name = "Gemini Liquidity Models"
-sources = "src"
-tests = "tests"
+setup(
+    name="gemini-liquidity-models",
+    version="0.1.0",
+    packages=find_packages(where="src"),
+    package_dir={"": "src"},
+    install_requires=[
+        "polars>=0.20.0",
+        "pandera[polars]>=0.17.0",
+        "pandas>=2.0.0",
+        "openpyxl>=3.1.0",
+        "xlsxwriter>=3.1.0",
+        "numpy>=1.24.0",
+    ],
+    python_requires=">=3.9",
+)
+This package structure follows your company's standards with proper use of __all__, private methods with underscores, polars instead of pandas where possible, and modular design
