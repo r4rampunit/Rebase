@@ -1,0 +1,311 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gemini-liquidity-models"
+version = "0.1.0"
+description = "Liquidity Impact Calculation Model for ILM Analysis"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "Proprietary"}
+authors = [
+    {name = "Gemini Team", email = "gemini-team@company.com"}
+]
+maintainers = [
+    {name = "Gemini Team", email = "gemini-team@company.com"}
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Operating System :: OS Independent",
+    "Topic :: Office/Business :: Financial",
+]
+dependencies = [
+    "polars>=0.20.0",
+    "pandera[polars]>=0.17.0",
+    "pandas>=2.0.0",
+    "openpyxl>=3.1.0",
+    "xlsxwriter>=3.1.0",
+    "numpy>=1.24.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "black>=23.0.0",
+    "flake8>=6.0.0",
+    "mypy>=1.5.0",
+    "pre-commit>=3.4.0",
+    "isort>=5.12.0",
+    "pylint>=2.17.0",
+]
+test = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.11.0",
+]
+
+[project.urls]
+Repository = "https://github.com/company/gemini-liquidity-models"
+Documentation = "https://docs.company.com/gemini-liquidity-models"
+Issues = "https://github.com/company/gemini-liquidity-models/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["gemini_liquidity_models*"]
+namespaces = false
+
+[tool.setuptools.package-data]
+gemini_liquidity_models = ["*.md", "*.txt"]
+
+[tool.black]
+line-length = 120
+target-version = ['py39', 'py310', 'py311']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+    \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 120
+known_third_party = ["polars", "pandas", "numpy", "pandera", "openpyxl"]
+known_first_party = ["gemini_liquidity_models"]
+default_section = "THIRDPARTY"
+sections = ["FUTURE", "STDLIB", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_any_unimported = false
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+check_untyped_defs = true
+strict_equality = true
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "-ra -q --strict-markers --cov=gemini_liquidity_models --cov-report=term-missing"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
+[tool.coverage.run]
+source = ["src/gemini_liquidity_models"]
+omit = ["*/tests/*", "*/test_*.py"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]
+precision = 2
+skip_covered = false
+show_missing = true
+
+[tool.pylint.messages_control]
+disable = [
+    "C0103",
+    "C0114",
+    "C0115",
+    "C0116",
+    "R0903",
+    "R0913",
+    "W0212",
+]
+
+[tool.pylint.format]
+max-line-length = 120
+
+[tool.pylint.basic]
+good-names = ["i", "j", "k", "df", "wb", "ws"]
+
+[tool.sonarqube]
+project_key = "gemini-liquidity-models"
+project_name = "Gemini Liquidity Models"
+sources = "src"
+tests = "tests"
+
+
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gemini-liquidity-models"
+version = "0.1.0"
+description = "Liquidity Impact Calculation Model for ILM Analysis"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "Proprietary"}
+authors = [
+    {name = "Gemini Team", email = "gemini-team@company.com"}
+]
+maintainers = [
+    {name = "Gemini Team", email = "gemini-team@company.com"}
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Operating System :: OS Independent",
+    "Topic :: Office/Business :: Financial",
+]
+dependencies = [
+    "polars>=0.20.0",
+    "pandera[polars]>=0.17.0",
+    "pandas>=2.0.0",
+    "openpyxl>=3.1.0",
+    "xlsxwriter>=3.1.0",
+    "numpy>=1.24.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "black>=23.0.0",
+    "flake8>=6.0.0",
+    "mypy>=1.5.0",
+    "pre-commit>=3.4.0",
+    "isort>=5.12.0",
+    "pylint>=2.17.0",
+]
+test = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.11.0",
+]
+
+[project.urls]
+Repository = "https://github.com/company/gemini-liquidity-models"
+Documentation = "https://docs.company.com/gemini-liquidity-models"
+Issues = "https://github.com/company/gemini-liquidity-models/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["gemini_liquidity_models*"]
+namespaces = false
+
+[tool.setuptools.package-data]
+gemini_liquidity_models = ["*.md", "*.txt"]
+
+[tool.black]
+line-length = 120
+target-version = ['py39', 'py310', 'py311']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+    \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 120
+known_third_party = ["polars", "pandas", "numpy", "pandera", "openpyxl"]
+known_first_party = ["gemini_liquidity_models"]
+default_section = "THIRDPARTY"
+sections = ["FUTURE", "STDLIB", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_any_unimported = false
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+check_untyped_defs = true
+strict_equality = true
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "-ra -q --strict-markers --cov=gemini_liquidity_models --cov-report=term-missing"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
+[tool.coverage.run]
+source = ["src/gemini_liquidity_models"]
+omit = ["*/tests/*", "*/test_*.py"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]
+precision = 2
+skip_covered = false
+show_missing = true
+
+[tool.pylint.messages_control]
+disable = [
+    "C0103",
+    "C0114",
+    "C0115",
+    "C0116",
+    "R0903",
+    "R0913",
+    "W0212",
+]
+
+[tool.pylint.format]
+max-line-length = 120
+
+[tool.pylint.basic]
+good-names = ["i", "j", "k", "df", "wb", "ws"]
+
+[tool.sonarqube]
+project_key = "gemini-liquidity-models"
+project_name = "Gemini Liquidity Models"
+sources = "src"
+tests = "tests"
