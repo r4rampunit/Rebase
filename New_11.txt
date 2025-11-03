@@ -1,0 +1,308 @@
+import polars as pl
+import numpy as np
+from .dependencies import CalculationComponents
+
+class LiquidityCalculator:
+    
+    def __init__(self, liquidity_df: pl.DataFrame, assumptions_df: pl.DataFrame, date_columns: list):
+        self.liquidity_df = liquidity_df
+        self.assumptions_df = assumptions_df
+        self.date_columns = date_columns
+        self.base_date = '31-Dec-24'
+        self.liquidity_pandas = liquidity_df.to_pandas()
+        
+    def _get_assumption_value(self, key: str) -> float:
+        result = self.assumptions_df.filter(pl.col("Description") == key)
+        if len(result) > 0:
+            return result["US_ILM"][0]
+        return 0.0
+    
+    def _calculate_row_difference(self, row_indices: list, date_col: str) -> float:
+        try:
+            if not row_indices:
+                return 0.0
+            total_date = 0.0
+            total_base = 0.0
+            for idx in row_indices:
+                if idx < len(self.liquidity_pandas):
+                    if date_col in self.liquidity_pandas.columns:
+                        total_date += float(self.liquidity_pandas.iloc[idx][date_col] or 0)
+                    if self.base_date in self.liquidity_pandas.columns:
+                        total_base += float(self.liquidity_pandas.iloc[idx][self.base_date] or 0)
+            return total_date - total_base
+        except:
+            return 0.0
+    
+    def _calculate_sumifs(self, date_col: str, column_name: str, criteria_value: str) -> float:
+        try:
+            filtered = self.liquidity_df.filter(pl.col(column_name) == criteria_value)
+            if len(filtered) > 0:
+                date_sum = filtered.select(pl.col(date_col).sum())[0, 0] if date_col in filtered.columns else 0
+                base_sum = filtered.select(pl.col(self.base_date).sum())[0, 0] if self.base_date in filtered.columns else 0
+                return float(date_sum or 0) - float(base_sum or 0)
+            return 0.0
+        except:
+            return 0.0
+    
+    def calculate_asset_impact(self) -> pl.DataFrame:
+        results = []
+        
+        for date_col in self.date_columns:
+            row_data = {
+                'IWPB Premier': -self._calculate_row_difference(list(range(5, 21)), date_col),
+                'IWPB Private Banking': -self._calculate_row_difference(list(range(22, 25)), date_col),
+                'CIB Loans': -self._calculate_row_difference(list(range(26, 47)), date_col),
+                'UST HTM': self._calculate_row_difference([54], date_col) * -self._get_assumption_value("UST HTM"),
+                'Level 1 MBS HTM': self._calculate_row_difference([53], date_col) * -self._get_assumption_value("Level 1 MBS HTM"),
+                'Level 1 Other HTM': self._calculate_row_difference([55], date_col) * -self._get_assumption_value("Level 1 Other HTM"),
+                'Level 2A MBS - HTM': self._calculate_row_difference([57], date_col) * -self._get_assumption_value("Level 2A MBS HTM"),
+                'Level 2A Other HTM': self._calculate_row_difference([58], date_col) * -self._get_assumption_value("Level 2A Other HTM"),
+                'Illiquid': 0.0,
+                'UST AFS': self._calculate_row_difference([63], date_col) * -self._get_assumption_value("UST AFS"),
+                'Level 1 MBS AFS': self._calculate_row_difference([62], date_col) * -self._get_assumption_value("Level 1 MBS AFS"),
+                'Level 1 Other - AFS': self._calculate_row_difference([64], date_col) * -self._get_assumption_value("Level 1 Other AFS"),
+                'Level 2A- MBS - AFS': self._calculate_row_difference([66], date_col) * -self._get_assumption_value("Level 2A MBS AFS"),
+                'Level 2A- Other AFS': self._calculate_row_difference([67], date_col) * -self._get_assumption_value("Level 2A Other AFS"),
+                'Liquid Equities': self._calculate_row_difference([86], date_col) * -self._get_assumption_value("Equities"),
+                'Illiquid Trading Assets': -self._calculate_row_difference([90], date_col),
+                'MSS - Loans': -self._calculate_row_difference([94], date_col),
+                'Liquid Trading Assets': 0.0
+            }
+            row_data['Asset Impact'] = sum(row_data.values())
+            results.append(row_data)
+        
+        df = pl.DataFrame(results)
+        df = df.with_columns(pl.Series("Date", self.date_columns))
+        cols = ["Date"] + [col for col in df.columns if col != "Date"]
+        return df.select(cols)
+    
+    def calculate_liability_impact(self) -> pl.DataFrame:
+        results = []
+        
+        for date_col in self.date_columns:
+            row_data = {
+                'IWPB - Premier': -self._calculate_row_difference([100], date_col) * (1 - self._get_assumption_value("IWPB Premier")),
+                'PB - Personal': -self._calculate_row_difference([108], date_col) * (1 - self._get_assumption_value("PB Personal")),
+                'PB Commercial - Financial': -self._calculate_row_difference([113], date_col) * (1 - self._get_assumption_value("PB Commercial Financial")),
+                'PB Commercial - Non Financial': -self._calculate_row_difference([118], date_col) * (1 - self._get_assumption_value("PB Commercial Non Financial")),
+                'PB - Other': -self._calculate_row_difference([123], date_col) * (1 - self._get_assumption_value("PB Other")),
+                'Affiliate': 0.0,
+                'Corp': 0.0,
+                'Operational': self._calculate_sumifs(date_col, 'Level_3', 'Operational') * (1 - self._get_assumption_value("Corp Operational")),
+                'Non-Operational': self._calculate_sumifs(date_col, 'Level_3', 'Non-Operational') * (1 - self._get_assumption_value("Corp Non Operational")),
+                'NBFI': 0.0,
+                'NBFI Operational': self._calculate_sumifs(date_col, 'Level_3', 'Operational') * (1 - self._get_assumption_value("NBFI Operational")),
+                'NBFI Non-Operational': self._calculate_sumifs(date_col, 'Level_3', 'Non-Operational') * (1 - self._get_assumption_value("NBFI Non Operational")),
+                'Banks': 0.0,
+                'Banks Operational': self._calculate_sumifs(date_col, 'Level_3', 'Operational') * (1 - self._get_assumption_value("Banks Operational")),
+                'Banks Non-Operational': self._calculate_sumifs(date_col, 'Level_3', 'Non-Operational') * (1 - self._get_assumption_value("Banks Non Operational")),
+                'SME': -self._calculate_row_difference([202], date_col) * (1 - self._get_assumption_value("SME")),
+                'Other (GPS)': -self._calculate_row_difference([208], date_col) * (1 - self._get_assumption_value("Other (GPS)")),
+                'Brokered Committed': -self._calculate_row_difference([213], date_col) * (1 - self._get_assumption_value("Brokered Committed")),
+                'Brokered Uncommitted': -self._calculate_row_difference([214], date_col),
+                'ISV': -self._calculate_row_difference([215], date_col),
+                'Innovation Banking': -self._calculate_row_difference([218], date_col),
+                'Other (CIB)': -self._calculate_row_difference([221], date_col),
+                'Structured CDs': -self._calculate_row_difference([130], date_col),
+                'Wholesale CDs': -self._calculate_row_difference([139], date_col),
+                'Equity': -self._calculate_row_difference([225], date_col)
+            }
+            row_data['Liability Impact'] = sum(row_data.values())
+            results.append(row_data)
+        
+        df = pl.DataFrame(results)
+        df = df.with_columns(pl.Series("Date", self.date_columns))
+        cols = ["Date"] + [col for col in df.columns if col != "Date"]
+        return df.select(cols)
+    
+    def calculate_committed_facility_impact(self) -> pl.DataFrame:
+        results = []
+        
+        for date_col in self.date_columns:
+            row_data = {
+                'Credit': self._calculate_sumifs(date_col, 'Level_2', 'Credit') * -0.05,
+                'Liquidity': self._calculate_sumifs(date_col, 'Level_2', 'Liquidity') * -0.05,
+                'Mortgage commitments': self._calculate_row_difference([250], date_col) * -0.05,
+                'Retail commitments': self._calculate_row_difference([253], date_col) * -0.05
+            }
+            row_data['Comitted Facility Impact'] = sum(row_data.values())
+            results.append(row_data)
+        
+        df = pl.DataFrame(results)
+        df = df.with_columns(pl.Series("Date", self.date_columns))
+        cols = ["Date"] + [col for col in df.columns if col != "Date"]
+        return df.select(cols)
+    
+    def calculate_all_impacts(self) -> CalculationComponents:
+        asset_impact = self.calculate_asset_impact()
+        liability_impact = self.calculate_liability_impact()
+        committed_facility_impact = self.calculate_committed_facility_impact()
+        
+        return CalculationComponents(
+            asset_impact=asset_impact,
+            liability_impact=liability_impact,
+            committed_facility_impact=committed_facility_impact
+        )
+
+
+
+
+
+
+
+
+
+import polars as pl
+import pandas as pd
+from openpyxl import load_workbook
+from .dependencies import Constants
+
+def load_liquidity_input(file_path: str) -> tuple[pl.DataFrame, list]:
+    df_pandas = pd.read_excel(
+        file_path,
+        sheet_name=Constants.LIQUIDITY_INPUT_SHEET,
+        header=1
+    )
+    
+    date_columns = []
+    for col in df_pandas.columns:
+        if pd.api.types.is_datetime64_any_dtype(df_pandas[col]):
+            date_col_name = pd.to_datetime(col).strftime('%d-%b-%y')
+            date_columns.append(date_col_name)
+            df_pandas.rename(columns={col: date_col_name}, inplace=True)
+    
+    column_mapping = {
+        'Balance sheet': 'Balance_sheet',
+        'Level 1': 'Level_1',
+        'Level 2': 'Level_2', 
+        'Level 3': 'Level_3',
+        'Level 4': 'Level_4',
+        'Level 5': 'Level_5'
+    }
+    df_pandas.rename(columns=column_mapping, inplace=True)
+    
+    df_pandas = df_pandas.fillna(0)
+    
+    for col in date_columns:
+        df_pandas[col] = pd.to_numeric(df_pandas[col], errors='coerce').fillna(0)
+    
+    df_polars = pl.from_pandas(df_pandas)
+    
+    return df_polars, date_columns
+
+def load_assumptions(file_path: str) -> pl.DataFrame:
+    df_pandas = pd.read_excel(
+        file_path,
+        sheet_name=Constants.ASSUMPTIONS_SHEET,
+        header=1,
+        usecols="B:D"
+    )
+    
+    df_pandas.columns = ['Description', 'US_ILM', 'ILM']
+    
+    for col in ['US_ILM', 'ILM']:
+        if df_pandas[col].dtype == 'object':
+            df_pandas[col] = df_pandas[col].astype(str).str.rstrip('%')
+            df_pandas[col] = pd.to_numeric(df_pandas[col], errors='coerce') / 100.0
+        df_pandas[col] = df_pandas[col].fillna(0)
+    
+    df_polars = pl.from_pandas(df_pandas)
+    
+    return df_polars
+
+def prepare_input_data(file_path: str) -> tuple[pl.DataFrame, pl.DataFrame, list]:
+    liquidity_df, date_columns = load_liquidity_input(file_path)
+    assumptions_df = load_assumptions(file_path)
+    
+    return liquidity_df, assumptions_df, date_columns
+
+
+
+
+
+
+
+import polars as pl
+import pandas as pd
+from openpyxl import load_workbook
+from openpyxl.styles import Font
+from .dependencies import Constants, CalculationComponents
+
+def _create_output_dataframe(components: CalculationComponents, date_columns: list) -> pd.DataFrame:
+    all_rows = []
+    
+    asset_df_pd = components.asset_impact.to_pandas()
+    for col in asset_df_pd.columns:
+        if col != 'Date':
+            values = [asset_df_pd[date_col][0] if date_col in asset_df_pd.columns else asset_df_pd.iloc[i][col] 
+                     for i, date_col in enumerate(date_columns)]
+            row = {'Category': col}
+            row.update({date: val for date, val in zip(date_columns, values)})
+            all_rows.append(row)
+    
+    all_rows.append({'Category': ''})
+    
+    liability_df_pd = components.liability_impact.to_pandas()
+    for col in liability_df_pd.columns:
+        if col != 'Date':
+            values = [liability_df_pd[date_col][0] if date_col in liability_df_pd.columns else liability_df_pd.iloc[i][col] 
+                     for i, date_col in enumerate(date_columns)]
+            row = {'Category': col}
+            row.update({date: val for date, val in zip(date_columns, values)})
+            all_rows.append(row)
+    
+    all_rows.append({'Category': ''})
+    
+    facility_df_pd = components.committed_facility_impact.to_pandas()
+    for col in facility_df_pd.columns:
+        if col != 'Date':
+            values = [facility_df_pd[date_col][0] if date_col in facility_df_pd.columns else facility_df_pd.iloc[i][col] 
+                     for i, date_col in enumerate(date_columns)]
+            row = {'Category': col}
+            row.update({date: val for date, val in zip(date_columns, values)})
+            all_rows.append(row)
+    
+    all_rows.append({'Category': ''})
+    
+    us_ilm_values = []
+    cumulative = 0
+    for i in range(len(date_columns)):
+        asset_total = asset_df_pd.iloc[i]['Asset Impact'] if i < len(asset_df_pd) else 0
+        liability_total = liability_df_pd.iloc[i]['Liability Impact'] if i < len(liability_df_pd) else 0
+        facility_total = facility_df_pd.iloc[i]['Comitted Facility Impact'] if i < len(facility_df_pd) else 0
+        cumulative += asset_total + liability_total + facility_total
+        us_ilm_values.append(cumulative)
+    
+    us_ilm_row = {'Category': 'US ILM December'}
+    us_ilm_row.update({date: val for date, val in zip(date_columns, us_ilm_values)})
+    all_rows.append(us_ilm_row)
+    
+    return pd.DataFrame(all_rows)
+
+def write_output_to_excel(file_path: str, components: CalculationComponents, date_columns: list) -> None:
+    output_df = _create_output_dataframe(components, date_columns)
+    
+    wb = load_workbook(file_path)
+    
+    if Constants.OUTPUT_SHEET in wb.sheetnames:
+        del wb[Constants.OUTPUT_SHEET]
+    
+    ws = wb.create_sheet(Constants.OUTPUT_SHEET)
+    
+    for i, col in enumerate(date_columns, start=1):
+        cell = ws.cell(row=2, column=i+2)
+        cell.value = col
+        cell.font = Font(bold=True)
+    
+    for r_idx, row in output_df.iterrows():
+        ws.cell(row=r_idx+3, column=2, value=row['Category'])
+        
+        for c_idx, col in enumerate(date_columns):
+            if col in row and pd.notna(row[col]):
+                ws.cell(row=r_idx+3, column=c_idx+3, value=row[col])
+        
+        if row['Category'] in ['Asset Impact', 'Liability Impact', 'Comitted Facility Impact', 'US ILM December']:
+            for c in range(2, len(date_columns)+3):
+                ws.cell(row=r_idx+3, column=c).font = Font(bold=True)
+    
+    wb.save(file_path)
