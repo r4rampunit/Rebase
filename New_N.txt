@@ -1,0 +1,1094 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gemini-liquidity-models"
+version = "0.1.0"
+description = "Liquidity Impact Calculation Model for ILM Analysis"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "Proprietary"}
+dependencies = [
+    "polars>=0.20.0",
+    "openpyxl>=3.1.0",
+    "xlsxwriter>=3.1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "black>=23.0.0",
+    "mypy>=1.5.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src", "utils"]
+include = ["gemini_liquidity_models*", "utils*"]
+namespaces = false
+
+
+
+
+utils/init.py
+pythonfrom .excel_utils import ExcelReader, ExcelWriter
+from .data_utils import DataProcessor
+
+__all__ = ["ExcelReader", "ExcelWriter", "DataProcessor"]
+utils/excel_utils.py
+import polars as pl
+from openpyxl import load_workbook, Workbook
+from openpyxl.styles import Font
+from datetime import datetime
+from typing import Dict, List, Tuple, Any
+
+class ExcelReader:
+    
+    @staticmethod
+    def read_sheet(file_path: str, sheet_name: str, header_row: int = 1) -> Tuple[pl.DataFrame, List[str]]:
+        wb = load_workbook(file_path, data_only=True)
+        ws = wb[sheet_name]
+        
+        headers = []
+        date_columns = []
+        date_indices = []
+        
+        header_row_data = list(ws[header_row + 1])
+        
+        for idx, cell in enumerate(header_row_data):
+            if cell.value:
+                if isinstance(cell.value, datetime):
+                    col_name = cell.value.strftime('%d-%b-%y')
+                    date_columns.append(col_name)
+                    date_indices.append(idx)
+                else:
+                    col_name = str(cell.value).replace(' ', '_').replace('.', '')
+                headers.append(col_name)
+        
+        data = []
+        for row_idx, row in enumerate(ws.iter_rows(min_row=header_row + 2, values_only=True)):
+            if row[0] is not None:
+                row_dict = {}
+                for col_idx, value in enumerate(row[:len(headers)]):
+                    header = headers[col_idx]
+                    if value is None:
+                        value = 0 if col_idx in date_indices else ""
+                    elif col_idx in date_indices:
+                        value = float(value) if isinstance(value, (int, float)) else 0
+                    else:
+                        value = str(value) if value is not None else ""
+                    row_dict[header] = value
+                data.append(row_dict)
+        
+        wb.close()
+        
+        df = pl.DataFrame(data)
+        
+        for date_col in date_columns:
+            df = df.with_columns(pl.col(date_col).cast(pl.Float64))
+        
+        return df, date_columns
+    
+    @staticmethod
+    def read_assumptions(file_path: str, sheet_name: str) -> pl.DataFrame:
+        wb = load_workbook(file_path, data_only=True)
+        ws = wb[sheet_name]
+        
+        data = []
+        for row in ws.iter_rows(min_row=3, min_col=2, max_col=4, values_only=True):
+            if row[0] is not None:
+                desc = str(row[0])
+                us_ilm = row[1] if row[1] else 0
+                ilm = row[2] if row[2] else 0
+                
+                if isinstance(us_ilm, str):
+                    us_ilm = float(us_ilm.rstrip('%')) / 100.0 if '%' in us_ilm else float(us_ilm)
+                else:
+                    us_ilm = float(us_ilm) if us_ilm else 0
+                
+                if isinstance(ilm, str):
+                    ilm = float(ilm.rstrip('%')) / 100.0 if '%' in ilm else float(ilm)
+                else:
+                    ilm = float(ilm) if ilm else 0
+                
+                data.append({
+                    'Description': desc,
+                    'US_ILM': us_ilm,
+                    'ILM': ilm
+                })
+        
+        wb.close()
+        
+        return pl.DataFrame(data)
+
+class ExcelWriter:
+    
+    @staticmethod
+    def write_output(file_path: str, sheet_name: str, data_dict: Dict[str, pl.DataFrame], 
+                     date_columns: List[str], bold_rows: List[str] = None):
+        wb = load_workbook(file_path)
+        
+        if sheet_name in wb.sheetnames:
+            del wb[sheet_name]
+        
+        ws = wb.create_sheet(sheet_name)
+        
+        for i, col in enumerate(date_columns, start=1):
+            cell = ws.cell(row=2, column=i+2)
+            cell.value = col
+            cell.font = Font(bold=True)
+        
+        row_num = 3
+        
+        for section_name, section_df in data_dict.items():
+            for category in section_df.columns:
+                if category != 'Date':
+                    ws.cell(row=row_num, column=2, value=category)
+                    
+                    for col_idx, date_col in enumerate(date_columns):
+                        value = 0
+                        for i in range(len(section_df)):
+                            if section_df.row(i, named=True).get('Date') == date_col:
+                                value = section_df.row(i, named=True).get(category, 0)
+                                break
+                        ws.cell(row=row_num, column=col_idx+3, value=value)
+                    
+                    if bold_rows and category in bold_rows:
+                        for c in range(2, len(date_columns)+3):
+                            ws.cell(row=row_num, column=c).font = Font(bold=True)
+                    
+                    row_num += 1
+            
+            if section_name != list(data_dict.keys())[-1]:
+                row_num += 1
+        
+        wb.save(file_path)
+
+
+
+utils/data_utils.py
+
+import polars as pl
+from typing import List, Dict, Optional
+
+class DataProcessor:
+    
+    @staticmethod
+    def get_value_by_key(df: pl.DataFrame, key_column: str, key_value: str, value_column: str) -> float:
+        result = df.filter(pl.col(key_column) == key_value)
+        if len(result) > 0:
+            return result[value_column][0]
+        return 0.0
+    
+    @staticmethod
+    def calculate_row_range_diff(df: pl.DataFrame, row_indices: List[int], 
+                                 date_col: str, base_col: str) -> float:
+        try:
+            if not row_indices:
+                return 0.0
+            total_date = 0.0
+            total_base = 0.0
+            for idx in row_indices:
+                if idx < len(df):
+                    row = df.row(idx, named=True)
+                    if date_col in row:
+                        total_date += float(row[date_col] or 0)
+                    if base_col in row:
+                        total_base += float(row[base_col] or 0)
+            return total_date - total_base
+        except:
+            return 0.0
+    
+    @staticmethod
+    def calculate_sumifs(df: pl.DataFrame, date_col: str, base_col: str,
+                        filter_column: str, filter_value: str) -> float:
+        try:
+            filtered = df.filter(pl.col(filter_column) == filter_value)
+            if len(filtered) > 0:
+                date_sum = filtered.select(pl.col(date_col).sum())[0, 0] if date_col in filtered.columns else 0
+                base_sum = filtered.select(pl.col(base_col).sum())[0, 0] if base_col in filtered.columns else 0
+                return float(date_sum or 0) - float(base_sum or 0)
+            return 0.0
+        except:
+            return 0.0
+
+
+src/gemini_liquidity_models/init.py
+
+from .liquidity_impact_calculation import LiquidityImpactCalculation
+
+__all__ = ["LiquidityImpactCalculation"]
+
+
+src/gemini_liquidity_models/liquidity_impact_calculation/init.py
+
+from .model import LiquidityImpactCalculation
+from .calculation_engine import LiquidityCalculator
+from .calculation_config import CalculationConfig
+
+__all__ = ["LiquidityImpactCalculation", "LiquidityCalculator", "CalculationConfig"]
+
+
+src/gemini_liquidity_models/liquidity_impact_calculation/calculation_config.py
+
+from dataclasses import dataclass
+from typing import Dict, List
+
+@dataclass
+class CalculationConfig:
+    asset_row_mappings: Dict[str, List[int]]
+    liability_row_mappings: Dict[str, List[int]]
+    facility_row_mappings: Dict[str, List[int]]
+    assumption_mappings: Dict[str, str]
+    
+    @classmethod
+    def get_default_config(cls):
+        return cls(
+            asset_row_mappings={
+                'IWPB Premier': list(range(5, 21)),
+                'IWPB Private Banking': list(range(22, 25)),
+                'CIB Loans': list(range(26, 47)),
+                'UST HTM': [54],
+                'Level 1 MBS HTM': [53],
+                'Level 1 Other HTM': [55],
+                'Level 2A MBS - HTM': [57],
+                'Level 2A Other HTM': [58],
+                'UST AFS': [63],
+                'Level 1 MBS AFS': [62],
+                'Level 1 Other - AFS': [64],
+                'Level 2A- MBS - AFS': [66],
+                'Level 2A- Other AFS': [67],
+                'Liquid Equities': [86],
+                'Illiquid Trading Assets': [90],
+                'MSS - Loans': [94]
+            },
+            liability_row_mappings={
+                'IWPB - Premier': [100],
+                'PB - Personal': [108],
+                'PB Commercial - Financial': [113],
+                'PB Commercial - Non Financial': [118],
+                'PB - Other': [123],
+                'SME': [202],
+                'Other (GPS)': [208],
+                'Brokered Committed': [213],
+                'Brokered Uncommitted': [214],
+                'ISV': [215],
+                'Innovation Banking': [218],
+                'Other (CIB)': [221],
+                'Structured CDs': [130],
+                'Wholesale CDs': [139],
+                'Equity': [225]
+            },
+            facility_row_mappings={
+                'Mortgage commitments': [250],
+                'Retail commitments': [253]
+            },
+            assumption_mappings={
+                'UST HTM': 'UST HTM',
+                'Level 1 MBS HTM': 'Level 1 MBS HTM',
+                'Level 1 Other HTM': 'Level 1 Other HTM',
+                'Level 2A MBS - HTM': 'Level 2A MBS HTM',
+                'Level 2A Other HTM': 'Level 2A Other HTM',
+                'UST AFS': 'UST AFS',
+                'Level 1 MBS AFS': 'Level 1 MBS AFS',
+                'Level 1 Other - AFS': 'Level 1 Other AFS',
+                'Level 2A- MBS - AFS': 'Level 2A MBS AFS',
+                'Level 2A- Other AFS': 'Level 2A Other AFS',
+                'Liquid Equities': 'Equities',
+                'IWPB - Premier': 'IWPB Premier',
+                'PB - Personal': 'PB Personal',
+                'PB Commercial - Financial': 'PB Commercial Financial',
+                'PB Commercial - Non Financial': 'PB Commercial Non Financial',
+                'PB - Other': 'PB Other',
+                'SME': 'SME',
+                'Other (GPS)': 'Other (GPS)',
+                'Brokered Committed': 'Brokered Committed'
+            }
+        )
+
+
+src/gemini_liquidity_models/liquidity_impact_calculation/calculation_engine.py
+
+import polars as pl
+from typing import Dict, List, Tuple
+from utils.data_utils import DataProcessor
+
+class LiquidityCalculator:
+    
+    def __init__(self, config: 'CalculationConfig'):
+        self.config = config
+        self.processor = DataProcessor()
+    
+    def calculate_impacts(self, liquidity_df: pl.DataFrame, assumptions_df: pl.DataFrame,
+                         date_columns: List[str], base_date: str = '31-Dec-24') -> Dict[str, pl.DataFrame]:
+        
+        asset_impact = self._calculate_asset_impact(liquidity_df, assumptions_df, date_columns, base_date)
+        liability_impact = self._calculate_liability_impact(liquidity_df, assumptions_df, date_columns, base_date)
+        facility_impact = self._calculate_facility_impact(liquidity_df, assumptions_df, date_columns, base_date)
+        us_ilm_summary = self._calculate_us_ilm_summary(asset_impact, liability_impact, facility_impact, date_columns)
+        
+        return {
+            'asset': asset_impact,
+            'liability': liability_impact,
+            'facility': facility_impact,
+            'summary': us_ilm_summary
+        }
+    
+    def _get_assumption(self, assumptions_df: pl.DataFrame, key: str) -> float:
+        mapped_key = self.config.assumption_mappings.get(key, key)
+        return self.processor.get_value_by_key(assumptions_df, 'Description', mapped_key, 'US_ILM')
+    
+    def _calculate_asset_impact(self, liquidity_df: pl.DataFrame, assumptions_df: pl.DataFrame,
+                                date_columns: List[str], base_date: str) -> pl.DataFrame:
+        results = []
+        
+        for date_col in date_columns:
+            row_data = {'Date': date_col}
+            
+            for item_name, row_indices in self.config.asset_row_mappings.items():
+                diff = self.processor.calculate_row_range_diff(liquidity_df, row_indices, date_col, base_date)
+                
+                if item_name in ['IWPB Premier', 'IWPB Private Banking', 'CIB Loans', 
+                                'Illiquid Trading Assets', 'MSS - Loans']:
+                    row_data[item_name] = -diff
+                else:
+                    assumption_val = self._get_assumption(assumptions_df, item_name)
+                    row_data[item_name] = diff * -assumption_val
+            
+            row_data['Illiquid'] = 0.0
+            row_data['Liquid Trading Assets'] = 0.0
+            
+            asset_total = sum(v for k, v in row_data.items() if k != 'Date')
+            row_data['Asset Impact'] = asset_total
+            results.append(row_data)
+        
+        return pl.DataFrame(results)
+    
+    def _calculate_liability_impact(self, liquidity_df: pl.DataFrame, assumptions_df: pl.DataFrame,
+                                   date_columns: List[str], base_date: str) -> pl.DataFrame:
+        results = []
+        
+        for date_col in date_columns:
+            row_data = {'Date': date_col}
+            
+            for item_name, row_indices in self.config.liability_row_mappings.items():
+                diff = self.processor.calculate_row_range_diff(liquidity_df, row_indices, date_col, base_date)
+                
+                if item_name in ['Structured CDs', 'Wholesale CDs', 'Equity', 
+                                'Brokered Uncommitted', 'ISV', 'Innovation Banking', 'Other (CIB)']:
+                    row_data[item_name] = -diff
+                else:
+                    assumption_val = self._get_assumption(assumptions_df, item_name)
+                    row_data[item_name] = -diff * (1 - assumption_val)
+            
+            row_data['Affiliate'] = 0.0
+            row_data['Corp'] = 0.0
+            row_data['NBFI'] = 0.0
+            row_data['Banks'] = 0.0
+            
+            row_data['Operational'] = self.processor.calculate_sumifs(
+                liquidity_df, date_col, base_date, 'Level_3', 'Operational'
+            ) * (1 - self._get_assumption(assumptions_df, 'Corp Operational'))
+            
+            row_data['Non-Operational'] = self.processor.calculate_sumifs(
+                liquidity_df, date_col, base_date, 'Level_3', 'Non-Operational'
+            ) * (1 - self._get_assumption(assumptions_df, 'Corp Non Operational'))
+            
+            liability_total = sum(v for k, v in row_data.items() if k != 'Date')
+            row_data['Liability Impact'] = liability_total
+            results.append(row_data)
+        
+        return pl.DataFrame(results)
+    
+    def _calculate_facility_impact(self, liquidity_df: pl.DataFrame, assumptions_df: pl.DataFrame,
+                                   date_columns: List[str], base_date: str) -> pl.DataFrame:
+        results = []
+        
+        for date_col in date_columns:
+            row_data = {'Date': date_col}
+            
+            row_data['Credit'] = self.processor.calculate_sumifs(
+                liquidity_df, date_col, base_date, 'Level_2', 'Credit'
+            ) * -0.05
+            
+            row_data['Liquidity'] = self.processor.calculate_sumifs(
+                liquidity_df, date_col, base_date, 'Level_2', 'Liquidity'
+            ) * -0.05
+            
+            for item_name, row_indices in self.config.facility_row_mappings.items():
+                diff = self.processor.calculate_row_range_diff(liquidity_df, row_indices, date_col, base_date)
+                row_data[item_name] = diff * -0.05
+            
+            facility_total = sum(v for k, v in row_data.items() if k != 'Date')
+            row_data['Comitted Facility Impact'] = facility_total
+            results.append(row_data)
+        
+        return pl.DataFrame(results)
+    
+    def _calculate_us_ilm_summary(self, asset_df: pl.DataFrame, liability_df: pl.DataFrame,
+                                  facility_df: pl.DataFrame, date_columns: List[str]) -> pl.DataFrame:
+        results = []
+        cumulative = 0
+        
+        for i, date_col in enumerate(date_columns):
+            asset_val = asset_df.filter(pl.col('Date') == date_col).select('Asset Impact')[0, 0]
+            liability_val = liability_df.filter(pl.col('Date') == date_col).select('Liability Impact')[0, 0]
+            facility_val = facility_df.filter(pl.col('Date') == date_col).select('Comitted Facility Impact')[0, 0]
+            
+            cumulative += asset_val + liability_val + facility_val
+            results.append({'Date': date_col, 'US ILM December': cumulative})
+        
+        return pl.DataFrame(results)
+
+
+src/gemini_liquidity_models/liquidity_impact_calculation/model.py
+
+import polars as pl
+from typing import Dict, List, Optional
+from .calculation_engine import LiquidityCalculator
+from .calculation_config import CalculationConfig
+
+class LiquidityImpactCalculation:
+    
+    def __init__(self, config: Optional[CalculationConfig] = None):
+        self.config = config or CalculationConfig.get_default_config()
+        self.calculator = LiquidityCalculator(self.config)
+    
+    def calculate(self, liquidity_data: pl.DataFrame, assumptions_data: pl.DataFrame,
+                 date_columns: List[str], base_date: str = '31-Dec-24') -> Dict[str, pl.DataFrame]:
+        
+        return self.calculator.calculate_impacts(
+            liquidity_data, assumptions_data, date_columns, base_date
+        )
+    
+    def get_formatted_output(self, calculation_results: Dict[str, pl.DataFrame]) -> Dict[str, pl.DataFrame]:
+        return {
+            'Assets': calculation_results['asset'],
+            'Liabilities': calculation_results['liability'],
+            'Committed Facilities': calculation_results['facility'],
+            'US ILM Summary': calculation_results['summary']
+        }
+
+main.py
+
+import sys
+from pathlib import Path
+
+sys.path.append(str(Path(__file__).parent))
+
+from src.gemini_liquidity_models.liquidity_impact_calculation import LiquidityImpactCalculation
+from utils import ExcelReader, ExcelWriter
+
+def main():
+    input_file = r"path/to/your/excel/file.xlsx"
+    output_file = input_file
+    
+    reader = ExcelReader()
+    liquidity_data, date_columns = reader.read_sheet(
+        file_path=input_file,
+        sheet_name="Liquidity Input",
+        header_row=1
+    )
+    
+    assumptions_data = reader.read_assumptions(
+        file_path=input_file,
+        sheet_name="US ILM ILM Assumptions"
+    )
+    
+    model = LiquidityImpactCalculation()
+    
+    results = model.calculate(
+        liquidity_data=liquidity_data,
+        assumptions_data=assumptions_data,
+        date_columns=date_columns,
+        base_date='31-Dec-24'
+    )
+    
+    formatted_results = model.get_formatted_output(results)
+    
+    writer = ExcelWriter()
+    writer.write_output(
+        file_path=output_file,
+        sheet_name="US ILM + ILM",
+        data_dict=formatted_results,
+        date_columns=date_columns,
+        bold_rows=['Asset Impact', 'Liability Impact', 'Comitted Facility Impact', 'US ILM December']
+    )
+    
+    print(f"Calculation completed. Results saved to sheet 'US ILM + ILM'")
+    
+    for section_name, section_df in formatted_results.items():
+        print(f"\n{section_name}:")
+        print(section_df.head())
+
+if __name__ == "__main__":
+    main()
+
+
+tests/conftest.py
+
+import pytest
+import polars as pl
+from typing import List
+from src.gemini_liquidity_models.liquidity_impact_calculation.calculation_config import CalculationConfig
+
+@pytest.fixture
+def sample_liquidity_data():
+    data = {
+        'Balance_sheet': ['Asset'] * 300,
+        'Business': ['IWPB'] * 100 + ['CIB'] * 100 + ['MKTY'] * 100,
+        'Level_1': ['Premier'] * 20 + ['Private Banking'] * 5 + ['CIB'] * 175 + ['MKTY'] * 100,
+        'Level_2': ['Credit'] * 50 + ['Liquidity'] * 50 + ['Other'] * 200,
+        'Level_3': ['Operational'] * 100 + ['Non-Operational'] * 100 + ['Other'] * 100,
+        '31-Dec-24': [100.0] * 300,
+        '7-Jan-25': [110.0] * 300,
+        '14-Jan-25': [120.0] * 300,
+        '21-Jan-25': [130.0] * 300,
+        '28-Jan-25': [140.0] * 300,
+    }
+    return pl.DataFrame(data)
+
+@pytest.fixture
+def sample_assumptions_data():
+    data = {
+        'Description': [
+            'UST HTM', 'Level 1 MBS HTM', 'Level 1 Other HTM',
+            'Level 2A MBS HTM', 'Level 2A Other HTM', 'UST AFS',
+            'Level 1 MBS AFS', 'Level 1 Other AFS', 'Level 2A MBS AFS',
+            'Level 2A Other AFS', 'Equities', 'IWPB Premier',
+            'PB Personal', 'PB Commercial Financial', 'PB Commercial Non Financial',
+            'PB Other', 'Corp Operational', 'Corp Non Operational',
+            'NBFI Operational', 'NBFI Non Operational', 'Banks Operational',
+            'Banks Non Operational', 'SME', 'Other (GPS)', 'Brokered Committed'
+        ],
+        'US_ILM': [
+            0.0273, 0.018, 0.05, 0.014, 0.05, 0.0009,
+            0.0071, 0.002, 0.0055, 0.01, 0.15, 0.125,
+            0.10, 0.325, 1.0, 0.10, 0.175, 0.318,
+            0.25, 1.0, 0.25, 1.0, 0.20, 0.40, 0.20
+        ],
+        'ILM': [0.0] * 25
+    }
+    return pl.DataFrame(data)
+
+@pytest.fixture
+def date_columns():
+    return ['7-Jan-25', '14-Jan-25', '21-Jan-25', '28-Jan-25']
+
+@pytest.fixture
+def default_config():
+    return CalculationConfig.get_default_config()
+
+
+
+tests/test_data_utils.py
+import pytest
+import polars as pl
+from utils.data_utils import DataProcessor
+
+class TestDataProcessor:
+    
+    def test_get_value_by_key(self, sample_assumptions_data):
+        processor = DataProcessor()
+        
+        value = processor.get_value_by_key(
+            sample_assumptions_data, 'Description', 'UST HTM', 'US_ILM'
+        )
+        assert value == 0.0273
+        
+        value = processor.get_value_by_key(
+            sample_assumptions_data, 'Description', 'NonExistent', 'US_ILM'
+        )
+        assert value == 0.0
+    
+    def test_calculate_row_range_diff(self, sample_liquidity_data):
+        processor = DataProcessor()
+        
+        diff = processor.calculate_row_range_diff(
+            sample_liquidity_data,
+            row_indices=[0, 1, 2],
+            date_col='7-Jan-25',
+            base_col='31-Dec-24'
+        )
+        assert diff == 30.0
+        
+        diff = processor.calculate_row_range_diff(
+            sample_liquidity_data,
+            row_indices=[],
+            date_col='7-Jan-25',
+            base_col='31-Dec-24'
+        )
+        assert diff == 0.0
+    
+    def test_calculate_sumifs(self, sample_liquidity_data):
+        processor = DataProcessor()
+        
+        diff = processor.calculate_sumifs(
+            sample_liquidity_data,
+            date_col='7-Jan-25',
+            base_col='31-Dec-24',
+            filter_column='Level_3',
+            filter_value='Operational'
+        )
+        assert diff == 1000.0
+        
+        diff = processor.calculate_sumifs(
+            sample_liquidity_data,
+            date_col='7-Jan-25',
+            base_col='31-Dec-24',
+            filter_column='Level_3',
+            filter_value='NonExistent'
+        )
+        assert diff == 0.0
+
+
+tests/test_calculation_config.py
+
+import pytest
+from src.gemini_liquidity_models.liquidity_impact_calculation.calculation_config import CalculationConfig
+
+class TestCalculationConfig:
+    
+    def test_default_config_creation(self):
+        config = CalculationConfig.get_default_config()
+        
+        assert isinstance(config.asset_row_mappings, dict)
+        assert isinstance(config.liability_row_mappings, dict)
+        assert isinstance(config.facility_row_mappings, dict)
+        assert isinstance(config.assumption_mappings, dict)
+        
+        assert 'IWPB Premier' in config.asset_row_mappings
+        assert config.asset_row_mappings['IWPB Premier'] == list(range(5, 21))
+        
+        assert 'IWPB - Premier' in config.liability_row_mappings
+        assert config.liability_row_mappings['IWPB - Premier'] == [100]
+        
+        assert 'Mortgage commitments' in config.facility_row_mappings
+        assert config.facility_row_mappings['Mortgage commitments'] == [250]
+        
+        assert 'UST HTM' in config.assumption_mappings
+        assert config.assumption_mappings['UST HTM'] == 'UST HTM'
+    
+    def test_custom_config_creation(self):
+        custom_config = CalculationConfig(
+            asset_row_mappings={'Test Asset': [1, 2, 3]},
+            liability_row_mappings={'Test Liability': [4, 5]},
+            facility_row_mappings={'Test Facility': [6]},
+            assumption_mappings={'Test': 'Test Mapping'}
+        )
+        
+        assert custom_config.asset_row_mappings['Test Asset'] == [1, 2, 3]
+        assert custom_config.liability_row_mappings['Test Liability'] == [4, 5]
+        assert custom_config.facility_row_mappings['Test Facility'] == [6]
+        assert custom_config.assumption_mappings['Test'] == 'Test Mapping'
+
+
+
+tests/test_calculation_engine.py
+
+import pytest
+import polars as pl
+from src.gemini_liquidity_models.liquidity_impact_calculation.calculation_engine import LiquidityCalculator
+from src.gemini_liquidity_models.liquidity_impact_calculation.calculation_config import CalculationConfig
+
+class TestLiquidityCalculator:
+    
+    def test_initialization(self, default_config):
+        calculator = LiquidityCalculator(default_config)
+        assert calculator.config == default_config
+        assert calculator.processor is not None
+    
+    def test_calculate_impacts(self, sample_liquidity_data, sample_assumptions_data, 
+                              date_columns, default_config):
+        calculator = LiquidityCalculator(default_config)
+        
+        results = calculator.calculate_impacts(
+            sample_liquidity_data,
+            sample_assumptions_data,
+            date_columns,
+            '31-Dec-24'
+        )
+        
+        assert 'asset' in results
+        assert 'liability' in results
+        assert 'facility' in results
+        assert 'summary' in results
+        
+        assert isinstance(results['asset'], pl.DataFrame)
+        assert isinstance(results['liability'], pl.DataFrame)
+        assert isinstance(results['facility'], pl.DataFrame)
+        assert isinstance(results['summary'], pl.DataFrame)
+        
+        assert len(results['asset']) == len(date_columns)
+        assert len(results['liability']) == len(date_columns)
+        assert len(results['facility']) == len(date_columns)
+        assert len(results['summary']) == len(date_columns)
+        
+        assert 'Asset Impact' in results['asset'].columns
+        assert 'Liability Impact' in results['liability'].columns
+        assert 'Comitted Facility Impact' in results['facility'].columns
+        assert 'US ILM December' in results['summary'].columns
+    
+    def test_get_assumption(self, sample_assumptions_data, default_config):
+        calculator = LiquidityCalculator(default_config)
+        
+        value = calculator._get_assumption(sample_assumptions_data, 'UST HTM')
+        assert value == 0.0273
+        
+        value = calculator._get_assumption(sample_assumptions_data, 'IWPB - Premier')
+        assert value == 0.125
+    
+    def test_calculate_asset_impact(self, sample_liquidity_data, sample_assumptions_data,
+                                   date_columns, default_config):
+        calculator = LiquidityCalculator(default_config)
+        
+        asset_impact = calculator._calculate_asset_impact(
+            sample_liquidity_data,
+            sample_assumptions_data,
+            date_columns,
+            '31-Dec-24'
+        )
+        
+        assert isinstance(asset_impact, pl.DataFrame)
+        assert len(asset_impact) == len(date_columns)
+        assert 'Date' in asset_impact.columns
+        assert 'Asset Impact' in asset_impact.columns
+        
+        for col in ['IWPB Premier', 'UST HTM', 'Illiquid']:
+            assert col in asset_impact.columns
+    
+    def test_calculate_liability_impact(self, sample_liquidity_data, sample_assumptions_data,
+                                       date_columns, default_config):
+        calculator = LiquidityCalculator(default_config)
+        
+        liability_impact = calculator._calculate_liability_impact(
+            sample_liquidity_data,
+            sample_assumptions_data,
+            date_columns,
+            '31-Dec-24'
+        )
+        
+        assert isinstance(liability_impact, pl.DataFrame)
+        assert len(liability_impact) == len(date_columns)
+        assert 'Date' in liability_impact.columns
+        assert 'Liability Impact' in liability_impact.columns
+        
+        for col in ['IWPB - Premier', 'Affiliate', 'Corp']:
+            assert col in liability_impact.columns
+    
+    def test_calculate_facility_impact(self, sample_liquidity_data, sample_assumptions_data,
+                                      date_columns, default_config):
+        calculator = LiquidityCalculator(default_config)
+        
+        facility_impact = calculator._calculate_facility_impact(
+            sample_liquidity_data,
+            sample_assumptions_data,
+            date_columns,
+            '31-Dec-24'
+        )
+        
+        assert isinstance(facility_impact, pl.DataFrame)
+        assert len(facility_impact) == len(date_columns)
+        assert 'Date' in facility_impact.columns
+        assert 'Comitted Facility Impact' in facility_impact.columns
+        
+        for col in ['Credit', 'Liquidity']:
+            assert col in facility_impact.columns
+    
+    def test_calculate_us_ilm_summary(self, date_columns, default_config):
+        calculator = LiquidityCalculator(default_config)
+        
+        asset_data = {
+            'Date': date_columns,
+            'Asset Impact': [100.0, 110.0, 120.0, 130.0]
+        }
+        liability_data = {
+            'Date': date_columns,
+            'Liability Impact': [50.0, 55.0, 60.0, 65.0]
+        }
+        facility_data = {
+            'Date': date_columns,
+            'Comitted Facility Impact': [10.0, 11.0, 12.0, 13.0]
+        }
+        
+        asset_df = pl.DataFrame(asset_data)
+        liability_df = pl.DataFrame(liability_data)
+        facility_df = pl.DataFrame(facility_data)
+        
+        summary = calculator._calculate_us_ilm_summary(
+            asset_df, liability_df, facility_df, date_columns
+        )
+        
+        assert isinstance(summary, pl.DataFrame)
+        assert len(summary) == len(date_columns)
+        assert 'Date' in summary.columns
+        assert 'US ILM December' in summary.columns
+        
+        expected_cumulative = [160.0, 336.0, 528.0, 736.0]
+        actual_values = summary['US ILM December'].to_list()
+        assert actual_values == expected_cumulative
+
+
+
+tests/test_model.py
+import pytest
+import polars as pl
+from src.gemini_liquidity_models.liquidity_impact_calculation import LiquidityImpactCalculation
+from src.gemini_liquidity_models.liquidity_impact_calculation.calculation_config import CalculationConfig
+
+class TestLiquidityImpactCalculation:
+    
+    def test_initialization_with_default_config(self):
+        model = LiquidityImpactCalculation()
+        
+        assert model.config is not None
+        assert isinstance(model.config, CalculationConfig)
+        assert model.calculator is not None
+    
+    def test_initialization_with_custom_config(self):
+        custom_config = CalculationConfig(
+            asset_row_mappings={'Test': [1, 2]},
+            liability_row_mappings={'Test': [3, 4]},
+            facility_row_mappings={'Test': [5]},
+            assumption_mappings={'Test': 'Test'}
+        )
+        
+        model = LiquidityImpactCalculation(config=custom_config)
+        assert model.config == custom_config
+    
+    def test_calculate(self, sample_liquidity_data, sample_assumptions_data, date_columns):
+        model = LiquidityImpactCalculation()
+        
+        results = model.calculate(
+            liquidity_data=sample_liquidity_data,
+            assumptions_data=sample_assumptions_data,
+            date_columns=date_columns,
+            base_date='31-Dec-24'
+        )
+        
+        assert isinstance(results, dict)
+        assert 'asset' in results
+        assert 'liability' in results
+        assert 'facility' in results
+        assert 'summary' in results
+        
+        for key in results:
+            assert isinstance(results[key], pl.DataFrame)
+    
+    def test_get_formatted_output(self, sample_liquidity_data, sample_assumptions_data, date_columns):
+        model = LiquidityImpactCalculation()
+        
+        results = model.calculate(
+            liquidity_data=sample_liquidity_data,
+            assumptions_data=sample_assumptions_data,
+            date_columns=date_columns
+        )
+        
+        formatted = model.get_formatted_output(results)
+        
+        assert isinstance(formatted, dict)
+        assert 'Assets' in formatted
+        assert 'Liabilities' in formatted
+        assert 'Committed Facilities' in formatted
+        assert 'US ILM Summary' in formatted
+        
+        assert formatted['Assets'].equals(results['asset'])
+        assert formatted['Liabilities'].equals(results['liability'])
+        assert formatted['Committed Facilities'].equals(results['facility'])
+        assert formatted['US ILM Summary'].equals(results['summary'])
+
+
+
+tests/test_excel_utils.py
+
+import pytest
+import polars as pl
+import tempfile
+import os
+from openpyxl import Workbook
+from datetime import datetime
+from utils.excel_utils import ExcelReader, ExcelWriter
+
+class TestExcelReader:
+    
+    def test_read_sheet(self):
+        with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as tmp:
+            wb = Workbook()
+            ws = wb.active
+            ws.title = "Test Sheet"
+            
+            ws['A2'] = 'Column1'
+            ws['B2'] = 'Column2'
+            ws['C2'] = datetime(2025, 1, 7)
+            ws['D2'] = datetime(2025, 1, 14)
+            
+            ws['A3'] = 'Value1'
+            ws['B3'] = 'Value2'
+            ws['C3'] = 100.0
+            ws['D3'] = 110.0
+            
+            ws['A4'] = 'Value3'
+            ws['B4'] = 'Value4'
+            ws['C4'] = 200.0
+            ws['D4'] = 220.0
+            
+            wb.save(tmp.name)
+            
+            reader = ExcelReader()
+            df, date_columns = reader.read_sheet(tmp.name, 'Test Sheet', header_row=1)
+            
+            assert isinstance(df, pl.DataFrame)
+            assert len(df) == 2
+            assert len(date_columns) == 2
+            assert '07-Jan-25' in date_columns
+            assert '14-Jan-25' in date_columns
+            
+            assert df['Column1'].to_list() == ['Value1', 'Value3']
+            assert df['Column2'].to_list() == ['Value2', 'Value4']
+            
+            os.unlink(tmp.name)
+    
+    def test_read_assumptions(self):
+        with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as tmp:
+            wb = Workbook()
+            ws = wb.active
+            ws.title = "Assumptions"
+            
+            ws['B2'] = 'Description'
+            ws['C2'] = 'US_ILM'
+            ws['D2'] = 'ILM'
+            
+            ws['B3'] = 'UST HTM'
+            ws['C3'] = '2.73%'
+            ws['D3'] = None
+            
+            ws['B4'] = 'Level 1 MBS HTM'
+            ws['C4'] = 0.018
+            ws['D4'] = 0.0
+            
+            wb.save(tmp.name)
+            
+            reader = ExcelReader()
+            df = reader.read_assumptions(tmp.name, 'Assumptions')
+            
+            assert isinstance(df, pl.DataFrame)
+            assert len(df) == 2
+            assert df['Description'].to_list() == ['UST HTM', 'Level 1 MBS HTM']
+            assert abs(df['US_ILM'][0] - 0.0273) < 0.0001
+            assert df['US_ILM'][1] == 0.018
+            
+            os.unlink(tmp.name)
+
+class TestExcelWriter:
+    
+    def test_write_output(self):
+        with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as tmp:
+            wb = Workbook()
+            wb.save(tmp.name)
+            
+            data_dict = {
+                'Test Section': pl.DataFrame({
+                    'Date': ['07-Jan-25', '14-Jan-25'],
+                    'Item1': [100.0, 110.0],
+                    'Item2': [200.0, 220.0],
+                    'Total': [300.0, 330.0]
+                })
+            }
+            
+            date_columns = ['07-Jan-25', '14-Jan-25']
+            bold_rows = ['Total']
+            
+            writer = ExcelWriter()
+            writer.write_output(tmp.name, 'Output Sheet', data_dict, date_columns, bold_rows)
+            
+            wb = Workbook()
+            wb = load_workbook(tmp.name)
+            assert 'Output Sheet' in wb.sheetnames
+            
+            ws = wb['Output Sheet']
+            assert ws['C2'].value == '07-Jan-25'
+            assert ws['D2'].value == '14-Jan-25'
+            assert ws['B3'].value == 'Item1'
+            assert ws['B4'].value == 'Item2'
+            assert ws['B5'].value == 'Total'
+            
+            os.unlink(tmp.name)
+
+
+tests/test_integration.py
+import pytest
+import polars as pl
+from src.gemini_liquidity_models.liquidity_impact_calculation import LiquidityImpactCalculation
+
+class TestIntegration:
+    
+    def test_full_workflow(self, sample_liquidity_data, sample_assumptions_data, date_columns):
+        model = LiquidityImpactCalculation()
+        
+        results = model.calculate(
+            liquidity_data=sample_liquidity_data,
+            assumptions_data=sample_assumptions_data,
+            date_columns=date_columns,
+            base_date='31-Dec-24'
+        )
+        
+        formatted_output = model.get_formatted_output(results)
+        
+        assert len(formatted_output) == 4
+        
+        for section_name, section_df in formatted_output.items():
+            assert isinstance(section_df, pl.DataFrame)
+            assert len(section_df) > 0
+            assert 'Date' in section_df.columns
+        
+        assert 'Asset Impact' in formatted_output['Assets'].columns
+        assert 'Liability Impact' in formatted_output['Liabilities'].columns
+        assert 'Comitted Facility Impact' in formatted_output['Committed Facilities'].columns
+        assert 'US ILM December' in formatted_output['US ILM Summary'].columns
+    
+    def test_empty_data_handling(self):
+        model = LiquidityImpactCalculation()
+        
+        empty_liquidity = pl.DataFrame({
+            'Balance_sheet': [],
+            'Business': [],
+            'Level_1': [],
+            'Level_2': [],
+            'Level_3': [],
+            '31-Dec-24': [],
+            '07-Jan-25': []
+        })
+        
+        empty_assumptions = pl.DataFrame({
+            'Description': [],
+            'US_ILM': [],
+            'ILM': []
+        })
+        
+        results = model.calculate(
+            liquidity_data=empty_liquidity,
+            assumptions_data=empty_assumptions,
+            date_columns=['07-Jan-25'],
+            base_date='31-Dec-24'
+        )
+        
+        assert all(len(df) == 1 for df in results.values())
+    
+    def test_single_date_column(self, sample_liquidity_data, sample_assumptions_data):
+        model = LiquidityImpactCalculation()
+        
+        results = model.calculate(
+            liquidity_data=sample_liquidity_data,
+            assumptions_data=sample_assumptions_data,
+            date_columns=['07-Jan-25'],
+            base_date='31-Dec-24'
+        )
+        
+        assert all(len(df) == 1 for df in results.values())
+        
+        for key in ['asset', 'liability', 'facility', 'summary']:
+            assert results[key]['Date'][0] == '07-Jan-25'
+
+
+
