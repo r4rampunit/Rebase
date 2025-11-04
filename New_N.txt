@@ -1,0 +1,351 @@
+src/gemini_liquidity_models/liquidity_impact_calculation/calculation_config.py
+
+from dataclasses import dataclass
+from typing import Dict, List
+
+@dataclass
+class CalculationConfig:
+    asset_row_mappings: Dict[str, List[int]]
+    liability_row_mappings: Dict[str, List[int]]
+    facility_row_mappings: Dict[str, List[int]]
+    assumption_row_mappings: Dict[str, int]  # Direct row mapping for assumptions
+    
+    @classmethod
+    def get_default_config(cls):
+        return cls(
+            asset_row_mappings={
+                'IWPB Premier': list(range(5, 21)),  # Excel rows 6-21 = Python 5-20
+                'IWPB Private Banking': list(range(22, 25)),  # Excel rows 23-25
+                'CIB Loans': list(range(26, 47)),  # Excel rows 27-47
+                'UST HTM': [54],  # Excel row 55
+                'Level 1 MBS HTM': [53],  # Excel row 54
+                'Level 1 Other HTM': [55],  # Excel row 56
+                'Level 2A MBS - HTM': [57],  # Excel row 58
+                'Level 2A Other HTM': [58],  # Excel row 59
+                'UST AFS': [63],  # Excel row 64
+                'Level 1 MBS AFS': [62],  # Excel row 63
+                'Level 1 Other - AFS': [64],  # Excel row 65
+                'Level 2A- MBS - AFS': [66],  # Excel row 67
+                'Level 2A- Other AFS': [67],  # Excel row 68
+                'Liquid Equities': [86],  # Excel row 87
+                'Illiquid Trading Assets': [90],  # Excel row 91
+                'MSS - Loans': [94]  # Excel row 95
+            },
+            liability_row_mappings={
+                'IWPB - Premier': [100],  # Excel row 101
+                'PB - Personal': [108],  # Excel row 109
+                'PB Commercial - Financial': [113],  # Excel row 114
+                'PB Commercial - Non Financial': [118],  # Excel row 119
+                'PB - Other': [123],  # Excel row 124
+                'SME': [202],  # Excel row 203
+                'Other (GPS)': [208],  # Excel row 209
+                'Brokered Committed': [213],  # Excel row 214
+                'Brokered Uncommitted': [214],  # Excel row 215
+                'ISV': [215],  # Excel row 216
+                'Innovation Banking': [218],  # Excel row 219
+                'Other (CIB)': [221],  # Excel row 222
+                'Structured CDs': [130],  # Excel row 131
+                'Wholesale CDs': [139],  # Excel row 140
+                'Equity': [225]  # Excel row 226
+            },
+            facility_row_mappings={
+                'Mortgage commitments': [250],  # Excel row 251
+                'Retail commitments': [253]  # Excel row 254
+            },
+            assumption_row_mappings={
+                'UST HTM': 2,  # C3 in Excel = row index 2
+                'Level 1 MBS HTM': 3,  # C4
+                'Level 1 Other HTM': 4,  # C5
+                'Level 2A MBS - HTM': 5,  # C6
+                'Level 2A Other HTM': 6,  # C7
+                'Illiquid': 7,  # C8
+                'UST AFS': 8,  # C9
+                'Level 1 MBS AFS': 9,  # C10
+                'Level 1 Other - AFS': 10,  # C11
+                'Level 2A- MBS - AFS': 11,  # C12
+                'Level 2A- Other AFS': 12,  # C13
+                'Liquid Equities': 13,  # C14
+                'IWPB - Premier': 15,  # C16
+                'PB - Personal': 16,  # C17
+                'PB Commercial - Financial': 17,  # C18
+                'PB Commercial - Non Financial': 18,  # C19
+                'PB - Other': 19,  # C20
+                'Corp Operational': 20,  # C21
+                'Corp Non Operational': 21,  # C22
+                'NBFI Operational': 22,  # C23
+                'NBFI Non Operational': 23,  # C24
+                'Banks Operational': 24,  # C25
+                'Banks Non Operational': 25,  # C26
+                'SME': 26,  # C27
+                'Other (GPS)': 27,  # C28
+                'Brokered Committed': 28,  # C29
+                'Brokered Uncommitted': 29,  # C30
+                'ISV': 30,  # C31
+                'Innovation Banking': 31,  # C32
+                'Other (CIB)': 32,  # C33
+                'Credit1': 34,  # C35
+                'Liquidity1': 35,  # C36
+                'Credit2': 36,  # C37
+                'Liquidity2': 37,  # C38
+                'Credit3': 38,  # C39
+                'Liquidity3': 39,  # C40
+                'Mortgage commitments': 40,  # C41
+                'Retail commitments': 41  # C42
+            }
+        )
+
+
+
+src/gemini_liquidity_models/liquidity_impact_calculation/calculation_engine.py
+
+import polars as pl
+from typing import Dict, List, Tuple
+from utils.data_utils import DataProcessor
+
+class LiquidityCalculator:
+    
+    def __init__(self, config: 'CalculationConfig'):
+        self.config = config
+        self.processor = DataProcessor()
+    
+    def calculate_impacts(self, liquidity_df: pl.DataFrame, assumptions_df: pl.DataFrame,
+                         date_columns: List[str], base_date: str = '31-Dec-24') -> Dict[str, pl.DataFrame]:
+        
+        asset_impact = self._calculate_asset_impact(liquidity_df, assumptions_df, date_columns, base_date)
+        liability_impact = self._calculate_liability_impact(liquidity_df, assumptions_df, date_columns, base_date)
+        facility_impact = self._calculate_facility_impact(liquidity_df, assumptions_df, date_columns, base_date)
+        us_ilm_summary = self._calculate_us_ilm_summary(asset_impact, liability_impact, facility_impact, date_columns)
+        
+        return {
+            'asset': asset_impact,
+            'liability': liability_impact,
+            'facility': facility_impact,
+            'summary': us_ilm_summary
+        }
+    
+    def _get_assumption_by_row(self, assumptions_df: pl.DataFrame, row_index: int) -> float:
+        try:
+            if row_index < len(assumptions_df):
+                return float(assumptions_df.row(row_index, named=True)['US_ILM'])
+            return 0.0
+        except:
+            return 0.0
+    
+    def _calculate_asset_impact(self, liquidity_df: pl.DataFrame, assumptions_df: pl.DataFrame,
+                                date_columns: List[str], base_date: str) -> pl.DataFrame:
+        results = []
+        
+        for date_col in date_columns:
+            row_data = {'Date': date_col}
+            
+            # Direct calculations for sum ranges
+            row_data['IWPB Premier'] = -self.processor.calculate_row_range_diff(
+                liquidity_df, self.config.asset_row_mappings['IWPB Premier'], date_col, base_date
+            )
+            row_data['IWPB Private Banking'] = -self.processor.calculate_row_range_diff(
+                liquidity_df, self.config.asset_row_mappings['IWPB Private Banking'], date_col, base_date
+            )
+            row_data['CIB Loans'] = -self.processor.calculate_row_range_diff(
+                liquidity_df, self.config.asset_row_mappings['CIB Loans'], date_col, base_date
+            )
+            
+            # HTM calculations with assumptions
+            row_data['UST HTM'] = self.processor.calculate_row_range_diff(
+                liquidity_df, self.config.asset_row_mappings['UST HTM'], date_col, base_date
+            ) * -self._get_assumption_by_row(assumptions_df, self.config.assumption_row_mappings['UST HTM'])
+            
+            row_data['Level 1 MBS HTM'] = self.processor.calculate_row_range_diff(
+                liquidity_df, self.config.asset_row_mappings['Level 1 MBS HTM'], date_col, base_date
+            ) * -self._get_assumption_by_row(assumptions_df, self.config.assumption_row_mappings['Level 1 MBS HTM'])
+            
+            row_data['Level 1 Other HTM'] = self.processor.calculate_row_range_diff(
+                liquidity_df, self.config.asset_row_mappings['Level 1 Other HTM'], date_col, base_date
+            ) * -self._get_assumption_by_row(assumptions_df, self.config.assumption_row_mappings['Level 2A MBS - HTM'])
+            
+            row_data['Level 2A MBS - HTM'] = self.processor.calculate_row_range_diff(
+                liquidity_df, self.config.asset_row_mappings['Level 2A MBS - HTM'], date_col, base_date
+            ) * -self._get_assumption_by_row(assumptions_df, self.config.assumption_row_mappings['Level 2A MBS - HTM'])
+            
+            row_data['Level 2A Other HTM'] = self.processor.calculate_row_range_diff(
+                liquidity_df, self.config.asset_row_mappings['Level 2A Other HTM'], date_col, base_date
+            ) * -self._get_assumption_by_row(assumptions_df, self.config.assumption_row_mappings['Level 2A Other HTM'])
+            
+            row_data['Illiquid'] = 0.0
+            
+            # AFS calculations with assumptions
+            row_data['UST AFS'] = self.processor.calculate_row_range_diff(
+                liquidity_df, self.config.asset_row_mappings['UST AFS'], date_col, base_date
+            ) * -self._get_assumption_by_row(assumptions_df, self.config.assumption_row_mappings['UST AFS'])
+            
+            row_data['Level 1 MBS AFS'] = self.processor.calculate_row_range_diff(
+                liquidity_df, self.config.asset_row_mappings['Level 1 MBS AFS'], date_col, base_date
+            ) * -self._get_assumption_by_row(assumptions_df, self.config.assumption_row_mappings['Level 1 MBS AFS'])
+            
+            row_data['Level 1 Other - AFS'] = self.processor.calculate_row_range_diff(
+                liquidity_df, self.config.asset_row_mappings['Level 1 Other - AFS'], date_col, base_date
+            ) * -self._get_assumption_by_row(assumptions_df, self.config.assumption_row_mappings['Level 1 Other - AFS'])
+            
+            row_data['Level 2A- MBS - AFS'] = self.processor.calculate_row_range_diff(
+                liquidity_df, self.config.asset_row_mappings['Level 2A- MBS - AFS'], date_col, base_date
+            ) * -self._get_assumption_by_row(assumptions_df, self.config.assumption_row_mappings['Level 2A- MBS - AFS'])
+            
+            row_data['Level 2A- Other AFS'] = self.processor.calculate_row_range_diff(
+                liquidity_df, self.config.asset_row_mappings['Level 2A- Other AFS'], date_col, base_date
+            ) * -self._get_assumption_by_row(assumptions_df, self.config.assumption_row_mappings['Level 2A- Other AFS'])
+            
+            row_data['Liquid Equities'] = self.processor.calculate_row_range_diff(
+                liquidity_df, self.config.asset_row_mappings['Liquid Equities'], date_col, base_date
+            ) * -self._get_assumption_by_row(assumptions_df, self.config.assumption_row_mappings['Liquid Equities'])
+            
+            row_data['Illiquid Trading Assets'] = -self.processor.calculate_row_range_diff(
+                liquidity_df, self.config.asset_row_mappings['Illiquid Trading Assets'], date_col, base_date
+            )
+            
+            row_data['MSS - Loans'] = -self.processor.calculate_row_range_diff(
+                liquidity_df, self.config.asset_row_mappings['MSS - Loans'], date_col, base_date
+            )
+            
+            row_data['Liquid Trading Assets'] = 0.0
+            
+            asset_total = sum(v for k, v in row_data.items() if k != 'Date')
+            row_data['Asset Impact'] = asset_total
+            results.append(row_data)
+        
+        return pl.DataFrame(results)
+    
+    def _calculate_liability_impact(self, liquidity_df: pl.DataFrame, assumptions_df: pl.DataFrame,
+                                   date_columns: List[str], base_date: str) -> pl.DataFrame:
+        results = []
+        
+        for date_col in date_columns:
+            row_data = {'Date': date_col}
+            
+            # Apply formulas with (1 - assumption) for most liabilities
+            row_data['IWPB - Premier'] = -self.processor.calculate_row_range_diff(
+                liquidity_df, self.config.liability_row_mappings['IWPB - Premier'], date_col, base_date
+            ) * (1 - self._get_assumption_by_row(assumptions_df, self.config.assumption_row_mappings['IWPB - Premier']))
+            
+            row_data['PB - Personal'] = -self.processor.calculate_row_range_diff(
+                liquidity_df, self.config.liability_row_mappings['PB - Personal'], date_col, base_date
+            ) * (1 - self._get_assumption_by_row(assumptions_df, self.config.assumption_row_mappings['PB - Personal']))
+            
+            row_data['PB Commercial - Financial'] = -self.processor.calculate_row_range_diff(
+                liquidity_df, self.config.liability_row_mappings['PB Commercial - Financial'], date_col, base_date
+            ) * (1 - self._get_assumption_by_row(assumptions_df, self.config.assumption_row_mappings['PB Commercial - Financial']))
+            
+            row_data['PB Commercial - Non Financial'] = -self.processor.calculate_row_range_diff(
+                liquidity_df, self.config.liability_row_mappings['PB Commercial - Non Financial'], date_col, base_date
+            ) * (1 - self._get_assumption_by_row(assumptions_df, self.config.assumption_row_mappings['PB Commercial - Non Financial']))
+            
+            row_data['PB - Other'] = -self.processor.calculate_row_range_diff(
+                liquidity_df, self.config.liability_row_mappings['PB - Other'], date_col, base_date
+            ) * (1 - self._get_assumption_by_row(assumptions_df, self.config.assumption_row_mappings['PB - Other']))
+            
+            row_data['Affiliate'] = 0.0
+            row_data['Corp'] = 0.0
+            
+            # SUMIFS calculations - these would need actual filtering logic
+            row_data['Operational'] = 0.0  # Placeholder for SUMIFS logic
+            row_data['Non-Operational'] = 0.0  # Placeholder for SUMIFS logic
+            
+            row_data['NBFI'] = 0.0
+            row_data['Operational '] = 0.0  # Placeholder for SUMIFS logic  
+            row_data['Non-Operational '] = 0.0  # Placeholder for SUMIFS logic
+            
+            row_data['Banks'] = 0.0
+            row_data['Operational  '] = 0.0  # Placeholder for SUMIFS logic
+            row_data['Non-Operational  '] = 0.0  # Placeholder for SUMIFS logic
+            
+            row_data['SME'] = -self.processor.calculate_row_range_diff(
+                liquidity_df, self.config.liability_row_mappings['SME'], date_col, base_date
+            ) * (1 - self._get_assumption_by_row(assumptions_df, self.config.assumption_row_mappings['SME']))
+            
+            row_data['Other (GPS)'] = -self.processor.calculate_row_range_diff(
+                liquidity_df, self.config.liability_row_mappings['Other (GPS)'], date_col, base_date
+            ) * (1 - self._get_assumption_by_row(assumptions_df, self.config.assumption_row_mappings['Other (GPS)']))
+            
+            row_data['Brokered - Committed'] = -self.processor.calculate_row_range_diff(
+                liquidity_df, self.config.liability_row_mappings['Brokered Committed'], date_col, base_date
+            ) * (1 - self._get_assumption_by_row(assumptions_df, self.config.assumption_row_mappings['Brokered Committed']))
+            
+            row_data['Brokered - Uncommitted'] = -self.processor.calculate_row_range_diff(
+                liquidity_df, self.config.liability_row_mappings['Brokered Uncommitted'], date_col, base_date
+            ) * (1 - self._get_assumption_by_row(assumptions_df, self.config.assumption_row_mappings['Brokered Uncommitted']))
+            
+            row_data['ISV'] = -self.processor.calculate_row_range_diff(
+                liquidity_df, self.config.liability_row_mappings['ISV'], date_col, base_date
+            ) * (1 - self._get_assumption_by_row(assumptions_df, self.config.assumption_row_mappings['ISV']))
+            
+            row_data['Innovation Banking'] = -self.processor.calculate_row_range_diff(
+                liquidity_df, self.config.liability_row_mappings['Innovation Banking'], date_col, base_date
+            ) * (1 - self._get_assumption_by_row(assumptions_df, self.config.assumption_row_mappings['Innovation Banking']))
+            
+            row_data['Other (CIB)'] = -self.processor.calculate_row_range_diff(
+                liquidity_df, self.config.liability_row_mappings['Other (CIB)'], date_col, base_date
+            ) * (1 - self._get_assumption_by_row(assumptions_df, self.config.assumption_row_mappings['Other (CIB)']))
+            
+            # Direct calculations without assumptions
+            row_data['Structured CDs'] = -self.processor.calculate_row_range_diff(
+                liquidity_df, self.config.liability_row_mappings['Structured CDs'], date_col, base_date
+            )
+            
+            row_data['Wholesale CDs'] = -self.processor.calculate_row_range_diff(
+                liquidity_df, self.config.liability_row_mappings['Wholesale CDs'], date_col, base_date
+            )
+            
+            row_data['Equity'] = -self.processor.calculate_row_range_diff(
+                liquidity_df, self.config.liability_row_mappings['Equity'], date_col, base_date
+            )
+            
+            liability_total = sum(v for k, v in row_data.items() if k != 'Date')
+            row_data['Liability Impact'] = liability_total
+            results.append(row_data)
+        
+        return pl.DataFrame(results)
+    
+    def _calculate_facility_impact(self, liquidity_df: pl.DataFrame, assumptions_df: pl.DataFrame,
+                                   date_columns: List[str], base_date: str) -> pl.DataFrame:
+        results = []
+        
+        for date_col in date_columns:
+            row_data = {'Date': date_col}
+            
+            # Credit and Liquidity with assumptions from rows C35-C40
+            row_data['Credit'] = 0.0  # Placeholder for SUMIFS logic with assumption C35
+            row_data['Liquidity'] = 0.0  # Placeholder for SUMIFS logic with assumption C36
+            row_data['Credit '] = 0.0  # Placeholder for SUMIFS logic with assumption C37
+            row_data['Liquidity '] = 0.0  # Placeholder for SUMIFS logic with assumption C38
+            row_data['Credit  '] = 0.0  # Placeholder for SUMIFS logic with assumption C39
+            row_data['Liquidity  '] = 0.0  # Placeholder for SUMIFS logic with assumption C40
+            
+            row_data['Mortgage commitments'] = self.processor.calculate_row_range_diff(
+                liquidity_df, self.config.facility_row_mappings['Mortgage commitments'], date_col, base_date
+            ) * -self._get_assumption_by_row(assumptions_df, self.config.assumption_row_mappings['Mortgage commitments'])
+            
+            row_data['Retail commitments'] = self.processor.calculate_row_range_diff(
+                liquidity_df, self.config.facility_row_mappings['Retail commitments'], date_col, base_date
+            ) * -self._get_assumption_by_row(assumptions_df, self.config.assumption_row_mappings['Retail commitments'])
+            
+            facility_total = sum(v for k, v in row_data.items() if k != 'Date')
+            row_data['Comitted Facility Impact'] = facility_total
+            results.append(row_data)
+        
+        return pl.DataFrame(results)
+    
+    def _calculate_us_ilm_summary(self, asset_df: pl.DataFrame, liability_df: pl.DataFrame,
+                                  facility_df: pl.DataFrame, date_columns: List[str]) -> pl.DataFrame:
+        results = []
+        cumulative = 0
+        
+        for i, date_col in enumerate(date_columns):
+            asset_val = asset_df.filter(pl.col('Date') == date_col).select('Asset Impact')[0, 0]
+            liability_val = liability_df.filter(pl.col('Date') == date_col).select('Liability Impact')[0, 0]
+            facility_val = facility_df.filter(pl.col('Date') == date_col).select('Comitted Facility Impact')[0, 0]
+            
+            cumulative += asset_val + liability_val + facility_val
+            results.append({'Date': date_col, 'US ILM December': cumulative})
+        
+        return pl.DataFrame(results)
+
+
+
