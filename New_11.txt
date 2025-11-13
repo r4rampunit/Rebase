@@ -1,0 +1,141 @@
+utils/excel_utils.py (Fix column naming)
+@staticmethod
+def read_sheet(file_path: str, sheet_name: str, header_row: int = 2) -> Tuple[pl.DataFrame, List[str]]:
+    wb = load_workbook(file_path, data_only=True)
+    ws = wb[sheet_name]
+    
+    headers = []
+    date_columns = []
+    date_indices = []
+    
+    # Read headers from row 2
+    for idx, cell in enumerate(ws[header_row], start=0):
+        if cell.value:
+            if isinstance(cell.value, datetime):
+                col_name = cell.value.strftime('%d-%b-%y')
+                if idx >= 8:  # Column I onwards
+                    date_columns.append(col_name)
+                    date_indices.append(idx)
+                headers.append(col_name)
+            else:
+                # Keep original column names without replacing spaces
+                col_name = str(cell.value).strip()
+                headers.append(col_name)
+    
+    data = []
+    for row in ws.iter_rows(min_row=3, values_only=True):
+        if row and row[0] is not None:
+            row_dict = {}
+            for col_idx, value in enumerate(row[:len(headers)]):
+                if col_idx < len(headers):
+                    header = headers[col_idx]
+                    if value is None:
+                        value = 0.0 if col_idx in date_indices else ""
+                    elif col_idx in date_indices:
+                        if isinstance(value, (int, float)):
+                            value = float(value)
+                        else:
+                            try:
+                                value = float(str(value).replace(',', ''))
+                            except:
+                                value = 0.0
+                    else:
+                        value = str(value).strip() if value is not None else ""
+                    row_dict[header] = value
+            data.append(row_dict)
+    
+    wb.close()
+    
+    df = pl.DataFrame(data)
+    
+    for date_col in date_columns:
+        if date_col in df.columns:
+            df = df.with_columns(pl.col(date_col).cast(pl.Float64))
+    
+    if '31-Dec-24' in date_columns:
+        date_columns.remove('31-Dec-24')
+    
+    return df, date_columns
+utils/data_utils.py (Fix filtering)
+@staticmethod
+def calculate_sumifs_multi(df: pl.DataFrame, date_col: str, base_col: str,
+                          filter_column1: str, filter_value1: str,
+                          filter_column2: str, filter_value2: str) -> float:
+    try:
+        # Clean filter values
+        filter_value1 = str(filter_value1).strip()
+        filter_value2 = str(filter_value2).strip()
+        
+        # Apply filters - handle both string and non-string columns
+        filtered = df.filter(
+            (pl.col(filter_column1).cast(pl.Utf8).str.strip_chars() == filter_value1) &
+            (pl.col(filter_column2).cast(pl.Utf8).str.strip_chars() == filter_value2)
+        )
+        
+        if len(filtered) > 0:
+            date_sum = 0.0
+            base_sum = 0.0
+            
+            if date_col in filtered.columns:
+                date_sum = float(filtered.select(pl.col(date_col).sum())[0, 0] or 0)
+            if base_col in filtered.columns:
+                base_sum = float(filtered.select(pl.col(base_col).sum())[0, 0] or 0)
+            
+            return date_sum - base_sum
+        return 0.0
+    except Exception as e:
+        return 0.0
+src/gemini_liquidity_models/liquidity_impact_calculation/calculation_engine.py (Fix column references)
+def _calculate_liability_impact(self, liquidity_df: pl.DataFrame, assumptions_df: pl.DataFrame,
+                               date_columns: List[str], base_date: str) -> pl.DataFrame:
+    results = []
+    
+    for date_col in date_columns:
+        row_data = {'Date': date_col}
+        
+        # These are working correctly
+        row_data['IWPB - Premier'] = -self.processor.calculate_row_range_diff(
+            liquidity_df, self.config.liability_row_mappings['IWPB - Premier'], date_col, base_date
+        ) * (1 - self._get_assumption_by_index(assumptions_df, 'IWPB - Premier'))
+        
+        row_data['PB - Personal'] = -self.processor.calculate_row_range_diff(
+            liquidity_df, self.config.liability_row_mappings['PB - Personal'], date_col, base_date
+        ) * (1 - self._get_assumption_by_index(assumptions_df, 'PB - Personal'))
+        
+        # ... other PB calculations ...
+        
+        row_data['Affiliate'] = 0.0
+        row_data['Corp'] = 0.0
+        
+        # Fix column names for SUMIFS - use exact column names from Excel
+        row_data['Operational'] = self.processor.calculate_sumifs_multi(
+            liquidity_df, date_col, base_date, 'Business', 'Corp', 'Level 3', 'Operational'
+        ) * -(1 - self._get_assumption_by_index(assumptions_df, 'Corp - Operational'))
+        
+        row_data['Non-Operational'] = self.processor.calculate_sumifs_multi(
+            liquidity_df, date_col, base_date, 'Business', 'Corp', 'Level 3', 'Non-Operational'
+        ) * -(1 - self._get_assumption_by_index(assumptions_df, 'Corp - Non Operational'))
+        
+        # Continue with other calculations...
+        
+    return pl.DataFrame(results)
+
+def _calculate_facility_impact(self, liquidity_df: pl.DataFrame, assumptions_df: pl.DataFrame,
+                               date_columns: List[str], base_date: str) -> pl.DataFrame:
+    results = []
+    
+    for date_col in date_columns:
+        row_data = {'Date': date_col}
+        
+        # Fix the Balance sheet column name and values
+        row_data['Credit'] = self.processor.calculate_sumifs_multi(
+            liquidity_df, date_col, base_date, 'Balance sheet', 'Non-FI', 'Level 2', 'Credit'
+        ) * -self._get_assumption_by_index(assumptions_df, 'Credit1')
+        
+        row_data['Liquidity'] = self.processor.calculate_sumifs_multi(
+            liquidity_df, date_col, base_date, 'Balance sheet', 'Non-FI', 'Level 2', 'Liquidity'
+        ) * -self._get_assumption_by_index(assumptions_df, 'Liquidity1')
+        
+        # Continue with other facility calculations...
+        
+    return pl.DataFrame(results)
